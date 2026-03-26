@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "n8n": {
+      "command": "npx",
+      "args": ["-y", "@czlonkowski/n8n-mcp"],
+      "env": {
+        "N8N_API_URL": "http://localhost:5678",
+        "N8N_API_KEY": "REMPLACE_PAR_TA_CLE_API",
+        "MCP_MODE": "stdio",
+        "N8N_MCP_TELEMETRY_DISABLED": "true"
+      }
+    }
+  }
+}

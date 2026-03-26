@@ -23,7 +23,10 @@ services:
 
   # ─── LightRAG — moteur de recherche intelligent ───────────────────────────
   lightrag:
-    image: ghcr.io/hkuds/lightrag:latest
+    image: mem_lightrag:local
+    build:
+      context: .
+      dockerfile: lightrag.Dockerfile
     container_name: mem_lightrag
     restart: unless-stopped
     ports:

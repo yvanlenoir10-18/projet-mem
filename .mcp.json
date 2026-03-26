@@ -5,7 +5,7 @@
       "args": ["-y", "@czlonkowski/n8n-mcp"],
       "env": {
         "N8N_API_URL": "http://localhost:5678",
-        "N8N_API_KEY": "REMPLACE_PAR_TA_CLE_API",
+        "N8N_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwZE0GU4Yy0yYTlhLTQzMmEtOWZhZS1hNTU2MTMzZTJmYTYiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwiaWF0IjoxNzQzNjM2OVkN2YkN2M2Y2MtMWVjYy00ZWMzLWJlNWItMGUzMzRkYjRlNzg3IiwiaWFuF0IjoxNzQzNjM2OVkN2YkN2M2Y2MtMWVjYy00ZWMzLWJlNWItMGUzMzRkYjRlNzg3IiwianRpIjoxNzQzNjM2OVkN2YkN2M2Y2MtMWVjYy00ZWMzLWJlNWItMGUzMzRkYjRlNzg3fQ.q4pF5GVOJGvRIgqs2cDFkIgrKnCzgWJD8Q7cwy55lkk",
         "MCP_MODE": "stdio",
         "N8N_MCP_TELEMETRY_DISABLED": "true"
       }

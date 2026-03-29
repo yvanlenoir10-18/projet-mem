@@ -1,5 +1,9 @@
 {
   "mcpServers": {
+    "excel": {
+      "command": "npx",
+      "args": ["-y", "@guillehr2/excel-mcp-server@latest"]
+    },
     "n8n": {
       "command": "npx",
       "args": ["-y", "@czlonkowski/n8n-mcp"],

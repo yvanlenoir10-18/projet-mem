@@ -2,9 +2,23 @@
 
 ## Project Overview
 
-**projet-mem** is a memoir application — a personal journaling and memory-keeping platform where users write, organize, and reflect on life events. Content is personal and potentially sensitive (memories, emotions, private data).
+**projet-mem** = **Mémoire de Master 2** de BWAME EBENGUE CARLOS YVAN, ISABEE — Université d'Ebolowa.
 
-- **Stack:** Node.js 20, React + TypeScript, PostgreSQL + Prisma
+**Titre :** Amélioration des performances de production de la chaîne 4 de la scierie industrielle CUF d'Ebolowa
+
+**Contexte complet :** voir `contexte_memoire_CUF.md` à la racine du repo (TOUJOURS lire ce fichier en début de session).
+
+### Ce que ce repo contient réellement
+- **Documents du mémoire** : protocole, fiches de revue de littérature, méthodologie
+- **Outils de collecte** : feuilles de relevé terrain, Google Forms
+- **Outils d'analyse** : calcul TRS/OEE, Pareto, Ishikawa, capacité théorique
+- **Tableau de bord** : Excel ou Looker Studio (3 vues : opérateur / chef production / PDG)
+- **Infrastructure IA** : outils installés pour assister la rédaction et l'analyse
+
+### Outils de développement disponibles (déjà installés)
+- **Stack web** : Node.js 20, React + TypeScript, PostgreSQL + Prisma (disponible si besoin)
+- **IA** : LightRAG (recherche sémantique), Claude AI service (analyse), LangChain, LangGraph, CrewAI
+- **Automatisation** : n8n (workflows), MCP servers (context7, tavily, task-master, markdownify)
 - **Package manager:** npm
 - **Commit style:** Conventional Commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`)
 - **Testing:** Jest (unit/integration), Playwright (E2E)

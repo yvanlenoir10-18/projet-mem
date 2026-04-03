@@ -43,6 +43,13 @@
     "stealth-browser": {
       "command": "npx",
       "args": ["-y", "stealth-browser-mcp@latest"]
+    },
+    "token-savior": {
+      "command": "/root/.local/token-savior-venv/bin/token-savior",
+      "env": {
+        "WORKSPACE_ROOTS": "/home/user/projet-mem",
+        "TOKEN_SAVIOR_CLIENT": "claude"
+      }
     }
   }
 }

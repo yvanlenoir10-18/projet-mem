@@ -6,7 +6,7 @@
 
 **Titre :** Amélioration des performances de production de la chaîne 4 de la scierie industrielle CUF d'Ebolowa
 
-**Contexte complet :** voir `contexte_memoire_CUF.md` à la racine du repo (TOUJOURS lire ce fichier en début de session).
+**Contexte complet :** @contexte_memoire_CUF.md
 
 ### Ce que ce repo contient réellement
 - **Documents du mémoire** : protocole, fiches de revue de littérature, méthodologie

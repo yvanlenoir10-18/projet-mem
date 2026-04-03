@@ -190,3 +190,11 @@ npm run db:studio    # Open Prisma Studio
 ---
 
 **Source:** [aiagentskit/claude-agents-library](https://github.com/aiagentskit/claude-agents-library)
+
+---
+
+## Intégrations à faire (backlog)
+
+| Outil | Repo | Quand intégrer | Pourquoi |
+|---|---|---|---|
+| **Arbor** | [penso/arbor](https://github.com/penso/arbor) | Quand plusieurs branches/worktrees actives en parallèle | Gestionnaire natif de worktrees Git + daemon multi-agents (Claude, Codex) + MCP server + terminal PTY intégré. Rust nightly requis — compiler quand le besoin de parallélisation devient réel. |

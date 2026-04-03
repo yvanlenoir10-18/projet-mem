@@ -9,6 +9,27 @@ if [ -z "$FILE_PATH" ]; then
   exit 0
 fi
 
+# --- Protection fichiers sensibles (exit 2 = Claude reçoit le feedback) ---
+PROTECTED_PATTERNS=(
+  "\.env$"
+  "\.env\."
+  "\.pem$"
+  "\.key$"
+  "\.p12$"
+  "\.pfx$"
+  "secrets/"
+  "package-lock\.json$"
+  "yarn\.lock$"
+  "\.git/"
+)
+
+for pattern in "${PROTECTED_PATTERNS[@]}"; do
+  if echo "$FILE_PATH" | grep -qiE "$pattern"; then
+    echo "BLOCKED: '$FILE_PATH' est un fichier protégé. Expliquez pourquoi cette modification est nécessaire." >&2
+    exit 2
+  fi
+done
+
 # Vérifier si le fichier existe déjà
 if [ -f "$FILE_PATH" ]; then
   # Rappel TODO/FIXME

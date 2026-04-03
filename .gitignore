@@ -22,6 +22,7 @@ pids/
 # Claude Code
 .claude/session.log
 .claude/.snapshots/
+.claude/command-log.txt
 
 # OS
 .DS_Store

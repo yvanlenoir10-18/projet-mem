@@ -1,11 +1,16 @@
 #!/bin/bash
 # Hook: PreToolUse → Bash
-# Bloque les commandes dangereuses avant exécution
+# Bloque les commandes dangereuses avant exécution + log audit
 
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input',{}).get('command',''))" 2>/dev/null)
 
-# --- Commandes destructives bloquées ---
+# --- Log audit de toutes les commandes ---
+LOG_FILE="${CLAUDE_PROJECT_DIR:-$(pwd)}/.claude/command-log.txt"
+mkdir -p "$(dirname "$LOG_FILE")"
+printf '%s  %s\n' "$(date -Is)" "$COMMAND" >> "$LOG_FILE" 2>/dev/null || true
+
+# --- Commandes destructives bloquées (exit 2 = Claude reçoit le feedback) ---
 BLOCKED_PATTERNS=(
   "rm -rf /"
   "rm -rf \*"
@@ -20,13 +25,14 @@ BLOCKED_PATTERNS=(
   "dd if=.*of=/dev/"
   "mkfs\."
   ":(){ :|:& };:"
+  "^curl.*\|.*(sh|bash)"
+  "^wget.*\|.*(sh|bash)"
 )
 
 for pattern in "${BLOCKED_PATTERNS[@]}"; do
   if echo "$COMMAND" | grep -qiE "$pattern"; then
-    echo "BLOCKED: Commande dangereuse détectée : $pattern" >&2
-    echo "Commande refusée par le hook pre-bash.sh. Vérifiez avant d'exécuter." >&2
-    exit 1
+    echo "BLOCKED: Commande dangereuse détectée : $pattern. Proposez une alternative plus sûre." >&2
+    exit 2
   fi
 done
 

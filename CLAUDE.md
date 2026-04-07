@@ -198,3 +198,4 @@ npm run db:studio    # Open Prisma Studio
 | Outil | Repo | Quand intégrer | Pourquoi |
 |---|---|---|---|
 | **Arbor** | [penso/arbor](https://github.com/penso/arbor) | Quand plusieurs branches/worktrees actives en parallèle | Gestionnaire natif de worktrees Git + daemon multi-agents (Claude, Codex) + MCP server + terminal PTY intégré. Rust nightly requis — compiler quand le besoin de parallélisation devient réel. |
+| **agentic-ai-prompt-research** | [Leonxlnx/agentic-ai-prompt-research](https://github.com/Leonxlnx/agentic-ai-prompt-research) | Cloné dans `ressources/` — disponible maintenant | 30 patterns de prompts agentiques documentés (coordinator, verification, explore agent, yolo classifier, memory, compact…). Référence pour améliorer les agents `.claude/agents/` et comprendre comment Claude Code fonctionne en interne. |

@@ -2,13 +2,16 @@
 Routes des tableaux de bord.
 - Vue Chef Scierie : analyse opérationnelle (TRS, Pareto, volumes)
 - Vue PDG         : synthèse financière (FCFA, objectifs, traffic light)
+- Export Excel    : rapport mensuel téléchargeable
 """
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, send_file, abort
 from flask_login import login_required, current_user
 from datetime import date, timedelta
+import io
 from sqlalchemy import func
 from ..models import db, Poste, Arret, Parametre
 from ..services.trs import pareto_arrets, couleur_trs, calcule_pertes_fcfa
+from ..services.export import generer_rapport_excel
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
@@ -165,3 +168,42 @@ def vue_pdg():
                            pareto=pareto,
                            tendance=tendance,
                            mois_courant=aujourd_hui.strftime('%B %Y'))
+
+
+@dashboard_bp.route('/export/excel')
+@login_required
+def export_excel():
+    """
+    Génère et télécharge un rapport Excel pour un mois donné.
+    Paramètres GET : mois (1-12), annee (ex. 2026).
+    Accessible depuis les vues chef et PDG.
+    """
+    aujourd_hui = date.today()
+    try:
+        mois  = int(request.args.get('mois', aujourd_hui.month))
+        annee = int(request.args.get('annee', aujourd_hui.year))
+        if not (1 <= mois <= 12) or annee < 2020:
+            abort(400)
+    except (ValueError, TypeError):
+        abort(400)
+
+    debut = date(annee, mois, 1)
+    fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)
+
+    postes = Poste.query.filter(
+        Poste.date >= debut,
+        Poste.date < fin
+    ).order_by(Poste.date.asc()).all()
+
+    contenu = generer_rapport_excel(postes, mois, annee)
+
+    noms_mois = ['', 'Janv', 'Fevr', 'Mars', 'Avri', 'Mai', 'Juin',
+                 'Juil', 'Aout', 'Sept', 'Octo', 'Nove', 'Dece']
+    nom_fichier = f"CUF_Chaine4_{noms_mois[mois]}{annee}.xlsx"
+
+    return send_file(
+        io.BytesIO(contenu),
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=nom_fichier
+    )

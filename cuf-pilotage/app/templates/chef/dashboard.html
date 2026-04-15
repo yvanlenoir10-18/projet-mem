@@ -1,0 +1,204 @@
+{% extends 'base.html' %}
+{% block title %}Tableau de bord Chef Scierie{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4><i class="bi bi-bar-chart-line text-primary"></i> Analyse Production — Chaîne 4</h4>
+    <div class="btn-group">
+        <a href="?jours=7"  class="btn btn-sm btn-outline-secondary {% if jours==7 %}active{% endif %}">7 j</a>
+        <a href="?jours=30" class="btn btn-sm btn-outline-secondary {% if jours==30 %}active{% endif %}">30 j</a>
+        <a href="?jours=90" class="btn btn-sm btn-outline-secondary {% if jours==90 %}active{% endif %}">90 j</a>
+    </div>
+</div>
+
+{% if not postes %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Aucune donnée pour cette période.
+    <a href="{{ url_for('saisie.nouveau_poste') }}">Saisir le premier poste</a>.
+</div>
+{% else %}
+
+<!-- KPI Row -->
+<div class="row g-3 mb-4">
+    {% set couleur = stats.couleur_trs %}
+    <div class="col-md-3">
+        <div class="card kpi-card {{ couleur }}">
+            <div class="card-body">
+                <div class="text-muted small">TRS moyen ({{ jours }} j)</div>
+                <div class="kpi-value text-{{ couleur }}">{{ stats.trs_moyen }}%</div>
+                <div class="small text-muted">Cible ≥ 70%</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card kpi-card info">
+            <div class="card-body">
+                <div class="text-muted small">Production totale</div>
+                <div class="kpi-value">{{ stats.total_produit }} m³</div>
+                <div class="small text-muted">{{ stats.nb_postes }} postes saisis</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card kpi-card warning">
+            <div class="card-body">
+                <div class="text-muted small">Total arrêts</div>
+                <div class="kpi-value text-warning">{{ stats.total_arrets_h }} h</div>
+                <div class="small text-muted">Temps perdu en production</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card kpi-card danger">
+            <div class="card-body">
+                <div class="text-muted small">Volume rebut</div>
+                <div class="kpi-value text-danger">{{ stats.total_rebut }} m³</div>
+                <div class="small text-muted">Non conformités</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- Graphique TRS quotidien -->
+    <div class="col-md-8">
+        <div class="card h-100">
+            <div class="card-header">Évolution du TRS ({{ jours }} derniers jours)</div>
+            <div class="card-body">
+                <canvas id="chartTRS" height="120"></canvas>
+            </div>
+        </div>
+    </div>
+    <!-- Comparaison postes -->
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header">Matin vs Après-midi</div>
+            <div class="card-body d-flex flex-column justify-content-center">
+                <div class="text-center mb-3">
+                    <div class="text-muted small">Matin</div>
+                    {% set c_m = 'success' if stats.trs_matin >= 70 else ('warning' if stats.trs_matin >= 50 else 'danger') %}
+                    <div class="kpi-value text-{{ c_m }}">{{ stats.trs_matin }}%</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-muted small">Après-midi</div>
+                    {% set c_am = 'success' if stats.trs_apres_midi >= 70 else ('warning' if stats.trs_apres_midi >= 50 else 'danger') %}
+                    <div class="kpi-value text-{{ c_am }}">{{ stats.trs_apres_midi }}%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Pareto arrêts -->
+    <div class="col-md-7">
+        <div class="card">
+            <div class="card-header">
+                Pareto des causes d'arrêt
+                <span class="badge bg-secondary ms-2">Règle des 80/20</span>
+            </div>
+            <div class="card-body">
+                {% if pareto %}
+                <canvas id="chartPareto" height="150"></canvas>
+                {% else %}
+                <p class="text-muted">Aucun arrêt enregistré sur cette période.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <!-- TRS par essence -->
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header">TRS et volume par essence</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Essence</th><th>Volume (m³)</th><th>TRS moy.</th></tr></thead>
+                    <tbody>
+                        {% for e in stats.essence_stats %}
+                        <tr>
+                            <td><span class="badge bg-secondary">{{ e.essence }}</span></td>
+                            <td>{{ e.volume_total }}</td>
+                            <td>
+                                {% set ce = 'success' if e.trs_moyen >= 70 else ('warning' if e.trs_moyen >= 50 else 'danger') %}
+                                <span class="badge bg-{{ ce }}">{{ e.trs_moyen }}%</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if postes %}
+<script>
+// --- Graphique TRS quotidien ---
+new Chart(document.getElementById('chartTRS'), {
+    type: 'line',
+    data: {
+        labels: {{ chart_labels | tojson }},
+        datasets: [{
+            label: 'TRS (%)',
+            data:  {{ chart_trs | tojson }},
+            borderColor: '#0d6efd',
+            backgroundColor: 'rgba(13,110,253,0.1)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 4,
+        }]
+    },
+    options: {
+        scales: {
+            y: { min: 0, max: 100,
+                 ticks: { callback: v => v + '%' } }
+        },
+        plugins: {
+            annotation: { /* seuil 70% */ }
+        }
+    }
+});
+
+// --- Graphique Pareto ---
+{% if pareto %}
+const paretoLabels = {{ pareto | map(attribute='cause') | list | tojson }};
+const paretoDurees = {{ pareto | map(attribute='duree') | list | tojson }};
+const paretoCumul  = {{ pareto | map(attribute='pct_cumule') | list | tojson }};
+
+new Chart(document.getElementById('chartPareto'), {
+    type: 'bar',
+    data: {
+        labels: paretoLabels,
+        datasets: [
+            {
+                label: 'Durée (min)',
+                data: paretoDurees,
+                backgroundColor: '#dc3545',
+                yAxisID: 'y',
+            },
+            {
+                label: '% cumulé',
+                data: paretoCumul,
+                type: 'line',
+                borderColor: '#fd7e14',
+                backgroundColor: 'transparent',
+                yAxisID: 'y2',
+                tension: 0.2,
+            }
+        ]
+    },
+    options: {
+        scales: {
+            y:  { title: { display: true, text: 'Minutes' } },
+            y2: { position: 'right', min: 0, max: 100,
+                  ticks: { callback: v => v + '%' } }
+        }
+    }
+});
+{% endif %}
+</script>
+{% endif %}
+{% endblock %}

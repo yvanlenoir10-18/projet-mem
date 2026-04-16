@@ -10,9 +10,23 @@
             <a href="?jours=30" class="btn btn-sm btn-outline-secondary {% if jours==30 %}active{% endif %}">30 j</a>
             <a href="?jours=90" class="btn btn-sm btn-outline-secondary {% if jours==90 %}active{% endif %}">90 j</a>
         </div>
-        <a href="{{ url_for('dashboard.export_excel') }}" class="btn btn-sm btn-success">
-            <i class="bi bi-file-earmark-excel"></i> Exporter Excel
-        </a>
+        <div class="dropdown">
+            <button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-file-earmark-excel"></i> Exporter Excel
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><h6 class="dropdown-header">Choisir le mois</h6></li>
+                {% for m in mois_options %}
+                <li>
+                    <a class="dropdown-item {% if m.actif %}fw-bold{% endif %}"
+                       href="{{ url_for('dashboard.export_excel', mois=m.mois, annee=m.annee) }}">
+                        {% if m.actif %}<i class="bi bi-check2 text-success me-1"></i>{% else %}<span class="me-3"></span>{% endif %}
+                        {{ m.label }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
     </div>
 </div>
 

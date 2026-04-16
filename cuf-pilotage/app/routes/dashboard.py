@@ -15,6 +15,29 @@ from ..services.export import generer_rapport_excel
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
+NOMS_MOIS = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+             'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
+
+
+def _mois_disponibles(n=12):
+    """Génère la liste des n derniers mois pour le sélecteur d'export.
+    Recule mois par mois (sans timedelta) pour éviter les doublons en février."""
+    aujourd_hui = date.today()
+    result = []
+    annee, mois = aujourd_hui.year, aujourd_hui.month
+    for i in range(n):
+        result.append({
+            'label': f"{NOMS_MOIS[mois]} {annee}",
+            'mois':  mois,
+            'annee': annee,
+            'actif': (i == 0),
+        })
+        mois -= 1
+        if mois == 0:
+            mois = 12
+            annee -= 1
+    return result
+
 
 def _get_postes_periode(jours=30):
     """Récupère les postes des N derniers jours."""
@@ -108,7 +131,8 @@ def vue_chef():
                            stats=stats,
                            jours=jours,
                            chart_labels=chart_labels,
-                           chart_trs=chart_trs)
+                           chart_trs=chart_trs,
+                           mois_options=_mois_disponibles())
 
 
 @dashboard_bp.route('/pdg')
@@ -167,7 +191,8 @@ def vue_pdg():
                            nb_postes=nb_postes,
                            pareto=pareto,
                            tendance=tendance,
-                           mois_courant=aujourd_hui.strftime('%B %Y'))
+                           mois_courant=aujourd_hui.strftime('%B %Y'),
+                           mois_options=_mois_disponibles())
 
 
 @dashboard_bp.route('/export/excel')

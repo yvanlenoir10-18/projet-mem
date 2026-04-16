@@ -6,9 +6,23 @@
     <h4><i class="bi bi-speedometer2 text-dark"></i> Tableau de bord Direction</h4>
     <div class="d-flex align-items-center gap-2">
         <span class="text-muted me-2">{{ mois_courant }}</span>
-        <a href="{{ url_for('dashboard.export_excel') }}" class="btn btn-sm btn-success">
-            <i class="bi bi-file-earmark-excel"></i> Exporter Excel
-        </a>
+        <div class="dropdown">
+            <button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-file-earmark-excel"></i> Exporter Excel
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><h6 class="dropdown-header">Choisir le mois</h6></li>
+                {% for m in mois_options %}
+                <li>
+                    <a class="dropdown-item {% if m.actif %}fw-bold{% endif %}"
+                       href="{{ url_for('dashboard.export_excel', mois=m.mois, annee=m.annee) }}">
+                        {% if m.actif %}<i class="bi bi-check2 text-success me-1"></i>{% else %}<span class="me-3"></span>{% endif %}
+                        {{ m.label }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
     </div>
 </div>
 

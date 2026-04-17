@@ -29,11 +29,13 @@ def create_app():
     from .routes.saisie import saisie_bp
     from .routes.dashboard import dashboard_bp
     from .routes.admin import admin_bp
+    from .routes.analyse import analyse_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(saisie_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(admin_bp)
+    app.register_blueprint(analyse_bp)
 
     # Créer les tables si elles n'existent pas
     with app.app_context():

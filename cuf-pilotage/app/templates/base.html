@@ -64,6 +64,10 @@
                    href="{{ url_for('dashboard.vue_chef') }}">
                     <i class="bi bi-bar-chart-line"></i> Analyse Production
                 </a>
+                <a class="nav-link {% if request.endpoint == 'analyse.arrets' %}active{% endif %}"
+                   href="{{ url_for('analyse.arrets') }}">
+                    <i class="bi bi-exclamation-triangle"></i> Analyse des arrêts
+                </a>
                 {% endif %}
                 <a class="nav-link {% if request.endpoint == 'saisie.nouveau_poste' %}active{% endif %}"
                    href="{{ url_for('saisie.nouveau_poste') }}">

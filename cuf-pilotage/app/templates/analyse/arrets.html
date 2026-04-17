@@ -1,0 +1,324 @@
+{% extends 'base.html' %}
+{% block title %}Analyse des arrêts{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4><i class="bi bi-exclamation-triangle text-danger"></i> Analyse Pareto des arrêts — Chaîne 4</h4>
+    <span class="text-muted small">
+        {% if jours == 0 %}Toutes périodes{% else %}{{ jours }} derniers jours{% endif %}
+    </span>
+</div>
+
+<!-- ══════════ FILTRES ══════════ -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body py-3">
+        <form method="GET" class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small mb-1">Période</label>
+                <select name="jours" class="form-select form-select-sm">
+                    <option value="7"  {% if jours == 7  %}selected{% endif %}>7 derniers jours</option>
+                    <option value="30" {% if jours == 30 %}selected{% endif %}>30 derniers jours</option>
+                    <option value="90" {% if jours == 90 %}selected{% endif %}>90 derniers jours</option>
+                    <option value="0"  {% if jours == 0  %}selected{% endif %}>Toutes périodes</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-1">Machine</label>
+                <select name="machine" class="form-select form-select-sm">
+                    <option value="">Toutes les machines</option>
+                    {% for m in machines %}
+                    <option value="{{ m }}" {% if machine == m %}selected{% endif %}>{{ m }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label small mb-1">Catégorie</label>
+                <select name="categorie" class="form-select form-select-sm">
+                    <option value="">Toutes catégories</option>
+                    {% for c in categories %}
+                    <option value="{{ c }}" {% if categorie == c %}selected{% endif %}>{{ c }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-sm btn-primary flex-fill">
+                    <i class="bi bi-funnel"></i> Filtrer
+                </button>
+                <a href="{{ url_for('analyse.arrets') }}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-x-lg"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if stats.nb_arrets == 0 %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Aucun arrêt ne correspond aux filtres actuels.
+</div>
+{% else %}
+
+<!-- ══════════ STATISTIQUES ══════════ -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card kpi-card danger shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small">Nombre d'arrêts</div>
+                <div class="kpi-value text-danger">{{ stats.nb_arrets }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card kpi-card warning shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small">Durée totale</div>
+                <div class="kpi-value">{{ stats.total_heures }} h</div>
+                <div class="small text-muted">{{ stats.total_minutes }} minutes</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card kpi-card info shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small">Causes différentes</div>
+                <div class="kpi-value">{{ stats.nb_causes_total }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card kpi-card success shadow-sm h-100">
+            <div class="card-body">
+                <div class="text-muted small">Principe 80/20</div>
+                <div class="kpi-value">{{ stats.nb_causes_80 }}</div>
+                <div class="small text-muted">
+                    {% if stats.nb_causes_80 == 1 %}cause{% else %}causes{% endif %} = 80 % des pertes
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════ GRAPHIQUE PARETO ══════════ -->
+<div class="card shadow-sm mb-4">
+    <div class="card-header bg-dark text-white">
+        <i class="bi bi-bar-chart"></i> Diagramme Pareto (Top 10 causes)
+    </div>
+    <div class="card-body">
+        <canvas id="chartPareto" height="90"></canvas>
+        <p class="small text-muted mt-3 mb-0">
+            <strong>Lecture :</strong> les barres rouges montrent la durée cumulée de chaque cause (minutes, axe gauche).
+            La courbe bleue représente le pourcentage cumulé (axe droit). Le seuil des 80 % indique le point à partir
+            duquel les causes restantes deviennent marginales — c'est là qu'il faut concentrer les actions correctives.
+        </p>
+    </div>
+</div>
+
+<!-- ══════════ RÉPARTITION MACHINE / CATÉGORIE ══════════ -->
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><i class="bi bi-gear"></i> Répartition par machine</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr><th>Machine</th><th class="text-end">Durée</th><th class="text-end">%</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for machine_nom, duree in stats.par_machine %}
+                        {% set pct = (duree / stats.total_minutes * 100)|round(1) if stats.total_minutes > 0 else 0 %}
+                        <tr>
+                            <td>{{ machine_nom }}</td>
+                            <td class="text-end">{{ duree }} min</td>
+                            <td class="text-end">
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-dark" style="width: {{ pct }}%"></div>
+                                </div>
+                                <small>{{ pct }}%</small>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header"><i class="bi bi-tags"></i> Répartition par catégorie</div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr><th>Catégorie</th><th class="text-end">Durée</th><th class="text-end">%</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for cat_nom, duree in stats.par_categorie %}
+                        {% set pct = (duree / stats.total_minutes * 100)|round(1) if stats.total_minutes > 0 else 0 %}
+                        {% set color_map = {
+                            'Mécanique': 'danger',
+                            'Organisationnelle': 'warning',
+                            'Approvisionnement': 'info',
+                            'Qualité matière': 'secondary',
+                            'Maintenance planifiée': 'success',
+                            'Autre': 'dark'
+                        } %}
+                        {% set cat_color = color_map.get(cat_nom, 'dark') %}
+                        <tr>
+                            <td><span class="badge bg-{{ cat_color }}">{{ cat_nom }}</span></td>
+                            <td class="text-end">{{ duree }} min</td>
+                            <td class="text-end">
+                                <div class="progress" style="height: 6px;">
+                                    <div class="progress-bar bg-{{ cat_color }}" style="width: {{ pct }}%"></div>
+                                </div>
+                                <small>{{ pct }}%</small>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════ TABLEAU DÉTAILLÉ DES ARRÊTS ══════════ -->
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-table"></i> Détail des arrêts ({{ stats.nb_arrets }})</span>
+        <small class="text-muted">Cliquer sur la date pour voir le poste complet</small>
+    </div>
+    <div class="card-body p-0" style="max-height: 600px; overflow-y: auto;">
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light sticky-top">
+                <tr>
+                    <th>Date</th>
+                    <th>Poste</th>
+                    <th>Essence</th>
+                    <th>Machine</th>
+                    <th>Plage</th>
+                    <th class="text-end">Durée</th>
+                    <th>Cause</th>
+                    <th>Catégorie</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in arrets %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('saisie.detail_poste', poste_id=a.poste_id) }}"
+                           class="text-decoration-none">
+                            {{ a.date.strftime('%d/%m/%Y') }}
+                        </a>
+                    </td>
+                    <td><span class="badge bg-secondary">{{ a.numero_poste }}</span></td>
+                    <td>{{ a.essence }}</td>
+                    <td><strong>{{ a.machine }}</strong></td>
+                    <td class="text-muted small">{{ a.heure_debut }} → {{ a.heure_fin }}</td>
+                    <td class="text-end"><strong>{{ a.duree_min }} min</strong></td>
+                    <td>{{ a.cause }}</td>
+                    <td>
+                        {% set color_map = {
+                            'Mécanique': 'danger',
+                            'Organisationnelle': 'warning',
+                            'Approvisionnement': 'info',
+                            'Qualité matière': 'secondary',
+                            'Maintenance planifiée': 'success',
+                            'Autre': 'dark'
+                        } %}
+                        <span class="badge bg-{{ color_map.get(a.categorie, 'dark') }}">{{ a.categorie }}</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if stats.nb_arrets > 0 %}
+<script>
+// --- Diagramme Pareto : barres + courbe cumulée ---
+// C'est un graphique mixte Chart.js : type 'bar' + dataset type 'line'
+new Chart(document.getElementById('chartPareto'), {
+    type: 'bar',
+    data: {
+        labels: {{ chart_labels | tojson }},
+        datasets: [
+            {
+                type: 'bar',
+                label: 'Durée (min)',
+                data: {{ chart_durees | tojson }},
+                backgroundColor: '#dc3545',
+                borderColor: '#b02a37',
+                borderWidth: 1,
+                yAxisID: 'y',
+                order: 2
+            },
+            {
+                type: 'line',
+                label: '% cumulé',
+                data: {{ chart_cumul | tojson }},
+                borderColor: '#0d6efd',
+                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                borderWidth: 3,
+                pointRadius: 5,
+                pointBackgroundColor: '#0d6efd',
+                fill: false,
+                yAxisID: 'y1',
+                order: 1,
+                tension: 0.2
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+            x: {
+                ticks: {
+                    callback: function(value) {
+                        // Tronquer les noms trop longs
+                        const label = this.getLabelForValue(value);
+                        return label.length > 25 ? label.substring(0, 25) + '…' : label;
+                    },
+                    maxRotation: 45,
+                    minRotation: 30
+                }
+            },
+            y: {
+                type: 'linear',
+                position: 'left',
+                title: { display: true, text: 'Durée (minutes)' },
+                beginAtZero: true
+            },
+            y1: {
+                type: 'linear',
+                position: 'right',
+                title: { display: true, text: '% cumulé' },
+                min: 0,
+                max: 100,
+                ticks: { callback: v => v + '%' },
+                grid: { drawOnChartArea: false }
+            }
+        },
+        plugins: {
+            legend: { position: 'top' },
+            tooltip: {
+                callbacks: {
+                    label: function(ctx) {
+                        if (ctx.dataset.type === 'line') {
+                            return 'Cumulé : ' + ctx.parsed.y + '%';
+                        }
+                        return 'Durée : ' + ctx.parsed.y + ' min';
+                    }
+                }
+            }
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

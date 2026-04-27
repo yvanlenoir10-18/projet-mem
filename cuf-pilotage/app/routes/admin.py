@@ -20,7 +20,7 @@ def parametres():
     """Page de configuration des paramètres métier de CUF."""
     if request.method == 'POST':
         cles = ['prix_ayous', 'prix_azobe', 'prix_iroko', 'prix_movingui',
-                'objectif_m3', 'duree_poste', 'capacite_bicoupe']
+                'objectif_m3', 'duree_poste', 'capacite_equipe_h', 'taux_revente_rebut']
         for cle in cles:
             valeur = request.form.get(cle)
             if valeur:

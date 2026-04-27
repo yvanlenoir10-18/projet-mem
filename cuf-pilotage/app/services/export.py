@@ -1,42 +1,26 @@
 """
 Service d'export Excel — Rapport mensuel Chaîne 4, Scierie CUF.
-
-Génère un fichier .xlsx en mémoire avec 3 feuilles :
-  1. Résumé    — KPIs mensuels (TRS, production, pertes FCFA, top causes)
-  2. Postes    — Toutes les lignes avec D/P/Q colorisés
-  3. Arrêts    — Détail de chaque arrêt machine
-
-Usage :
-    from app.services.export import generer_rapport_excel
-    contenu_bytes = generer_rapport_excel(postes, mois=4, annee=2026)
-    # → envoyer comme réponse Flask avec send_file()
+3 feuilles : Résumé | Équipes | Arrêts
 """
 import io
 from datetime import date
 from openpyxl import Workbook
-from openpyxl.styles import (
-    Font, PatternFill, Alignment, Border, Side, numbers
-)
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 from app.models import Parametre
-from app.services.trs import pareto_arrets, couleur_trs
+from app.services.trs import pareto_arrets, couleur_trs, calcule_pertes_equipe
 
-# ── Palette de couleurs CUF ─────────────────────────────────────────────────
-VERT_FONCE   = "1B5E20"   # En-têtes principaux
-VERT_CLAIR   = "C8E6C9"   # Ligne paire (vert très pâle)
-ORANGE       = "FF8F00"
-ROUGE        = "C62828"
-JAUNE_PALE   = "FFF9C4"
-ORANGE_PALE  = "FFE0B2"
-ROUGE_PALE   = "FFCDD2"
-BLANC        = "FFFFFF"
-GRIS_CLAIR   = "F5F5F5"
+VERT_FONCE  = "1B5E20"
+VERT_CLAIR  = "C8E6C9"
+ORANGE_PALE = "FFE0B2"
+ROUGE_PALE  = "FFCDD2"
+JAUNE_PALE  = "FFF9C4"
+BLANC       = "FFFFFF"
+GRIS_CLAIR  = "F5F5F5"
 
-NOMS_MOIS = [
-    '', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
-]
+NOMS_MOIS = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+             'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
 
 
 def _style_entete(cell, bg_hex=VERT_FONCE, fg_hex=BLANC, taille=11, gras=True):
@@ -56,8 +40,7 @@ def _style_cellule(cell, gras=False, couleur_bg=None, align='center'):
     cell.border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
 
-def _couleur_bg_trs(valeur):
-    """Renvoie la couleur de fond hex selon la valeur TRS."""
+def _bg_trs(valeur):
     if valeur is None:
         return GRIS_CLAIR
     if valeur >= 70:
@@ -67,54 +50,47 @@ def _couleur_bg_trs(valeur):
     return ROUGE_PALE
 
 
-# ── Feuille 1 : Résumé ──────────────────────────────────────────────────────
+# ── Feuille 1 : Résumé ───────────────────────────────────────────────────────
 
-def _creer_feuille_resume(wb, postes, mois, annee):
+def _creer_feuille_resume(wb, equipes, mois, annee):
     ws = wb.active
     ws.title = "Résumé"
     ws.sheet_view.showGridLines = False
     ws.column_dimensions['A'].width = 35
     ws.column_dimensions['B'].width = 25
 
-    # Titre principal
     ws.merge_cells('A1:B1')
-    titre = ws['A1']
-    titre.value = f"RAPPORT MENSUEL — CHAÎNE 4, CUF EBOLOWA"
-    titre.font = Font(bold=True, size=14, color=BLANC, name='Calibri')
-    titre.fill = PatternFill("solid", fgColor=VERT_FONCE)
-    titre.alignment = Alignment(horizontal='center', vertical='center')
+    t = ws['A1']
+    t.value = "RAPPORT MENSUEL — CHAÎNE 4, CUF EBOLOWA"
+    t.font = Font(bold=True, size=14, color=BLANC, name='Calibri')
+    t.fill = PatternFill("solid", fgColor=VERT_FONCE)
+    t.alignment = Alignment(horizontal='center', vertical='center')
     ws.row_dimensions[1].height = 32
 
     ws.merge_cells('A2:B2')
-    sous_titre = ws['A2']
-    sous_titre.value = f"{NOMS_MOIS[mois]} {annee}"
-    sous_titre.font = Font(bold=True, size=12, color="333333", name='Calibri')
-    sous_titre.alignment = Alignment(horizontal='center', vertical='center')
-    sous_titre.fill = PatternFill("solid", fgColor=VERT_CLAIR)
+    st = ws['A2']
+    st.value = f"{NOMS_MOIS[mois]} {annee}"
+    st.font = Font(bold=True, size=12, color="333333", name='Calibri')
+    st.alignment = Alignment(horizontal='center', vertical='center')
+    st.fill = PatternFill("solid", fgColor=VERT_CLAIR)
     ws.row_dimensions[2].height = 22
 
-    if not postes:
-        ws['A4'] = "Aucun poste enregistré pour cette période."
+    if not equipes:
+        ws['A4'] = "Aucune équipe enregistrée pour cette période."
         return
 
-    # Calculs agrégés
-    trs_valeurs = [p.trs_global for p in postes if p.trs_global is not None]
+    trs_valeurs = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
-    production_reelle = round(sum(p.volume_sorti or 0 for p in postes), 1)
-    objectif_m3 = float(Parametre.get('objectif_m3', 25))
-    production_cible = objectif_m3 * len(postes)
+    production_reelle = round(sum(e.volume_sorti for e in equipes), 1)
+    objectif_m3 = float(Parametre.get('objectif_m3', 12.5))
+    production_cible = objectif_m3 * len(equipes)
     ecart = round(production_cible - production_reelle, 1)
 
-    # Pertes FCFA par essence
-    from app.services.trs import calcule_pertes_fcfa
-    pertes_total = sum(calcule_pertes_fcfa(p) for p in postes)
+    pertes_total = sum(calcule_pertes_equipe(e)['total'] for e in equipes)
+    duree_totale_arrets = sum(e.duree_totale_arrets for e in equipes)
 
-    # Durée totale arrêts
-    duree_totale_arrets = sum(p.duree_totale_arrets for p in postes)
-
-    # Données par lignes
     donnees = [
-        ("Nombre de postes enregistrés", len(postes)),
+        ("Nombre d'équipes enregistrées", len(equipes)),
         ("TRS moyen", f"{trs_moyen}%"),
         ("Benchmark international (cible)", "≥ 60%"),
         ("Production réelle", f"{production_reelle} m³"),
@@ -125,25 +101,19 @@ def _creer_feuille_resume(wb, postes, mois, annee):
         ("Date de génération", date.today().strftime("%d/%m/%Y")),
     ]
 
-    ws.row_dimensions[3].height = 10  # espace vide
-
+    ws.row_dimensions[3].height = 10
     for i, (label, valeur) in enumerate(donnees, start=4):
-        row = ws.row_dimensions[i]
-        row.height = 22
+        ws.row_dimensions[i].height = 22
         c_label = ws.cell(row=i, column=1, value=label)
-        c_val = ws.cell(row=i, column=2, value=valeur)
-
+        c_val   = ws.cell(row=i, column=2, value=valeur)
         bg = GRIS_CLAIR if i % 2 == 0 else BLANC
-        # Couleur spéciale pour TRS
         if label == "TRS moyen":
-            bg = _couleur_bg_trs(trs_moyen)
+            bg = _bg_trs(trs_moyen)
         elif label == "Pertes financières estimées":
             bg = ROUGE_PALE
-
         _style_cellule(c_label, gras=True, couleur_bg=bg, align='left')
         _style_cellule(c_val, couleur_bg=bg)
 
-    # Top causes
     row_top = len(donnees) + 6
     ws.merge_cells(f'A{row_top}:B{row_top}')
     titre_top = ws[f'A{row_top}']
@@ -151,13 +121,12 @@ def _creer_feuille_resume(wb, postes, mois, annee):
     _style_entete(titre_top, bg_hex="B71C1C")
     ws.row_dimensions[row_top].height = 22
 
-    entetes_pareto = ['Cause', 'Durée (min)']
-    for j, h in enumerate(entetes_pareto, start=1):
+    for j, h in enumerate(['Cause', 'Durée (min)'], start=1):
         c = ws.cell(row=row_top + 1, column=j, value=h)
         _style_entete(c, bg_hex="37474F")
     ws.row_dimensions[row_top + 1].height = 20
 
-    pareto = pareto_arrets(postes)
+    pareto = pareto_arrets(equipes)
     for k, item in enumerate(pareto[:5], start=row_top + 2):
         c1 = ws.cell(row=k, column=1, value=item['cause'])
         c2 = ws.cell(row=k, column=2, value=item['duree'])
@@ -167,21 +136,21 @@ def _creer_feuille_resume(wb, postes, mois, annee):
         ws.row_dimensions[k].height = 20
 
 
-# ── Feuille 2 : Détail des postes ───────────────────────────────────────────
+# ── Feuille 2 : Équipes ──────────────────────────────────────────────────────
 
-def _creer_feuille_postes(wb, postes):
-    ws = wb.create_sheet("Postes")
+def _creer_feuille_equipes(wb, equipes):
+    ws = wb.create_sheet("Équipes")
     ws.sheet_view.showGridLines = False
-    ws.freeze_panes = 'A2'  # Figer la première ligne d'en-têtes
+    ws.freeze_panes = 'A2'
 
     entetes = [
-        'Date', 'Poste', 'Essence',
-        'Entrée (m³)', 'Scié (m³)', 'Rebut (m³)', 'Rendement (%)',
-        'Conformes', 'Défectueux', 'Effectif',
-        'Arrêts (min)', 'TRS (%)', 'Disponibilité (%)', 'Performance (%)', 'Qualité (%)',
+        'Date', 'Équipe', 'Essences', 'Effectif',
+        'Entrée (m³)', 'Scié (m³)', 'Rebut (m³)',
+        'Arrêts (min)', 'TRS (%)', 'Dispo (%)', 'Perf (%)', 'Qualité (%)',
+        'Perte D (FCFA)', 'Perte P (FCFA)', 'Perte Q (FCFA)', 'Perte totale (FCFA)',
         'Notes'
     ]
-    largeurs = [14, 12, 11, 12, 11, 11, 13, 10, 11, 10, 12, 10, 16, 14, 12, 30]
+    largeurs = [14, 12, 20, 10, 12, 11, 11, 12, 10, 10, 10, 12, 14, 14, 14, 16, 30]
 
     for j, (h, w) in enumerate(zip(entetes, largeurs), start=1):
         ws.column_dimensions[get_column_letter(j)].width = w
@@ -189,53 +158,52 @@ def _creer_feuille_postes(wb, postes):
         _style_entete(c)
     ws.row_dimensions[1].height = 30
 
-    for i, p in enumerate(postes, start=2):
-        rendement = round(p.rendement_matiere * 100, 1) if p.rendement_matiere else None
+    for i, e in enumerate(equipes, start=2):
+        pertes = calcule_pertes_equipe(e)
         valeurs = [
-            p.date.strftime('%d/%m/%Y') if p.date else '',
-            p.numero_poste,
-            p.essence,
-            p.volume_entree,
-            p.volume_sorti,
-            p.volume_rebut,
-            rendement,
-            p.nb_planches_conformes,
-            p.nb_planches_defectueuses,
-            p.effectif,
-            p.duree_totale_arrets,
-            p.trs_global,
-            p.trs_disponibilite,
-            p.trs_performance,
-            p.trs_qualite,
-            p.notes or ''
+            e.date.strftime('%d/%m/%Y') if e.date else '',
+            e.numero_equipe,
+            e.essences_label,
+            e.effectif,
+            e.volume_entree,
+            e.volume_sorti,
+            e.volume_rebut,
+            e.duree_totale_arrets,
+            e.trs_global,
+            e.trs_disponibilite,
+            e.trs_performance,
+            e.trs_qualite,
+            pertes['perte_d'],
+            pertes['perte_p'],
+            pertes['perte_q'],
+            pertes['total'],
+            e.notes or ''
         ]
-
         bg_ligne = BLANC if i % 2 == 0 else GRIS_CLAIR
-        trs_val = p.trs_global
-
         for j, val in enumerate(valeurs, start=1):
             c = ws.cell(row=i, column=j, value=val)
-            # Colonne TRS global : couleur selon performance
-            if j == 12:
-                bg = _couleur_bg_trs(trs_val)
-            elif j in (13, 14, 15):
-                bg = _couleur_bg_trs(val)
+            if j == 9:
+                bg = _bg_trs(e.trs_global)
+            elif j in (10, 11, 12):
+                bg = _bg_trs(val)
+            elif j in (13, 14, 15, 16):
+                bg = ROUGE_PALE if (val or 0) > 0 else bg_ligne
             else:
                 bg = bg_ligne
-            _style_cellule(c, couleur_bg=bg, align='center' if j != 16 else 'left')
-
+            _style_cellule(c, couleur_bg=bg, align='left' if j == 17 else 'center')
         ws.row_dimensions[i].height = 18
 
 
-# ── Feuille 3 : Détail des arrêts ───────────────────────────────────────────
+# ── Feuille 3 : Arrêts ───────────────────────────────────────────────────────
 
-def _creer_feuille_arrets(wb, postes):
+def _creer_feuille_arrets(wb, equipes):
     ws = wb.create_sheet("Arrêts")
     ws.sheet_view.showGridLines = False
     ws.freeze_panes = 'A2'
 
-    entetes = ['Date', 'Poste', 'Essence', 'Machine', 'Heure début', 'Heure fin', 'Durée (min)', 'Cause', 'Catégorie']
-    largeurs = [14, 12, 11, 16, 12, 10, 12, 40, 22]
+    entetes = ['Date', 'Équipe', 'Essences', 'Machine',
+               'Heure début', 'Heure fin', 'Durée (min)', 'Cause', 'Catégorie']
+    largeurs = [14, 12, 18, 16, 12, 10, 12, 40, 22]
 
     for j, (h, w) in enumerate(zip(entetes, largeurs), start=1):
         ws.column_dimensions[get_column_letter(j)].width = w
@@ -244,12 +212,12 @@ def _creer_feuille_arrets(wb, postes):
     ws.row_dimensions[1].height = 28
 
     ligne = 2
-    for p in postes:
-        for a in p.arrets:
+    for e in equipes:
+        for a in e.arrets:
             valeurs = [
-                p.date.strftime('%d/%m/%Y') if p.date else '',
-                p.numero_poste,
-                p.essence,
+                e.date.strftime('%d/%m/%Y') if e.date else '',
+                e.numero_equipe,
+                e.essences_label,
                 a.machine,
                 a.heure_debut,
                 a.heure_fin,
@@ -259,8 +227,7 @@ def _creer_feuille_arrets(wb, postes):
             ]
             bg = ROUGE_PALE if a.categorie == 'Mécanique' else (
                  ORANGE_PALE if a.categorie == 'Organisationnelle' else (
-                 JAUNE_PALE if a.categorie == 'Maintenance planifiée' else BLANC
-            ))
+                 JAUNE_PALE if a.categorie == 'Maintenance planifiée' else BLANC))
             for j, val in enumerate(valeurs, start=1):
                 c = ws.cell(row=ligne, column=j, value=val)
                 _style_cellule(c, couleur_bg=bg, align='left' if j in (8, 9) else 'center')
@@ -273,23 +240,11 @@ def _creer_feuille_arrets(wb, postes):
 
 # ── Fonction principale ──────────────────────────────────────────────────────
 
-def generer_rapport_excel(postes, mois, annee):
-    """
-    Génère un rapport mensuel Excel en mémoire.
-
-    Args:
-        postes : liste d'objets Poste (avec leurs Arrets chargés)
-        mois   : int (1-12)
-        annee  : int (ex. 2026)
-
-    Returns:
-        bytes — contenu du fichier .xlsx
-    """
+def generer_rapport_excel(equipes, mois, annee):
     wb = Workbook()
-
-    _creer_feuille_resume(wb, postes, mois, annee)
-    _creer_feuille_postes(wb, postes)
-    _creer_feuille_arrets(wb, postes)
+    _creer_feuille_resume(wb, equipes, mois, annee)
+    _creer_feuille_equipes(wb, equipes)
+    _creer_feuille_arrets(wb, equipes)
 
     buffer = io.BytesIO()
     wb.save(buffer)

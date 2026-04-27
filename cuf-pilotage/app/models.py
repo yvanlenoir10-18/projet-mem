@@ -1,44 +1,52 @@
 """
 Modèles de données — Scierie CUF, Chaîne 4.
 
-Chaque classe correspond à une table dans la base de données SQLite.
-SQLAlchemy traduit automatiquement les classes Python en tables SQL.
+Hiérarchie :
+  Equipe  (1 poste de 8h)
+    └─ Production[]  (1 ligne par essence traitée)
+    └─ Arret[]       (arrêts machine partagés sur toute l'équipe)
 """
-from datetime import datetime, date
+import unicodedata
+from datetime import datetime, date, timedelta
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import UserMixin
 import bcrypt
 
 db = SQLAlchemy()
 
+REBUT_NIVEAUX = {
+    'aucun':  0.00,
+    'faible': 0.05,
+    'moyen':  0.15,
+    'fort':   0.30,
+}
+
+
+def normalise_essence(nom):
+    """Supprime les accents pour former la clé du paramètre prix."""
+    nfkd = unicodedata.normalize('NFKD', nom.lower())
+    return nfkd.encode('ASCII', 'ignore').decode()
+
 
 class User(UserMixin, db.Model):
-    """
-    Utilisateur de l'application.
-    Trois rôles possibles : 'admin' (agent saisie), 'chef' (chef scierie), 'pdg'.
-    """
     __tablename__ = 'user'
 
     id = db.Column(db.Integer, primary_key=True)
     nom = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
-    role = db.Column(db.String(20), nullable=False, default='admin')  # admin | chef | pdg
+    role = db.Column(db.String(20), nullable=False, default='admin')
     actif = db.Column(db.Boolean, default=True)
     cree_le = db.Column(db.DateTime, default=datetime.utcnow)
 
-    # Un utilisateur peut saisir plusieurs postes
-    postes = db.relationship('Poste', backref='saisie_par', lazy=True)
+    equipes = db.relationship('Equipe', backref='saisie_par', lazy=True)
 
     def set_password(self, mot_de_passe):
-        """Chiffre le mot de passe avec bcrypt avant de le stocker."""
         self.password_hash = bcrypt.hashpw(
-            mot_de_passe.encode('utf-8'),
-            bcrypt.gensalt()
+            mot_de_passe.encode('utf-8'), bcrypt.gensalt()
         ).decode('utf-8')
 
     def check_password(self, mot_de_passe):
-        """Vérifie si le mot de passe fourni correspond au hash stocké."""
         return bcrypt.checkpw(
             mot_de_passe.encode('utf-8'),
             self.password_hash.encode('utf-8')
@@ -49,11 +57,6 @@ class User(UserMixin, db.Model):
 
 
 class Parametre(db.Model):
-    """
-    Paramètres configurables de l'application.
-    Stockés sous forme clé/valeur pour rester flexibles.
-    Ex : 'prix_ayous' -> '85000', 'objectif_m3_poste' -> '25'
-    """
     __tablename__ = 'parametre'
 
     id = db.Column(db.Integer, primary_key=True)
@@ -64,7 +67,6 @@ class Parametre(db.Model):
 
     @staticmethod
     def get(cle, defaut=None):
-        """Récupère la valeur d'un paramètre par sa clé."""
         p = Parametre.query.filter_by(cle=cle).first()
         return p.valeur if p else defaut
 
@@ -72,100 +74,143 @@ class Parametre(db.Model):
         return f'<Parametre {self.cle}={self.valeur}>'
 
 
-class Poste(db.Model):
+class Equipe(db.Model):
     """
     Un poste de travail de 8 heures sur la Chaîne 4.
-    C'est l'unité de base de la collecte de données.
-    TRS calculé automatiquement depuis les arrêts et les volumes.
+    Une équipe peut traiter plusieurs essences via Production[].
+    Les arrêts sont partagés (même ligne de sciage physique).
     """
-    __tablename__ = 'poste'
+    __tablename__ = 'equipe'
 
     id = db.Column(db.Integer, primary_key=True)
     date = db.Column(db.Date, nullable=False, default=date.today)
-    numero_poste = db.Column(db.String(10), nullable=False)  # 'Matin' | 'Apres-midi'
-    essence = db.Column(db.String(50), nullable=False)       # Ayous, Azobé, Iroko, Movingui
-
-    # --- Données de production ---
-    volume_entree = db.Column(db.Float, nullable=False)   # m³ grumes en entrée
-    volume_sorti = db.Column(db.Float, nullable=False)    # m³ bois scié en sortie
-    volume_rebut = db.Column(db.Float, default=0.0)       # m³ rebut/perte
-    nb_planches_conformes = db.Column(db.Integer, default=0)
-    nb_planches_defectueuses = db.Column(db.Integer, default=0)
-    effectif = db.Column(db.Integer, default=10)          # Nb opérateurs présents
-
-    # --- TRS calculé automatiquement ---
-    trs_disponibilite = db.Column(db.Float)   # % de disponibilité
-    trs_performance = db.Column(db.Float)     # % de performance
-    trs_qualite = db.Column(db.Float)         # % de qualité
-    trs_global = db.Column(db.Float)          # TRS = D × P × Q
-
-    # --- Métadonnées ---
+    numero_equipe = db.Column(db.String(10), nullable=False)   # 'Matin' | 'Apres-midi'
+    effectif = db.Column(db.Integer, default=10)
+    statut = db.Column(db.String(20), nullable=False, default='soumis')
     notes = db.Column(db.Text)
+
     cree_le = db.Column(db.DateTime, default=datetime.utcnow)
+    soumis_le = db.Column(db.DateTime)
+
+    trs_disponibilite = db.Column(db.Float)
+    trs_performance = db.Column(db.Float)
+    trs_qualite = db.Column(db.Float)
+    trs_global = db.Column(db.Float)
+
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
 
-    # Un poste contient plusieurs arrêts
-    arrets = db.relationship('Arret', backref='poste', lazy=True,
-                              cascade='all, delete-orphan')
+    productions = db.relationship('Production', backref='equipe', lazy=True,
+                                  cascade='all, delete-orphan')
+    arrets = db.relationship('Arret', backref='equipe', lazy=True,
+                             cascade='all, delete-orphan')
 
     @property
     def duree_totale_arrets(self):
-        """Somme en minutes de tous les arrêts du poste."""
         return sum(a.duree_min for a in self.arrets if a.duree_min)
 
     @property
+    def volume_sorti(self):
+        return round(sum(p.volume_sorti for p in self.productions), 3)
+
+    @property
+    def volume_entree(self):
+        return round(sum(p.volume_entree for p in self.productions), 3)
+
+    @property
+    def volume_rebut(self):
+        return round(sum(p.volume_rebut_calcule for p in self.productions), 3)
+
+    @property
+    def volume_conforme(self):
+        return round(sum(p.volume_conforme for p in self.productions), 3)
+
+    @property
+    def essences_label(self):
+        return ', '.join(p.essence for p in self.productions)
+
+    @property
+    def est_verrouille(self):
+        if self.statut == 'verrouille':
+            return True
+        if self.soumis_le and self.statut == 'soumis':
+            return (datetime.utcnow() - self.soumis_le) > timedelta(days=3)
+        return False
+
+    def __repr__(self):
+        return f'<Equipe {self.date} {self.numero_equipe} TRS={self.trs_global}%>'
+
+
+class Production(db.Model):
+    """
+    Une ligne de production par essence dans une équipe.
+    rebut_niveau (qualitatif) détermine le % de rebut via REBUT_NIVEAUX.
+    prix_snapshot est figé à la soumission pour des pertes FCFA cohérentes.
+    """
+    __tablename__ = 'production'
+
+    id = db.Column(db.Integer, primary_key=True)
+    equipe_id = db.Column(db.Integer, db.ForeignKey('equipe.id'), nullable=False)
+
+    essence = db.Column(db.String(50), nullable=False)
+    volume_entree = db.Column(db.Float, nullable=False)
+    volume_sorti = db.Column(db.Float, nullable=False)
+    rebut_niveau = db.Column(db.String(10), nullable=False, default='aucun')
+    nb_planches_conformes = db.Column(db.Integer, default=0)
+    nb_planches_defectueuses = db.Column(db.Integer, default=0)
+    prix_snapshot = db.Column(db.Float)
+
+    cree_le = db.Column(db.DateTime, default=datetime.utcnow)
+
+    @property
+    def rebut_pct(self):
+        return REBUT_NIVEAUX.get(self.rebut_niveau, 0.0)
+
+    @property
+    def volume_rebut_calcule(self):
+        return round(self.volume_sorti * self.rebut_pct, 3)
+
+    @property
+    def volume_conforme(self):
+        return max(0.0, round(self.volume_sorti - self.volume_rebut_calcule, 3))
+
+    @property
     def rendement_matiere(self):
-        """Volume scié / Volume entré × 100 (en %)."""
         if self.volume_entree and self.volume_entree > 0:
             return round((self.volume_sorti / self.volume_entree) * 100, 1)
         return 0
 
-    @property
-    def volume_conforme(self):
-        """Volume scié moins le volume rebut."""
-        return max(0, self.volume_sorti - self.volume_rebut)
-
     def __repr__(self):
-        return f'<Poste {self.date} {self.numero_poste} {self.essence} TRS={self.trs_global}%>'
+        return f'<Production {self.essence} {self.volume_sorti}m³ rebut={self.rebut_niveau}>'
 
 
 class Arret(db.Model):
     """
-    Un arrêt machine survenu pendant un poste.
-    La durée est calculée automatiquement depuis heure_debut et heure_fin.
-    C'est la donnée la plus importante pour le Pareto et l'analyse des causes racines.
+    Un arrêt machine survenu pendant une équipe.
+    Lié à l'équipe entière (la bicoupe est le goulot commun à toutes les essences).
     """
     __tablename__ = 'arret'
 
     id = db.Column(db.Integer, primary_key=True)
-    poste_id = db.Column(db.Integer, db.ForeignKey('poste.id'), nullable=False)
+    equipe_id = db.Column(db.Integer, db.ForeignKey('equipe.id'), nullable=False)
 
-    # --- Identification de l'arrêt ---
-    machine = db.Column(db.String(50), nullable=False)     # Bicoupe, Scie de tête, etc.
-    heure_debut = db.Column(db.String(5), nullable=False)  # Format HH:MM ex: "07:30"
-    heure_fin = db.Column(db.String(5), nullable=False)    # Format HH:MM ex: "08:15"
-    duree_min = db.Column(db.Integer)                      # Calculée automatiquement
+    machine = db.Column(db.String(50), nullable=False)
+    heure_debut = db.Column(db.String(5), nullable=False)
+    heure_fin = db.Column(db.String(5), nullable=False)
+    duree_min = db.Column(db.Integer)
 
-    # --- Analyse des causes ---
-    cause = db.Column(db.String(200), nullable=False)      # Description détaillée
-    categorie = db.Column(db.String(50), nullable=False)   # Mécanique | Organisationnelle | etc.
+    cause = db.Column(db.String(200), nullable=False)
+    categorie = db.Column(db.String(50), nullable=False)
     notes = db.Column(db.Text)
 
     cree_le = db.Column(db.DateTime, default=datetime.utcnow)
 
     def calcule_duree(self):
-        """
-        Calcule automatiquement la durée en minutes depuis heure_debut et heure_fin.
-        Ex: debut=07:30, fin=08:15 → durée=45 minutes
-        """
         try:
-            h_debut, m_debut = map(int, self.heure_debut.split(':'))
-            h_fin, m_fin = map(int, self.heure_fin.split(':'))
-            total_debut = h_debut * 60 + m_debut
-            total_fin = h_fin * 60 + m_fin
-            self.duree_min = max(0, total_fin - total_debut)
+            h_d, m_d = map(int, self.heure_debut.split(':'))
+            h_f, m_f = map(int, self.heure_fin.split(':'))
+            self.duree_min = max(0, (h_f * 60 + m_f) - (h_d * 60 + m_d))
         except (ValueError, AttributeError):
             self.duree_min = 0
 
     def __repr__(self):
-        return f'<Arret {self.machine} {self.heure_debut}-{self.heure_fin} ({self.duree_min}min) — {self.cause}>'
+        return f'<Arret {self.machine} {self.heure_debut}-{self.heure_fin} ({self.duree_min}min)>'

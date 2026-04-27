@@ -44,11 +44,18 @@
                         <div class="form-text">480 min = 8 heures</div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">Capacité théorique bicoupe (m³/heure)</label>
-                        <input type="number" name="capacite_bicoupe" class="form-control"
-                               value="{{ params.get('capacite_bicoupe').valeur if params.get('capacite_bicoupe') else 4 }}"
-                               step="0.1" min="0.1">
-                        <div class="form-text">À renseigner depuis la fiche constructeur de la bicoupe</div>
+                        <label class="form-label">Capacité théorique de la ligne (m³/heure)</label>
+                        <input type="number" name="capacite_equipe_h" class="form-control"
+                               value="{{ params.get('capacite_equipe_h').valeur if params.get('capacite_equipe_h') else 1.5625 }}"
+                               step="0.0001" min="0.1">
+                        <div class="form-text">Valeur V1 : 1.5625 m³/h = 12.5 m³ sur 8h (provisoire — à calibrer avec les fiches constructeur)</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Taux de revente locale du bois rebut</label>
+                        <input type="number" name="taux_revente_rebut" class="form-control"
+                               value="{{ params.get('taux_revente_rebut').valeur if params.get('taux_revente_rebut') else 0.30 }}"
+                               step="0.01" min="0" max="1">
+                        <div class="form-text">Ex : 0.30 = 30% de la valeur initiale récupérée sur le rebut</div>
                     </div>
                 </div>
             </div>

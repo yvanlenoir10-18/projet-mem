@@ -1,16 +1,16 @@
 {% extends 'base.html' %}
-{% block title %}Détail poste {{ poste.date }}{% endblock %}
+{% block title %}Détail équipe {{ poste.date }}{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4><i class="bi bi-file-text"></i> Poste du {{ poste.date.strftime('%d/%m/%Y') }} — {{ poste.numero_poste }}</h4>
+    <h4><i class="bi bi-file-text"></i> Équipe du {{ poste.date.strftime('%d/%m/%Y') }} — {{ poste.numero_equipe }}</h4>
     <a href="{{ url_for('saisie.historique') }}" class="btn btn-outline-secondary btn-sm">
         <i class="bi bi-arrow-left"></i> Retour
     </a>
 </div>
 
+<!-- KPIs TRS -->
 <div class="row g-3 mb-4">
-    <!-- TRS Global -->
     <div class="col-md-3">
         <div class="card kpi-card {{ couleur_trs }} h-100">
             <div class="card-body text-center">
@@ -45,52 +45,127 @@
     </div>
 </div>
 
-<div class="row g-3">
-    <div class="col-md-6">
+<div class="row g-3 mb-3">
+    <!-- Productions par essence -->
+    <div class="col-md-7">
         <div class="card">
-            <div class="card-header">Production</div>
-            <div class="card-body">
+            <div class="card-header">
+                <i class="bi bi-boxes"></i> Productions par essence
+                <span class="badge bg-secondary ms-2">{{ poste.effectif }} opérateurs</span>
+            </div>
+            <div class="card-body p-0">
                 <table class="table table-sm mb-0">
-                    <tr><td>Essence</td><td><strong>{{ poste.essence }}</strong></td></tr>
-                    <tr><td>Volume entrée</td><td>{{ poste.volume_entree }} m³</td></tr>
-                    <tr><td>Volume scié</td><td>{{ poste.volume_sorti }} m³</td></tr>
-                    <tr><td>Volume rebut</td><td>{{ poste.volume_rebut }} m³</td></tr>
-                    <tr><td>Rendement matière</td><td>{{ poste.rendement_matiere }}%</td></tr>
-                    <tr><td>Effectif</td><td>{{ poste.effectif }} opérateurs</td></tr>
+                    <thead class="table-light">
+                        <tr>
+                            <th>Essence</th>
+                            <th>Entrée (m³)</th>
+                            <th>Scié (m³)</th>
+                            <th>Rebut</th>
+                            <th>Rendement</th>
+                            <th>Prix/m³</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for prod in poste.productions %}
+                        <tr>
+                            <td><span class="badge bg-secondary">{{ prod.essence }}</span></td>
+                            <td>{{ prod.volume_entree }}</td>
+                            <td>{{ prod.volume_sorti }}</td>
+                            <td>
+                                <span class="badge bg-{{ 'danger' if prod.rebut_niveau == 'fort' else ('warning' if prod.rebut_niveau == 'moyen' else ('info' if prod.rebut_niveau == 'faible' else 'success')) }} text-{{ 'dark' if prod.rebut_niveau in ['faible', 'moyen'] else 'white' }}">
+                                    {{ prod.rebut_niveau }} ({{ (prod.rebut_pct * 100)|int }}%)
+                                </span>
+                            </td>
+                            <td>{{ prod.rendement_matiere }}%</td>
+                            <td class="text-muted small">
+                                {% if prod.prix_snapshot %}
+                                {{ "{:,.0f}".format(prod.prix_snapshot) }} FCFA
+                                {% else %}—{% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                    <tfoot class="table-secondary fw-bold">
+                        <tr>
+                            <td>Total</td>
+                            <td>{{ poste.volume_entree }}</td>
+                            <td>{{ poste.volume_sorti }}</td>
+                            <td>{{ poste.volume_rebut }} m³</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Décomposition des pertes -->
+    <div class="col-md-5">
+        <div class="card border-danger h-100">
+            <div class="card-header bg-danger text-white">
+                <i class="bi bi-currency-dollar"></i> Pertes financières estimées
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <tr class="table-warning">
+                        <td><strong>Perte Disponibilité (D)</strong></td>
+                        <td class="text-end fw-bold">{{ "{:,.0f}".format(pertes.perte_d) }} FCFA</td>
+                    </tr>
+                    <tr class="table-warning">
+                        <td><small class="text-muted">Arrêts non planifiés × capacité × prix</small></td>
+                        <td></td>
+                    </tr>
+                    <tr class="table-info">
+                        <td><strong>Perte Performance (P)</strong></td>
+                        <td class="text-end fw-bold">{{ "{:,.0f}".format(pertes.perte_p) }} FCFA</td>
+                    </tr>
+                    <tr class="table-info">
+                        <td><small class="text-muted">Sous-production vs capacité théorique</small></td>
+                        <td></td>
+                    </tr>
                     <tr class="table-danger">
-                        <td>Perte financière estimée</td>
-                        <td><strong>{{ "{:,.0f}".format(perte_fcfa) }} FCFA</strong></td>
+                        <td><strong>Perte Qualité (Q)</strong></td>
+                        <td class="text-end fw-bold">{{ "{:,.0f}".format(pertes.perte_q) }} FCFA</td>
+                    </tr>
+                    <tr class="table-danger">
+                        <td><small class="text-muted">Rebut net après revente à 30%</small></td>
+                        <td></td>
+                    </tr>
+                    <tr class="table-dark">
+                        <td><strong>TOTAL PERTES</strong></td>
+                        <td class="text-end text-danger fw-bold fs-5">{{ "{:,.0f}".format(pertes.total) }} FCFA</td>
                     </tr>
                 </table>
             </div>
         </div>
     </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header d-flex justify-content-between">
-                <span>Arrêts machine</span>
-                <span class="badge bg-danger">{{ poste.arrets|length }} arrêt(s) — {{ poste.duree_totale_arrets }} min</span>
-            </div>
-            <div class="card-body p-0">
-                {% if poste.arrets %}
-                <table class="table table-sm mb-0">
-                    <thead><tr><th>Machine</th><th>Horaire</th><th>Durée</th><th>Cause</th></tr></thead>
-                    <tbody>
-                        {% for a in poste.arrets %}
-                        <tr>
-                            <td>{{ a.machine }}</td>
-                            <td>{{ a.heure_debut }}–{{ a.heure_fin }}</td>
-                            <td><span class="badge bg-danger">{{ a.duree_min }} min</span></td>
-                            <td>{{ a.cause }}</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <p class="p-3 text-muted mb-0"><i class="bi bi-check-circle text-success"></i> Aucun arrêt ce poste.</p>
-                {% endif %}
-            </div>
-        </div>
+</div>
+
+<!-- Arrêts machine -->
+<div class="card">
+    <div class="card-header d-flex justify-content-between">
+        <span><i class="bi bi-tools"></i> Arrêts machine</span>
+        <span class="badge bg-danger">{{ poste.arrets|length }} arrêt(s) — {{ poste.duree_totale_arrets }} min</span>
+    </div>
+    <div class="card-body p-0">
+        {% if poste.arrets %}
+        <table class="table table-sm mb-0">
+            <thead><tr><th>Machine</th><th>Horaire</th><th>Durée</th><th>Cause</th><th>Catégorie</th></tr></thead>
+            <tbody>
+                {% for a in poste.arrets %}
+                <tr>
+                    <td>{{ a.machine }}</td>
+                    <td>{{ a.heure_debut }}–{{ a.heure_fin }}</td>
+                    <td><span class="badge bg-danger">{{ a.duree_min }} min</span></td>
+                    <td>{{ a.cause }}</td>
+                    <td><span class="badge bg-secondary">{{ a.categorie }}</span></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="p-3 text-muted mb-0"><i class="bi bi-check-circle text-success"></i> Aucun arrêt cette équipe.</p>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

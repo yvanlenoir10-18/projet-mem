@@ -1,11 +1,11 @@
 {% extends 'base.html' %}
-{% block title %}Historique des postes{% endblock %}
+{% block title %}Historique des équipes{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4><i class="bi bi-clock-history text-secondary"></i> Historique des postes</h4>
+    <h4><i class="bi bi-clock-history text-secondary"></i> Historique des équipes</h4>
     <a href="{{ url_for('saisie.nouveau_poste') }}" class="btn btn-success">
-        <i class="bi bi-plus-circle"></i> Nouveau poste
+        <i class="bi bi-plus-circle"></i> Nouvelle équipe
     </a>
 </div>
 
@@ -15,13 +15,13 @@
         <thead class="table-dark">
             <tr>
                 <th>Date</th>
-                <th>Poste</th>
-                <th>Essence</th>
-                <th>Entrée (m³)</th>
-                <th>Sorti (m³)</th>
-                <th>Rebut (m³)</th>
+                <th>Équipe</th>
+                <th>Essences</th>
+                <th>Scié (m³)</th>
+                <th>Rebut</th>
                 <th>Arrêts (min)</th>
                 <th>TRS</th>
+                <th>Statut</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -29,18 +29,36 @@
             {% for p in postes %}
             <tr>
                 <td>{{ p.date.strftime('%d/%m/%Y') }}</td>
-                <td>{{ p.numero_poste }}</td>
-                <td><span class="badge bg-secondary">{{ p.essence }}</span></td>
-                <td>{{ p.volume_entree }}</td>
-                <td>{{ p.volume_sorti }}</td>
-                <td>{{ p.volume_rebut }}</td>
+                <td>{{ p.numero_equipe }}</td>
+                <td>
+                    {% for prod in p.productions %}
+                    <span class="badge bg-secondary">{{ prod.essence }}</span>
+                    {% endfor %}
+                </td>
+                <td>{{ p.volume_sorti }} m³</td>
+                <td>
+                    {% if p.volume_rebut > 0 %}
+                    <span class="text-danger">{{ p.volume_rebut }} m³</span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
                 <td>{{ p.duree_totale_arrets }} min</td>
                 <td>
                     {% if p.trs_global %}
-                    {% set couleur = 'success' if p.trs_global >= 70 else ('warning' if p.trs_global >= 50 else 'danger') %}
-                    <span class="badge bg-{{ couleur }} badge-trs">{{ p.trs_global }}%</span>
+                    {% set c = 'success' if p.trs_global >= 70 else ('warning' if p.trs_global >= 50 else 'danger') %}
+                    <span class="badge bg-{{ c }}">{{ p.trs_global }}%</span>
                     {% else %}
                     <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if p.statut == 'verrouille' or p.est_verrouille %}
+                    <span class="badge bg-secondary"><i class="bi bi-lock"></i> Verrouillé</span>
+                    {% elif p.statut == 'soumis' %}
+                    <span class="badge bg-success">Soumis</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark">Brouillon</span>
                     {% endif %}
                 </td>
                 <td>
@@ -48,14 +66,16 @@
                        class="btn btn-sm btn-outline-primary">
                         <i class="bi bi-eye"></i>
                     </a>
+                    {% if not p.est_verrouille %}
                     <form method="POST"
                           action="{{ url_for('saisie.supprimer_poste', poste_id=p.id) }}"
                           class="d-inline"
-                          onsubmit="return confirm('Supprimer ce poste ?')">
+                          onsubmit="return confirm('Supprimer cette équipe ?')">
                         <button type="submit" class="btn btn-sm btn-outline-danger">
                             <i class="bi bi-trash"></i>
                         </button>
                     </form>
+                    {% endif %}
                 </td>
             </tr>
             {% endfor %}
@@ -65,7 +85,7 @@
 {% else %}
 <div class="alert alert-info">
     <i class="bi bi-info-circle"></i>
-    Aucun poste enregistré. <a href="{{ url_for('saisie.nouveau_poste') }}">Saisir le premier poste</a>.
+    Aucune équipe enregistrée. <a href="{{ url_for('saisie.nouveau_poste') }}">Saisir la première équipe</a>.
 </div>
 {% endif %}
 {% endblock %}

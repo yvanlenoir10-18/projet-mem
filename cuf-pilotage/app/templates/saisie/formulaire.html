@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
-{% block title %}Saisie d'un poste{% endblock %}
+{% block title %}Saisie d'une équipe{% endblock %}
 
 {% block content %}
-<h4 class="mb-4"><i class="bi bi-plus-circle text-success"></i> Saisie d'un poste — Chaîne 4</h4>
+<h4 class="mb-4"><i class="bi bi-plus-circle text-success"></i> Saisie d'une équipe — Chaîne 4</h4>
 
-<form method="POST" id="formPoste">
-    <!-- BLOC 1 : En-tête du poste -->
+<form method="POST" id="formEquipe">
+    <!-- BLOC 1 : En-tête de l'équipe -->
     <div class="card mb-3">
         <div class="card-header bg-dark text-white">
-            <i class="bi bi-calendar3"></i> Informations du poste
+            <i class="bi bi-calendar3"></i> Informations de l'équipe
         </div>
         <div class="card-body row g-3">
             <div class="col-md-3">
@@ -17,18 +17,10 @@
                        value="{{ today }}" required>
             </div>
             <div class="col-md-3">
-                <label class="form-label">Poste <span class="text-danger">*</span></label>
-                <select name="numero_poste" class="form-select" required>
+                <label class="form-label">Équipe <span class="text-danger">*</span></label>
+                <select name="numero_equipe" class="form-select" required>
                     <option value="Matin">Matin</option>
                     <option value="Apres-midi">Après-midi</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Essence traitée <span class="text-danger">*</span></label>
-                <select name="essence" class="form-select" required>
-                    {% for e in essences %}
-                    <option value="{{ e }}">{{ e }}</option>
-                    {% endfor %}
                 </select>
             </div>
             <div class="col-md-3">
@@ -39,38 +31,16 @@
         </div>
     </div>
 
-    <!-- BLOC 2 : Production -->
+    <!-- BLOC 2 : Productions par essence -->
     <div class="card mb-3">
-        <div class="card-header bg-success text-white">
-            <i class="bi bi-boxes"></i> Production (m³)
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-boxes"></i> Productions (m³) — une ligne par essence</span>
+            <button type="button" class="btn btn-light btn-sm" onclick="ajouterProduction()">
+                <i class="bi bi-plus"></i> Ajouter une essence
+            </button>
         </div>
-        <div class="card-body row g-3">
-            <div class="col-md-4">
-                <label class="form-label">Volume grumes en entrée (m³) <span class="text-danger">*</span></label>
-                <input type="number" name="volume_entree" class="form-control"
-                       step="0.1" min="0" placeholder="ex: 35.5" required>
-                <div class="form-text">Volume de grumes mis en production ce poste</div>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Volume bois scié en sortie (m³) <span class="text-danger">*</span></label>
-                <input type="number" name="volume_sorti" class="form-control"
-                       step="0.1" min="0" placeholder="ex: 14.2" required>
-                <div class="form-text">Mesuré à l'empilage en fin de poste</div>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Volume rebut/perte (m³)</label>
-                <input type="number" name="volume_rebut" class="form-control"
-                       step="0.1" min="0" value="0" placeholder="ex: 1.5">
-                <div class="form-text">Planches non conformes ou chutes</div>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Nb planches conformes</label>
-                <input type="number" name="nb_conformes" class="form-control" min="0" value="0">
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Nb planches défectueuses</label>
-                <input type="number" name="nb_defectueux" class="form-control" min="0" value="0">
-            </div>
+        <div class="card-body" id="conteneur-productions">
+            <!-- La première ligne est ajoutée automatiquement -->
         </div>
     </div>
 
@@ -94,12 +64,12 @@
     <div class="mb-3">
         <label class="form-label">Notes / Observations</label>
         <textarea name="notes" class="form-control" rows="2"
-                  placeholder="Observations particulières du poste..."></textarea>
+                  placeholder="Observations particulières de l'équipe..."></textarea>
     </div>
 
     <div class="d-flex gap-2">
         <button type="submit" class="btn btn-success btn-lg">
-            <i class="bi bi-save"></i> Enregistrer le poste
+            <i class="bi bi-save"></i> Enregistrer l'équipe
         </button>
         <a href="{{ url_for('saisie.historique') }}" class="btn btn-outline-secondary btn-lg">
             Annuler
@@ -110,7 +80,61 @@
 
 {% block scripts %}
 <script>
-// Template HTML d'une ligne d'arrêt
+// ── Templates ────────────────────────────────────────────────────────────────
+
+const essencesOptions = `
+    {% for e in essences %}
+    <option value="{{ e }}">{{ e }}</option>
+    {% endfor %}
+`;
+
+const rebutOptions = `
+    <option value="aucun">Aucun (0%)</option>
+    <option value="faible">Faible (5%)</option>
+    <option value="moyen">Moyen (15%)</option>
+    <option value="fort">Fort (30%)</option>
+`;
+
+const templateProduction = (index) => `
+<div class="row g-2 mb-2 align-items-end border rounded p-2 bg-light" id="prod-${index}">
+    <div class="col-md-2">
+        <label class="form-label small fw-bold">Essence <span class="text-danger">*</span></label>
+        <select name="prod_essence[]" class="form-select form-select-sm" required>
+            ${essencesOptions}
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small">Volume entrée (m³) <span class="text-danger">*</span></label>
+        <input type="number" name="prod_volume_entree[]" class="form-control form-control-sm"
+               step="0.1" min="0" placeholder="ex: 35.5" required>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small">Volume scié (m³) <span class="text-danger">*</span></label>
+        <input type="number" name="prod_volume_sorti[]" class="form-control form-control-sm"
+               step="0.1" min="0" placeholder="ex: 14.2" required>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small">Niveau de rebut</label>
+        <select name="prod_rebut_niveau[]" class="form-select form-select-sm">
+            ${rebutOptions}
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small">Planches conformes</label>
+        <input type="number" name="prod_nb_conformes[]" class="form-control form-control-sm"
+               min="0" value="0">
+    </div>
+    <div class="col-md-1">
+        <label class="form-label small">Défectueux</label>
+        <input type="number" name="prod_nb_defectueux[]" class="form-control form-control-sm"
+               min="0" value="0">
+    </div>
+    <div class="col-md-1">
+        ${index > 0 ? `<button type="button" class="btn btn-outline-danger btn-sm w-100 mt-4"
+                onclick="supprimerProduction(${index})"><i class="bi bi-trash"></i></button>` : '<div class="mt-4">&nbsp;</div>'}
+    </div>
+</div>`;
+
 const templateArret = (index) => `
 <div class="row g-2 mb-2 align-items-end border rounded p-2" id="arret-${index}">
     <div class="col-md-2">
@@ -150,12 +174,27 @@ const templateArret = (index) => `
     </div>
 </div>`;
 
-let compteur = 0;
+// ── État ──────────────────────────────────────────────────────────────────────
+
+let compteurProd = 0;
+let compteurArret = 0;
+
+function ajouterProduction() {
+    document.getElementById('conteneur-productions')
+            .insertAdjacentHTML('beforeend', templateProduction(compteurProd));
+    compteurProd++;
+}
+
+function supprimerProduction(index) {
+    const el = document.getElementById('prod-' + index);
+    if (el) el.remove();
+}
 
 function ajouterArret() {
     document.getElementById('msg-aucun-arret').style.display = 'none';
-    document.getElementById('conteneur-arrets').insertAdjacentHTML('beforeend', templateArret(compteur));
-    compteur++;
+    document.getElementById('conteneur-arrets')
+            .insertAdjacentHTML('beforeend', templateArret(compteurArret));
+    compteurArret++;
 }
 
 function supprimerArret(index) {
@@ -165,5 +204,8 @@ function supprimerArret(index) {
         document.getElementById('msg-aucun-arret').style.display = 'block';
     }
 }
+
+// Ajouter la première ligne de production automatiquement
+ajouterProduction();
 </script>
 {% endblock %}

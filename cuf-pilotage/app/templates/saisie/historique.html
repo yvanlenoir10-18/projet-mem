@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block title %}Historique des postes{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4><i class="bi bi-clock-history text-secondary"></i> Historique des postes</h4>
+    <a href="{{ url_for('saisie.nouveau_poste') }}" class="btn btn-success">
+        <i class="bi bi-plus-circle"></i> Nouveau poste
+    </a>
+</div>
+
+{% if postes %}
+<div class="table-responsive">
+    <table class="table table-hover table-bordered align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>Date</th>
+                <th>Poste</th>
+                <th>Essence</th>
+                <th>Entrée (m³)</th>
+                <th>Sorti (m³)</th>
+                <th>Rebut (m³)</th>
+                <th>Arrêts (min)</th>
+                <th>TRS</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in postes %}
+            <tr>
+                <td>{{ p.date.strftime('%d/%m/%Y') }}</td>
+                <td>{{ p.numero_poste }}</td>
+                <td><span class="badge bg-secondary">{{ p.essence }}</span></td>
+                <td>{{ p.volume_entree }}</td>
+                <td>{{ p.volume_sorti }}</td>
+                <td>{{ p.volume_rebut }}</td>
+                <td>{{ p.duree_totale_arrets }} min</td>
+                <td>
+                    {% if p.trs_global %}
+                    {% set couleur = 'success' if p.trs_global >= 70 else ('warning' if p.trs_global >= 50 else 'danger') %}
+                    <span class="badge bg-{{ couleur }} badge-trs">{{ p.trs_global }}%</span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{{ url_for('saisie.detail_poste', poste_id=p.id) }}"
+                       class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-eye"></i>
+                    </a>
+                    <form method="POST"
+                          action="{{ url_for('saisie.supprimer_poste', poste_id=p.id) }}"
+                          class="d-inline"
+                          onsubmit="return confirm('Supprimer ce poste ?')">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i>
+    Aucun poste enregistré. <a href="{{ url_for('saisie.nouveau_poste') }}">Saisir le premier poste</a>.
+</div>
+{% endif %}
+{% endblock %}

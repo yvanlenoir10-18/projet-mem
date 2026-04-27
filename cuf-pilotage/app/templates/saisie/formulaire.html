@@ -1,0 +1,169 @@
+{% extends 'base.html' %}
+{% block title %}Saisie d'un poste{% endblock %}
+
+{% block content %}
+<h4 class="mb-4"><i class="bi bi-plus-circle text-success"></i> Saisie d'un poste — Chaîne 4</h4>
+
+<form method="POST" id="formPoste">
+    <!-- BLOC 1 : En-tête du poste -->
+    <div class="card mb-3">
+        <div class="card-header bg-dark text-white">
+            <i class="bi bi-calendar3"></i> Informations du poste
+        </div>
+        <div class="card-body row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Date <span class="text-danger">*</span></label>
+                <input type="date" name="date" class="form-control"
+                       value="{{ today }}" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Poste <span class="text-danger">*</span></label>
+                <select name="numero_poste" class="form-select" required>
+                    <option value="Matin">Matin</option>
+                    <option value="Apres-midi">Après-midi</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Essence traitée <span class="text-danger">*</span></label>
+                <select name="essence" class="form-select" required>
+                    {% for e in essences %}
+                    <option value="{{ e }}">{{ e }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Effectif présent</label>
+                <input type="number" name="effectif" class="form-control"
+                       value="10" min="1" max="30">
+            </div>
+        </div>
+    </div>
+
+    <!-- BLOC 2 : Production -->
+    <div class="card mb-3">
+        <div class="card-header bg-success text-white">
+            <i class="bi bi-boxes"></i> Production (m³)
+        </div>
+        <div class="card-body row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Volume grumes en entrée (m³) <span class="text-danger">*</span></label>
+                <input type="number" name="volume_entree" class="form-control"
+                       step="0.1" min="0" placeholder="ex: 35.5" required>
+                <div class="form-text">Volume de grumes mis en production ce poste</div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Volume bois scié en sortie (m³) <span class="text-danger">*</span></label>
+                <input type="number" name="volume_sorti" class="form-control"
+                       step="0.1" min="0" placeholder="ex: 14.2" required>
+                <div class="form-text">Mesuré à l'empilage en fin de poste</div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Volume rebut/perte (m³)</label>
+                <input type="number" name="volume_rebut" class="form-control"
+                       step="0.1" min="0" value="0" placeholder="ex: 1.5">
+                <div class="form-text">Planches non conformes ou chutes</div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Nb planches conformes</label>
+                <input type="number" name="nb_conformes" class="form-control" min="0" value="0">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Nb planches défectueuses</label>
+                <input type="number" name="nb_defectueux" class="form-control" min="0" value="0">
+            </div>
+        </div>
+    </div>
+
+    <!-- BLOC 3 : Arrêts machine -->
+    <div class="card mb-3">
+        <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-exclamation-triangle"></i> Arrêts machine</span>
+            <button type="button" class="btn btn-light btn-sm" onclick="ajouterArret()">
+                <i class="bi bi-plus"></i> Ajouter un arrêt
+            </button>
+        </div>
+        <div class="card-body" id="conteneur-arrets">
+            <p class="text-muted" id="msg-aucun-arret">
+                <i class="bi bi-check-circle text-success"></i>
+                Aucun arrêt — cliquez "Ajouter un arrêt" si des pannes ont eu lieu.
+            </p>
+        </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="mb-3">
+        <label class="form-label">Notes / Observations</label>
+        <textarea name="notes" class="form-control" rows="2"
+                  placeholder="Observations particulières du poste..."></textarea>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-success btn-lg">
+            <i class="bi bi-save"></i> Enregistrer le poste
+        </button>
+        <a href="{{ url_for('saisie.historique') }}" class="btn btn-outline-secondary btn-lg">
+            Annuler
+        </a>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Template HTML d'une ligne d'arrêt
+const templateArret = (index) => `
+<div class="row g-2 mb-2 align-items-end border rounded p-2" id="arret-${index}">
+    <div class="col-md-2">
+        <label class="form-label small">Machine</label>
+        <select name="arret_machine[]" class="form-select form-select-sm" required>
+            {% for m in machines %}
+            <option value="{{ m }}">{{ m }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small">Heure début</label>
+        <input type="time" name="arret_debut[]" class="form-control form-control-sm" required>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small">Heure fin</label>
+        <input type="time" name="arret_fin[]" class="form-control form-control-sm" required>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label small">Cause de l'arrêt</label>
+        <input type="text" name="arret_cause[]" class="form-control form-control-sm"
+               placeholder="Décrivez la cause..." required>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small">Catégorie</label>
+        <select name="arret_categorie[]" class="form-select form-select-sm">
+            {% for c in categories %}
+            <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-1">
+        <button type="button" class="btn btn-outline-danger btn-sm w-100"
+                onclick="supprimerArret(${index})">
+            <i class="bi bi-trash"></i>
+        </button>
+    </div>
+</div>`;
+
+let compteur = 0;
+
+function ajouterArret() {
+    document.getElementById('msg-aucun-arret').style.display = 'none';
+    document.getElementById('conteneur-arrets').insertAdjacentHTML('beforeend', templateArret(compteur));
+    compteur++;
+}
+
+function supprimerArret(index) {
+    const el = document.getElementById('arret-' + index);
+    if (el) el.remove();
+    if (document.querySelectorAll('[id^="arret-"]').length === 0) {
+        document.getElementById('msg-aucun-arret').style.display = 'block';
+    }
+}
+</script>
+{% endblock %}

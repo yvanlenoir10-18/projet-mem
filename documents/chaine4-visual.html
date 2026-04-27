@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Chaîne 4 — CUF Ebolowa — Process & Points de mesure TRS</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 24px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+    header h1 { font-size: 1.5rem; color: #f8fafc; font-weight: 700; }
+    header p  { color: #94a3b8; font-size: 0.9rem; margin-top: 4px; }
+
+    /* ─── LÉGENDE ─────────────────────────────────── */
+    .legend {
+      display: flex; gap: 16px; justify-content: center;
+      flex-wrap: wrap; margin-bottom: 28px;
+    }
+    .legend-item {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 0.8rem; color: #cbd5e1;
+    }
+    .legend-dot {
+      width: 14px; height: 14px; border-radius: 4px;
+    }
+
+    /* ─── FLOW CONTAINER ─────────────────────────── */
+    .flow {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    /* ─── ARROW ──────────────────────────────────── */
+    .arrow {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 0;
+      color: #475569; font-size: 0.75rem;
+    }
+    .arrow .line {
+      width: 2px; height: 24px;
+      background: linear-gradient(to bottom, #334155, #475569);
+    }
+    .arrow .head { font-size: 18px; color: #475569; line-height: 1; }
+    .arrow .label {
+      font-size: 0.7rem; color: #64748b; margin-top: 2px; font-style: italic;
+    }
+
+    /* ─── MACHINE CARD ───────────────────────────── */
+    .machine {
+      background: #1e293b;
+      border: 2px solid #334155;
+      border-radius: 12px;
+      padding: 14px 20px;
+      min-width: 260px; max-width: 420px; width: 100%;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .machine:hover { border-color: #60a5fa; transform: translateY(-1px); }
+    .machine.bottleneck {
+      border-color: #f97316;
+      background: #1c1007;
+      box-shadow: 0 0 20px rgba(249,115,22,0.2);
+    }
+    .machine.bottleneck:hover { border-color: #fb923c; }
+    .machine.secondary { background: #162032; border-color: #1e3a5f; }
+    .machine.output {
+      background: #0f2818; border-color: #166534;
+    }
+
+    .machine-header {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 6px;
+    }
+    .machine-icon { font-size: 1.4rem; }
+    .machine-name { font-weight: 700; font-size: 1rem; color: #f1f5f9; }
+    .machine-role { font-size: 0.75rem; color: #94a3b8; margin-bottom: 8px; }
+
+    .badge {
+      display: inline-block; padding: 2px 8px; border-radius: 999px;
+      font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.05em; margin-bottom: 8px;
+    }
+    .badge-bottleneck { background: #7c2d12; color: #fed7aa; }
+    .badge-measure    { background: #1e3a5f; color: #93c5fd; }
+    .badge-output     { background: #14532d; color: #86efac; }
+    .badge-secondary  { background: #1e1b4b; color: #c4b5fd; }
+
+    /* ─── MESURES TRS ────────────────────────────── */
+    .trs-measures {
+      display: none;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px dashed #334155;
+    }
+    .trs-measures.open { display: block; }
+    .trs-measures h4 {
+      font-size: 0.75rem; color: #60a5fa; margin-bottom: 6px;
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .measure-row {
+      display: flex; gap: 8px; align-items: flex-start;
+      font-size: 0.78rem; color: #cbd5e1; margin-bottom: 4px;
+    }
+    .measure-row .tag {
+      flex-shrink: 0; padding: 1px 6px; border-radius: 4px;
+      font-size: 0.65rem; font-weight: 600;
+    }
+    .tag-d { background: #1e3a5f; color: #93c5fd; } /* Disponibilité */
+    .tag-p { background: #3b1a6b; color: #d8b4fe; } /* Performance */
+    .tag-q { background: #14532d; color: #86efac; } /* Qualité */
+    .tag-w { background: #7c2d12; color: #fed7aa; } /* Qui saisit */
+
+    .hint {
+      font-size: 0.7rem; color: #64748b; margin-top: 4px; font-style: italic;
+    }
+
+    /* ─── SPLIT FLOW ─────────────────────────────── */
+    .split {
+      display: flex;
+      gap: 24px;
+      width: 100%;
+      max-width: 860px;
+      justify-content: center;
+      align-items: flex-start;
+    }
+    .split-branch {
+      display: flex; flex-direction: column; align-items: center;
+      flex: 1;
+    }
+    .split-label {
+      font-size: 0.72rem; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.04em; margin-bottom: 8px; padding: 4px 12px;
+      border-radius: 999px;
+    }
+    .split-label.bad  { background: #7c1d1d; color: #fca5a5; }
+    .split-label.good { background: #14532d; color: #86efac; }
+
+    .split-divider {
+      display: flex; align-items: center; gap: 0;
+      width: 100%; max-width: 860px;
+      margin: 8px 0;
+    }
+    .split-divider .line { flex: 1; height: 2px; background: #334155; }
+    .split-divider .text {
+      padding: 0 12px; font-size: 0.72rem; color: #64748b; white-space: nowrap;
+    }
+
+    /* ─── MISSING DATA PANEL ─────────────────────── */
+    .missing-panel {
+      max-width: 860px; margin: 32px auto 0;
+      background: #1a1a2e; border: 1px solid #7c2d12;
+      border-radius: 12px; padding: 20px;
+    }
+    .missing-panel h3 {
+      color: #fca5a5; font-size: 0.9rem; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .missing-item {
+      display: flex; gap: 10px; margin-bottom: 8px;
+      font-size: 0.8rem; color: #fcd34d;
+    }
+    .missing-item::before { content: "⚠"; flex-shrink: 0; }
+
+    /* ─── TACTIC PANEL ───────────────────────────── */
+    .tactic-panel {
+      max-width: 860px; margin: 16px auto 0;
+      background: #0f1e2f; border: 1px solid #1e3a5f;
+      border-radius: 12px; padding: 20px;
+    }
+    .tactic-panel h3 {
+      color: #93c5fd; font-size: 0.9rem; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .tactic-row {
+      display: flex; gap: 10px; margin-bottom: 8px; font-size: 0.8rem; color: #cbd5e1;
+    }
+    .tactic-row::before { content: "→"; color: #3b82f6; flex-shrink: 0; }
+
+    footer {
+      text-align: center; margin-top: 32px;
+      font-size: 0.7rem; color: #475569;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🪵 Chaîne 4 — Scierie CUF Ebolowa</h1>
+  <p>Process de production & Points de mesure TRS · Cliquez sur une machine pour voir les données à collecter</p>
+</header>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#f97316"></div> Machine goulot (bicoupe)</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div> Machine principale</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div> Machines de reprise</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div> Sortie / Empilage</div>
+</div>
+
+<div class="flow">
+
+  <!-- PARC À GRUMES -->
+  <div class="machine" onclick="toggle(this)">
+    <div class="machine-header">
+      <span class="machine-icon">🌲</span>
+      <span class="machine-name">Parc à grumes</span>
+    </div>
+    <div class="machine-role">Réception, classement et alimentation en grumes</div>
+    <span class="badge badge-measure">Point de départ TRS</span>
+    <div class="trs-measures">
+      <h4>📋 Données à collecter</h4>
+      <div class="measure-row"><span class="tag tag-d">DISPO</span> Heure d'ouverture du parc · Disponibilité des grumes</div>
+      <div class="measure-row"><span class="tag tag-p">PERF</span> Nombre de grumes prêtes au début du poste</div>
+      <div class="measure-row"><span class="tag tag-p">PERF</span> Essence(s) prévue(s) : Ayous · Azobé · Iroko · Movingui</div>
+      <div class="measure-row"><span class="tag tag-w">QUI</span> Chef de poste — en début de poste</div>
+      <p class="hint">⚠ Donnée manquante : diamètre moyen des grumes par essence — critique pour calculer la capacité théorique</p>
+    </div>
+  </div>
+
+  <div class="arrow"><div class="line"></div><div class="head">▼</div><span class="label">grumes entières</span></div>
+
+  <!-- SCIE DE TÊTE -->
+  <div class="machine" onclick="toggle(this)">
+    <div class="machine-header">
+      <span class="machine-icon">🔪</span>
+      <span class="machine-name">Scie de tête</span>
+    </div>
+    <div class="machine-role">Débit des grumes en plateaux bruts</div>
+    <span class="badge badge-measure">Mesure disponibilité</span>
+    <div class="trs-measures">
+      <h4>📋 Données à collecter</h4>
+      <div class="measure-row"><span class="tag tag-d">DISPO</span> Heure de démarrage réel · Heure d'arrêt réel</div>
+      <div class="measure-row"><span class="tag tag-d">DISPO</span> Causes d'arrêt (panne, manque grumes, affûtage lame…)</div>
+      <div class="measure-row"><span class="tag tag-d">DISPO</span> Durée de chaque arrêt en minutes</div>
+      <div class="measure-row"><span class="tag tag-p">PERF</span> Nombre de plateaux produits dans le poste</div>
+      <div class="measure-row"><span class="tag tag-w">QUI</span> Opérateur scie de tête — en fin de poste</div>
+      <p class="hint">⚠ Donnée manquante : temps cycle théorique par grume (en minutes) — à obtenir de la documentation constructeur</p>
+    </div>
+  </div>
+
+  <div class="arrow"><div class="line"></div><div class="head">▼</div><span class="label">plateaux bruts</span></div>
+
+  <!-- BICOUPE = GOULOT -->
+  <div class="machine bottleneck" onclick="toggle(this)">
+    <div class="machine-header">
+      <span class="machine-icon">⚙️</span>
+      <span class="machine-name">Bicoupe</span>
+    </div>
+    <div class="machine-role">Débit des plateaux en planches — traite 100% du bois</div>
+    <span class="badge badge-bottleneck">🔴 GOULOT · Machine critique TRS</span>
+    <div class="trs-measures">
+      <h4>📋 Données à collecter — PRIORITÉ ABSOLUE</h4>
+      <div class="measure-row"><span class="tag tag-d">DISPO</span> Heure démarrage · Heure arrêt · Durée nette de fonctionnement</div>
+      <div class="measure-row"><span class="tag tag-d">DISPO</span> Tous les arrêts : panne, affûtage, attente plateau, pause, réglage</div>
+      <div class="measure-row"><span class="tag tag-d">DISPO</span> Durée exacte de chaque arrêt en minutes</div>
+      <div class="measure-row"><span class="tag tag-p">PERF</span> Nombre de planches produites dans le poste</div>
+      <div class="measure-row"><span class="tag tag-p">PERF</span> Volume estimé en m³ (si mesure disponible)</div>
+      <div class="measure-row"><span class="tag tag-q">QUAL</span> Nombre de planches rejetées pour défaut à la sortie bicoupe</div>
+      <div class="measure-row"><span class="tag tag-q">QUAL</span> Type de défaut principal (nœud, flache, sciage gauche…)</div>
+      <div class="measure-row"><span class="tag tag-w">QUI</span> Opérateur bicoupe — saisie immédiate à chaque arrêt + fin de poste</div>
+      <p class="hint">🎯 C'est ici que se calcule l'essentiel du TRS. Si une seule fiche de collecte est parfaite, c'est celle-ci.</p>
+    </div>
+  </div>
+
+  <div class="arrow"><div class="line"></div><div class="head">▼</div><span class="label">planches débitées</span></div>
+
+  <!-- SPLIT -->
+  <div class="split-divider">
+    <div class="line"></div>
+    <div class="text">Tri visuel à la sortie bicoupe</div>
+    <div class="line"></div>
+  </div>
+
+  <div class="split">
+
+    <!-- BRANCHE GAUCHE : planches défectueuses -->
+    <div class="split-branch">
+      <span class="split-label bad">Planches défectueuses ~%</span>
+
+      <div class="arrow"><div class="line"></div><div class="head">▼</div></div>
+      <div class="machine secondary" onclick="toggle(this)" style="min-width:200px">
+        <div class="machine-header">
+          <span class="machine-icon">✂️</span>
+          <span class="machine-name">Déligneuse</span>
+        </div>
+        <div class="machine-role">Enlève les flaches (écorce sur les bords)</div>
+        <span class="badge badge-secondary">Reprise</span>
+        <div class="trs-measures">
+          <h4>📋 Données à collecter</h4>
+          <div class="measure-row"><span class="tag tag-p">PERF</span> Nombre de planches traitées</div>
+          <div class="measure-row"><span class="tag tag-d">DISPO</span> Arrêts éventuels + durée</div>
+          <div class="measure-row"><span class="tag tag-w">QUI</span> Opérateur déligneuse — fin de poste</div>
+        </div>
+      </div>
+
+      <div class="arrow"><div class="line"></div><div class="head">▼</div></div>
+      <div class="machine secondary" onclick="toggle(this)" style="min-width:200px">
+        <div class="machine-header">
+          <span class="machine-icon">📏</span>
+          <span class="machine-name">Ébouteuse</span>
+        </div>
+        <div class="machine-role">Coupe les extrémités pour calibrer la longueur</div>
+        <span class="badge badge-secondary">Reprise</span>
+        <div class="trs-measures">
+          <h4>📋 Données à collecter</h4>
+          <div class="measure-row"><span class="tag tag-p">PERF</span> Nombre de planches éboutées</div>
+          <div class="measure-row"><span class="tag tag-q">QUAL</span> Volume de chutes (perte matière)</div>
+          <div class="measure-row"><span class="tag tag-w">QUI</span> Opérateur ébouteuse — fin de poste</div>
+        </div>
+      </div>
+
+      <div class="arrow"><div class="line"></div><div class="head">▼</div></div>
+      <div class="machine secondary" onclick="toggle(this)" style="min-width:200px">
+        <div class="machine-header">
+          <span class="machine-icon">🔧</span>
+          <span class="machine-name">Dédoubleuse</span>
+        </div>
+        <div class="machine-role">Recoupe les plateaux trop épais en deux planches</div>
+        <span class="badge badge-secondary">Reprise</span>
+        <div class="trs-measures">
+          <h4>📋 Données à collecter</h4>
+          <div class="measure-row"><span class="tag tag-p">PERF</span> Nombre de plateaux dédoublés</div>
+          <div class="measure-row"><span class="tag tag-d">DISPO</span> Arrêts + durée</div>
+          <div class="measure-row"><span class="tag tag-w">QUI</span> Opérateur dédoubleuse — fin de poste</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- BRANCHE DROITE : planches conformes -->
+    <div class="split-branch">
+      <span class="split-label good">Planches conformes ~%</span>
+      <div style="height: 40px; display:flex; flex-direction:column; align-items:center;">
+        <div class="arrow"><div class="line" style="height:40px"></div><div class="head">▼</div></div>
+      </div>
+      <div class="machine output" onclick="toggle(this)" style="min-width:200px">
+        <div class="machine-header">
+          <span class="machine-icon">🗂️</span>
+          <span class="machine-name">Triage direct</span>
+        </div>
+        <div class="machine-role">Classement des planches conformes par qualité et essence</div>
+        <span class="badge badge-output">Sortie qualité</span>
+        <div class="trs-measures">
+          <h4>📋 Données à collecter</h4>
+          <div class="measure-row"><span class="tag tag-q">QUAL</span> Planches 1ère qualité · 2ème qualité · rebus</div>
+          <div class="measure-row"><span class="tag tag-p">PERF</span> Volume total trié en m³</div>
+          <div class="measure-row"><span class="tag tag-w">QUI</span> Trieur — en continu pendant le poste</div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- MERGE -->
+  <div class="split-divider" style="margin-top:16px">
+    <div class="line"></div>
+    <div class="text">Convergence vers l'empilage</div>
+    <div class="line"></div>
+  </div>
+
+  <div class="arrow"><div class="line"></div><div class="head">▼</div></div>
+
+  <!-- TRIAGE FINAL + EMPILAGE -->
+  <div class="machine output" onclick="toggle(this)">
+    <div class="machine-header">
+      <span class="machine-icon">📦</span>
+      <span class="machine-name">Triage final + Empilage</span>
+    </div>
+    <div class="machine-role">Mesure finale du volume produit — chiffre de référence du poste</div>
+    <span class="badge badge-output">📊 Mesure de production finale (m³)</span>
+    <div class="trs-measures">
+      <h4>📋 Données à collecter — FIN DE POSTE OBLIGATOIRE</h4>
+      <div class="measure-row"><span class="tag tag-p">PERF</span> <strong>Volume total produit en m³ — chiffre officiel du poste</strong></div>
+      <div class="measure-row"><span class="tag tag-q">QUAL</span> Volume 1ère qualité · 2ème qualité · rebus (en m³ ou %)</div>
+      <div class="measure-row"><span class="tag tag-q">QUAL</span> Essence(s) débitée(s) dans le poste</div>
+      <div class="measure-row"><span class="tag tag-d">DISPO</span> Heure de fin de poste officielle</div>
+      <div class="measure-row"><span class="tag tag-w">QUI</span> Chef de poste — signature obligatoire</div>
+      <p class="hint">🎯 Ce chiffre m³ est le numérateur du TRS Performance. Sans lui, pas de TRS.</p>
+    </div>
+  </div>
+
+</div>
+
+<!-- DONNÉES MANQUANTES -->
+<div class="missing-panel">
+  <h3>⚠️ Données critiques manquantes à obtenir sur le terrain</h3>
+  <div class="missing-item">Temps de cycle théorique de la bicoupe par essence (Ayous, Azobé, Iroko, Movingui) — documentation constructeur ou chronométrage</div>
+  <div class="missing-item">Diamètre moyen des grumes traitées par essence — mesure au parc à grumes</div>
+  <div class="missing-item">Taux de conversion grume → planche par essence (rendement matière théorique)</div>
+  <div class="missing-item">Durée théorique d'un poste (heures d'ouverture officielles) : est-ce 8h, 10h, 12h ?</div>
+  <div class="missing-item">% actuel de planches défectueuses (la proportion entre les deux branches du split)</div>
+  <div class="missing-item">Prix de vente du m³ par essence (pour chiffrer les pertes en FCFA)</div>
+</div>
+
+<!-- PLAN DE COLLECTE -->
+<div class="tactic-panel">
+  <h3>📋 Stratégie de collecte recommandée</h3>
+  <div class="tactic-row">Bicoupe : opérateur saisit chaque arrêt en temps réel sur fiche papier collée à la machine. Chef de poste valide en fin de poste.</div>
+  <div class="tactic-row">Scie de tête + Machines de reprise : saisie en fin de poste par l'opérateur concerné. 5 minutes maximum.</div>
+  <div class="tactic-row">Empilage : chef de poste mesure le volume total (m³) et signe la fiche. C'est le chiffre de référence officiel.</div>
+  <div class="tactic-row">Une seule feuille de relevé par poste, par machine. Format A4, stylo, cases à cocher pour les causes d'arrêt.</div>
+</div>
+
+<footer>
+  CUF Ebolowa · Mémoire M2 ISABEE 2025–2026 · Cliquez sur chaque machine pour voir les données à collecter
+</footer>
+
+<script>
+  function toggle(el) {
+    const panel = el.querySelector('.trs-measures');
+    if (panel) panel.classList.toggle('open');
+  }
+</script>
+</body>
+</html>

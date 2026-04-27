@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block title %}Détail poste {{ poste.date }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4><i class="bi bi-file-text"></i> Poste du {{ poste.date.strftime('%d/%m/%Y') }} — {{ poste.numero_poste }}</h4>
+    <a href="{{ url_for('saisie.historique') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i> Retour
+    </a>
+</div>
+
+<div class="row g-3 mb-4">
+    <!-- TRS Global -->
+    <div class="col-md-3">
+        <div class="card kpi-card {{ couleur_trs }} h-100">
+            <div class="card-body text-center">
+                <div class="text-muted small">TRS Global</div>
+                <div class="kpi-value text-{{ couleur_trs }}">{{ poste.trs_global }}%</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <div class="text-muted small">Disponibilité</div>
+                <div class="kpi-value">{{ poste.trs_disponibilite }}%</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <div class="text-muted small">Performance</div>
+                <div class="kpi-value">{{ poste.trs_performance }}%</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <div class="text-muted small">Qualité</div>
+                <div class="kpi-value">{{ poste.trs_qualite }}%</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">Production</div>
+            <div class="card-body">
+                <table class="table table-sm mb-0">
+                    <tr><td>Essence</td><td><strong>{{ poste.essence }}</strong></td></tr>
+                    <tr><td>Volume entrée</td><td>{{ poste.volume_entree }} m³</td></tr>
+                    <tr><td>Volume scié</td><td>{{ poste.volume_sorti }} m³</td></tr>
+                    <tr><td>Volume rebut</td><td>{{ poste.volume_rebut }} m³</td></tr>
+                    <tr><td>Rendement matière</td><td>{{ poste.rendement_matiere }}%</td></tr>
+                    <tr><td>Effectif</td><td>{{ poste.effectif }} opérateurs</td></tr>
+                    <tr class="table-danger">
+                        <td>Perte financière estimée</td>
+                        <td><strong>{{ "{:,.0f}".format(perte_fcfa) }} FCFA</strong></td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between">
+                <span>Arrêts machine</span>
+                <span class="badge bg-danger">{{ poste.arrets|length }} arrêt(s) — {{ poste.duree_totale_arrets }} min</span>
+            </div>
+            <div class="card-body p-0">
+                {% if poste.arrets %}
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Machine</th><th>Horaire</th><th>Durée</th><th>Cause</th></tr></thead>
+                    <tbody>
+                        {% for a in poste.arrets %}
+                        <tr>
+                            <td>{{ a.machine }}</td>
+                            <td>{{ a.heure_debut }}–{{ a.heure_fin }}</td>
+                            <td><span class="badge bg-danger">{{ a.duree_min }} min</span></td>
+                            <td>{{ a.cause }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="p-3 text-muted mb-0"><i class="bi bi-check-circle text-success"></i> Aucun arrêt ce poste.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

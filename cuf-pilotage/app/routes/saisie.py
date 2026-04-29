@@ -96,9 +96,9 @@ def nouveau_poste():
             flash(f'Équipe enregistrée. TRS calculé : {equipe.trs_global}%', 'success')
             return redirect(url_for('saisie.historique'))
 
-        except (ValueError, KeyError) as e:
+        except Exception as e:
             db.session.rollback()
-            flash(f'Erreur dans le formulaire : {str(e)}', 'danger')
+            flash(f'Erreur lors de l\'enregistrement : {type(e).__name__} — {str(e)}', 'danger')
 
     return _render_form()
 

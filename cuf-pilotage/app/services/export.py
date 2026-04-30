@@ -145,12 +145,12 @@ def _creer_feuille_equipes(wb, equipes):
 
     entetes = [
         'Date', 'Équipe', 'Essences', 'Effectif',
-        'Entrée (m³)', 'Scié (m³)', 'Rebut (m³)',
+        'Entrée (m³)', 'Conforme (m³)', 'Déclassé (m³)', 'Déchets (m³)',
         'Arrêts (min)', 'TRS (%)', 'Dispo (%)', 'Perf (%)', 'Qualité (%)',
         'Perte D (FCFA)', 'Perte P (FCFA)', 'Perte Q (FCFA)', 'Perte totale (FCFA)',
         'Notes'
     ]
-    largeurs = [14, 12, 20, 10, 12, 11, 11, 12, 10, 10, 10, 12, 14, 14, 14, 16, 30]
+    largeurs = [14, 12, 20, 10, 12, 11, 11, 11, 12, 10, 10, 10, 12, 14, 14, 14, 16, 30]
 
     for j, (h, w) in enumerate(zip(entetes, largeurs), start=1):
         ws.column_dimensions[get_column_letter(j)].width = w
@@ -166,8 +166,9 @@ def _creer_feuille_equipes(wb, equipes):
             e.essences_label,
             e.effectif,
             e.volume_entree,
-            e.volume_sorti,
-            e.volume_rebut,
+            e.volume_conforme,
+            e.volume_declass,
+            e.volume_dechets,
             e.duree_totale_arrets,
             e.trs_global,
             e.trs_disponibilite,
@@ -184,9 +185,9 @@ def _creer_feuille_equipes(wb, equipes):
             c = ws.cell(row=i, column=j, value=val)
             if j == 9:
                 bg = _bg_trs(e.trs_global)
-            elif j in (10, 11, 12):
+            elif j in (11, 12, 13):
                 bg = _bg_trs(val)
-            elif j in (13, 14, 15, 16):
+            elif j in (14, 15, 16, 17):
                 bg = ROUGE_PALE if (val or 0) > 0 else bg_ligne
             else:
                 bg = bg_ligne

@@ -6,10 +6,16 @@ Référence : Jonsson & Lesshammar (1999), fondateurs de l'OEE/TRS.
 
 Pertes FCFA décomposées en 3 composantes :
   Perte D = arrêts non planifiés × capacité_h × prix_moyen_pondéré
-  Perte P = (capacité_temps_utile − production_réelle) × prix_moyen_pondéré
-  Perte Q = Σ(volume_sorti × %rebut × prix_essence × (1 − taux_revente))
+  Perte P = (capacité_temps_utile − volume_sorti) × prix_moyen_pondéré
+  Perte Q = Σ(volume_declass × prix × (1−taux_revente)) + Σ(volume_dechets × prix)
+
+Volumes :
+  volume_sorti   = conforme + declass (base Performance et Qualité TRS)
+  volume_conforme = planches satisfaisant les contrats (base Qualité TRS)
+  volume_declass  = planches déclassées vendues localement à prix réduit
+  volume_dechets  = sciure/dosses/chutes — perte sèche 100%
 """
-from ..models import Parametre, REBUT_NIVEAUX, normalise_essence
+from ..models import Parametre, normalise_essence
 
 
 # ── TRS ──────────────────────────────────────────────────────────────────────
@@ -17,8 +23,9 @@ from ..models import Parametre, REBUT_NIVEAUX, normalise_essence
 def calcule_trs(equipe):
     """
     Calcule et stocke les 3 composantes du TRS d'une équipe.
-    Les arrêts sont partagés sur toute la durée du poste.
-    La performance compare la production agrégée à la capacité théorique.
+    Disponibilité : temps machine réel / temps poste officiel.
+    Performance   : volume sorti / volume théorique sur temps utile.
+    Qualité       : volume conforme / volume sorti (planches).
     """
     duree_poste = float(Parametre.get('duree_poste', 480))
     capacite_h  = float(Parametre.get('capacite_equipe_h', 1.5625))
@@ -31,10 +38,10 @@ def calcule_trs(equipe):
     # Performance
     temps_utile_h    = temps_utile / 60
     volume_theorique = capacite_h * temps_utile_h
-    volume_sorti     = equipe.volume_sorti
+    volume_sorti     = equipe.volume_sorti          # conforme + declass
     performance = min(1.0, volume_sorti / volume_theorique) if volume_theorique > 0 else 0
 
-    # Qualité
+    # Qualité : conforme / (conforme + declass) — les déchets ne sont pas du "produit"
     volume_conforme = equipe.volume_conforme
     qualite = volume_conforme / volume_sorti if volume_sorti > 0 else 0
 
@@ -70,8 +77,12 @@ def calcule_pertes_equipe(equipe):
     """
     Décompose les pertes financières d'une équipe en FCFA (D + P + Q).
 
+    Perte D : valeur non produite pendant les arrêts non planifiés.
+    Perte P : sous-performance vs capacité théorique sur le temps utile.
+    Perte Q : perte déclassé (revente à 30%) + perte déchets (perte sèche 100%).
+
     Returns:
-        dict {'perte_d', 'perte_p', 'perte_q', 'total'}
+        dict {'perte_d', 'perte_p', 'perte_q', 'perte_q_declass', 'perte_q_dechets', 'total'}
     """
     duree_poste   = float(Parametre.get('duree_poste', 480))
     capacite_h    = float(Parametre.get('capacite_equipe_h', 1.5625))
@@ -84,34 +95,44 @@ def calcule_pertes_equipe(equipe):
     duree_arrets_total = equipe.duree_totale_arrets
     temps_utile_h = max(0, duree_poste - duree_arrets_total) / 60
 
-    # Prix moyen pondéré par volume (D et P sont machine-level)
+    # Prix moyen pondéré par volume sorti (D et P sont machine-level)
     total_vol = equipe.volume_sorti
     if total_vol > 0 and equipe.productions:
         prix_moyen = sum(
-            _prix_production(p) * p.volume_sorti
+            _prix_production(p) * (p.volume_conforme + p.volume_declass)
             for p in equipe.productions
         ) / total_vol
     else:
         prix_moyen = 0.0
 
-    # Perte D : production perdue sur le temps d'arrêt non planifié
+    # Perte D : production perdue pendant les arrêts non planifiés
     perte_d = (duree_arrets_non_planifies / 60) * capacite_h * prix_moyen
 
     # Perte P : sous-performance sur le temps utile
     volume_theorique = temps_utile_h * capacite_h
     perte_p = max(0.0, volume_theorique - total_vol) * prix_moyen
 
-    # Perte Q : valeur nette du rebut (après revente partielle) par essence
-    perte_q = sum(
-        p.volume_sorti * p.rebut_pct * _prix_production(p) * (1 - taux_revente)
+    # Perte Q déclassé : valeur nette perdue sur les planches déclassées
+    perte_q_declass = sum(
+        p.volume_declass * _prix_production(p) * (1 - taux_revente)
         for p in equipe.productions
     )
 
+    # Perte Q déchets : perte sèche sur sciure/dosses/chutes (zéro valeur marchande)
+    perte_q_dechets = sum(
+        p.volume_dechets * _prix_production(p)
+        for p in equipe.productions
+    )
+
+    perte_q = perte_q_declass + perte_q_dechets
+
     return {
-        'perte_d': round(perte_d, 0),
-        'perte_p': round(perte_p, 0),
-        'perte_q': round(perte_q, 0),
-        'total':   round(perte_d + perte_p + perte_q, 0),
+        'perte_d':          round(perte_d, 0),
+        'perte_p':          round(perte_p, 0),
+        'perte_q':          round(perte_q, 0),
+        'perte_q_declass':  round(perte_q_declass, 0),
+        'perte_q_dechets':  round(perte_q_dechets, 0),
+        'total':            round(perte_d + perte_p + perte_q, 0),
     }
 
 
@@ -125,7 +146,6 @@ def calcule_pertes_fcfa(equipe):
 def pareto_arrets(equipes):
     """
     Calcule le Pareto des causes d'arrêt sur une liste d'équipes.
-    Interface inchangée : accepte tout objet ayant un attribut .arrets.
     """
     from collections import defaultdict
     cumul = defaultdict(lambda: {'duree': 0, 'count': 0, 'categorie': ''})

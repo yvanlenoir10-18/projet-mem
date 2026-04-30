@@ -59,8 +59,9 @@
                         <tr>
                             <th>Essence</th>
                             <th>Entrée (m³)</th>
-                            <th>Scié (m³)</th>
-                            <th>Rebut</th>
+                            <th>Conforme (m³)</th>
+                            <th>Déclassé (m³)</th>
+                            <th>Déchets (m³)</th>
                             <th>Rendement</th>
                             <th>Prix/m³</th>
                         </tr>
@@ -70,12 +71,9 @@
                         <tr>
                             <td><span class="badge bg-secondary">{{ prod.essence }}</span></td>
                             <td>{{ prod.volume_entree }}</td>
-                            <td>{{ prod.volume_sorti }}</td>
-                            <td>
-                                <span class="badge bg-{{ 'danger' if prod.rebut_niveau == 'fort' else ('warning' if prod.rebut_niveau == 'moyen' else ('info' if prod.rebut_niveau == 'faible' else 'success')) }} text-{{ 'dark' if prod.rebut_niveau in ['faible', 'moyen'] else 'white' }}">
-                                    {{ prod.rebut_niveau }} ({{ (prod.rebut_pct * 100)|int }}%)
-                                </span>
-                            </td>
+                            <td class="text-success fw-bold">{{ prod.volume_conforme }}</td>
+                            <td class="text-warning">{{ prod.volume_declass }}</td>
+                            <td class="text-danger">{{ prod.volume_dechets }}</td>
                             <td>{{ prod.rendement_matiere }}%</td>
                             <td class="text-muted small">
                                 {% if prod.prix_snapshot %}
@@ -88,9 +86,10 @@
                     <tfoot class="table-secondary fw-bold">
                         <tr>
                             <td>Total</td>
-                            <td>{{ poste.volume_entree }}</td>
-                            <td>{{ poste.volume_sorti }}</td>
-                            <td>{{ poste.volume_rebut }} m³</td>
+                            <td>{{ poste.volume_entree }} m³</td>
+                            <td class="text-success">{{ poste.volume_conforme }} m³</td>
+                            <td class="text-warning">{{ poste.volume_declass }} m³</td>
+                            <td class="text-danger">{{ poste.volume_dechets }} m³</td>
                             <td colspan="2"></td>
                         </tr>
                     </tfoot>
@@ -128,7 +127,7 @@
                         <td class="text-end fw-bold">{{ "{:,.0f}".format(pertes.perte_q) }} FCFA</td>
                     </tr>
                     <tr class="table-danger">
-                        <td><small class="text-muted">Rebut net après revente à 30%</small></td>
+                        <td><small class="text-muted">Déclassé (–70%) : {{ "{:,.0f}".format(pertes.perte_q_declass) }} + Déchets (–100%) : {{ "{:,.0f}".format(pertes.perte_q_dechets) }} FCFA</small></td>
                         <td></td>
                     </tr>
                     <tr class="table-dark">

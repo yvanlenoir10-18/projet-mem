@@ -5,6 +5,12 @@ Hiérarchie :
   Equipe  (1 poste de 8h)
     └─ Production[]  (1 ligne par essence traitée)
     └─ Arret[]       (arrêts machine partagés sur toute l'équipe)
+
+Volumes Production (3 catégories explicites) :
+  volume_entree   → grumes entrant dans la scie
+  volume_conforme → planches satisfaisant les contrats (prix plein)
+  volume_declass  → planches vendues localement à prix réduit
+  volume_dechets  → sciure/dosses/chutes (calculé : entree - conforme - declass)
 """
 import unicodedata
 from datetime import datetime, date, timedelta
@@ -13,13 +19,6 @@ from flask_login import UserMixin
 import bcrypt
 
 db = SQLAlchemy()
-
-REBUT_NIVEAUX = {
-    'aucun':  0.00,
-    'faible': 0.05,
-    'moyen':  0.15,
-    'fort':   0.30,
-}
 
 
 def normalise_essence(nom):
@@ -109,20 +108,28 @@ class Equipe(db.Model):
         return sum(a.duree_min for a in self.arrets if a.duree_min)
 
     @property
-    def volume_sorti(self):
-        return round(sum(p.volume_sorti for p in self.productions), 3)
-
-    @property
     def volume_entree(self):
         return round(sum(p.volume_entree for p in self.productions), 3)
 
     @property
-    def volume_rebut(self):
-        return round(sum(p.volume_rebut_calcule for p in self.productions), 3)
+    def volume_sorti(self):
+        """Total planches (conformes + déclassées) — base du TRS Performance."""
+        return round(sum(p.volume_conforme + p.volume_declass for p in self.productions), 3)
 
     @property
     def volume_conforme(self):
+        """Planches satisfaisant les contrats."""
         return round(sum(p.volume_conforme for p in self.productions), 3)
+
+    @property
+    def volume_declass(self):
+        """Planches déclassées vendues localement."""
+        return round(sum(p.volume_declass for p in self.productions), 3)
+
+    @property
+    def volume_dechets(self):
+        """Déchets inutilisables (sciure, dosses, chutes)."""
+        return round(sum(p.volume_dechets for p in self.productions), 3)
 
     @property
     def essences_label(self):
@@ -143,7 +150,7 @@ class Equipe(db.Model):
 class Production(db.Model):
     """
     Une ligne de production par essence dans une équipe.
-    rebut_niveau (qualitatif) détermine le % de rebut via REBUT_NIVEAUX.
+    Trois volumes explicites : conforme (contrats), declass (local), dechets (calculé).
     prix_snapshot est figé à la soumission pour des pertes FCFA cohérentes.
     """
     __tablename__ = 'production'
@@ -153,34 +160,27 @@ class Production(db.Model):
 
     essence = db.Column(db.String(50), nullable=False)
     volume_entree = db.Column(db.Float, nullable=False)
-    volume_sorti = db.Column(db.Float, nullable=False)
-    rebut_niveau = db.Column(db.String(10), nullable=False, default='aucun')
-    nb_planches_conformes = db.Column(db.Integer, default=0)
-    nb_planches_defectueuses = db.Column(db.Integer, default=0)
+    volume_conforme = db.Column(db.Float, nullable=False, default=0.0)
+    volume_declass = db.Column(db.Float, nullable=False, default=0.0)
     prix_snapshot = db.Column(db.Float)
 
     cree_le = db.Column(db.DateTime, default=datetime.utcnow)
 
     @property
-    def rebut_pct(self):
-        return REBUT_NIVEAUX.get(self.rebut_niveau, 0.0)
-
-    @property
-    def volume_rebut_calcule(self):
-        return round(self.volume_sorti * self.rebut_pct, 3)
-
-    @property
-    def volume_conforme(self):
-        return max(0.0, round(self.volume_sorti - self.volume_rebut_calcule, 3))
+    def volume_dechets(self):
+        """Sciure, dosses, chutes = entree - conforme - declass."""
+        return max(0.0, round(self.volume_entree - self.volume_conforme - self.volume_declass, 3))
 
     @property
     def rendement_matiere(self):
+        """(conforme + declass) / entree × 100 — rendement matière réel."""
+        total_planches = self.volume_conforme + self.volume_declass
         if self.volume_entree and self.volume_entree > 0:
-            return round((self.volume_sorti / self.volume_entree) * 100, 1)
+            return round((total_planches / self.volume_entree) * 100, 1)
         return 0
 
     def __repr__(self):
-        return f'<Production {self.essence} {self.volume_sorti}m³ rebut={self.rebut_niveau}>'
+        return f'<Production {self.essence} conf={self.volume_conforme}m³ dec={self.volume_declass}m³>'
 
 
 class Arret(db.Model):

@@ -88,13 +88,6 @@ const essencesOptions = `
     {% endfor %}
 `;
 
-const rebutOptions = `
-    <option value="aucun">Aucun (0%)</option>
-    <option value="faible">Faible (5%)</option>
-    <option value="moyen">Moyen (15%)</option>
-    <option value="fort">Fort (30%)</option>
-`;
-
 const templateProduction = (index) => `
 <div class="row g-2 mb-2 align-items-end border rounded p-2 bg-light" id="prod-${index}">
     <div class="col-md-2">
@@ -104,30 +97,27 @@ const templateProduction = (index) => `
         </select>
     </div>
     <div class="col-md-2">
-        <label class="form-label small">Volume entrée (m³) <span class="text-danger">*</span></label>
-        <input type="number" name="prod_volume_entree[]" class="form-control form-control-sm"
-               step="0.1" min="0" placeholder="ex: 35.5" required>
+        <label class="form-label small">Grumes en entrée (m³) <span class="text-danger">*</span></label>
+        <input type="number" name="prod_volume_entree[]" class="form-control form-control-sm vol-entree-${index}"
+               step="0.1" min="0" placeholder="ex: 35.5" required
+               oninput="majDechets(${index})">
     </div>
     <div class="col-md-2">
-        <label class="form-label small">Volume scié (m³) <span class="text-danger">*</span></label>
-        <input type="number" name="prod_volume_sorti[]" class="form-control form-control-sm"
-               step="0.1" min="0" placeholder="ex: 14.2" required>
+        <label class="form-label small">Planches conformes (m³) <span class="text-danger">*</span></label>
+        <input type="number" name="prod_volume_conforme[]" class="form-control form-control-sm vol-conforme-${index}"
+               step="0.001" min="0" placeholder="ex: 12.5" required
+               oninput="majDechets(${index})">
     </div>
     <div class="col-md-2">
-        <label class="form-label small">Niveau de rebut</label>
-        <select name="prod_rebut_niveau[]" class="form-select form-select-sm">
-            ${rebutOptions}
-        </select>
+        <label class="form-label small">Bois déclassé — vente locale (m³)</label>
+        <input type="number" name="prod_volume_declass[]" class="form-control form-control-sm vol-declass-${index}"
+               step="0.001" min="0" placeholder="ex: 2.1" value="0"
+               oninput="majDechets(${index})">
     </div>
     <div class="col-md-2">
-        <label class="form-label small">Planches conformes</label>
-        <input type="number" name="prod_nb_conformes[]" class="form-control form-control-sm"
-               min="0" value="0">
-    </div>
-    <div class="col-md-1">
-        <label class="form-label small">Défectueux</label>
-        <input type="number" name="prod_nb_defectueux[]" class="form-control form-control-sm"
-               min="0" value="0">
+        <label class="form-label small text-muted">Déchets estimés (m³)</label>
+        <input type="text" class="form-control form-control-sm bg-light text-muted"
+               id="dechets-${index}" placeholder="calculé auto" readonly>
     </div>
     <div class="col-md-1">
         ${index > 0 ? `<button type="button" class="btn btn-outline-danger btn-sm w-100 mt-4"
@@ -178,6 +168,15 @@ const templateArret = (index) => `
 
 let compteurProd = 0;
 let compteurArret = 0;
+
+function majDechets(index) {
+    const entree   = parseFloat(document.querySelector(`.vol-entree-${index}`)?.value)   || 0;
+    const conforme = parseFloat(document.querySelector(`.vol-conforme-${index}`)?.value) || 0;
+    const declass  = parseFloat(document.querySelector(`.vol-declass-${index}`)?.value)  || 0;
+    const dechets  = Math.max(0, entree - conforme - declass);
+    const champ    = document.getElementById(`dechets-${index}`);
+    if (champ) champ.value = dechets > 0 ? dechets.toFixed(3) + ' m³' : '—';
+}
 
 function ajouterProduction() {
     document.getElementById('conteneur-productions')

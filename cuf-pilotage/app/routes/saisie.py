@@ -32,12 +32,10 @@ def nouveau_poste():
             db.session.flush()  # obtenir equipe.id avant les enfants
 
             # ── Productions (multi-essence) ──────────────────────────────────
-            essences     = request.form.getlist('prod_essence[]')
-            vol_entrees  = request.form.getlist('prod_volume_entree[]')
-            vol_sortis   = request.form.getlist('prod_volume_sorti[]')
-            rebut_niveaux = request.form.getlist('prod_rebut_niveau[]')
-            nb_conformes  = request.form.getlist('prod_nb_conformes[]')
-            nb_defectueux = request.form.getlist('prod_nb_defectueux[]')
+            essences      = request.form.getlist('prod_essence[]')
+            vol_entrees   = request.form.getlist('prod_volume_entree[]')
+            vol_conformes = request.form.getlist('prod_volume_conforme[]')
+            vol_declass   = request.form.getlist('prod_volume_declass[]')
 
             if not essences:
                 flash('Au moins une ligne de production est requise.', 'danger')
@@ -47,9 +45,9 @@ def nouveau_poste():
             for i, essence in enumerate(essences):
                 if not essence:
                     continue
-                v_entree = float(vol_entrees[i]) if i < len(vol_entrees) and vol_entrees[i] else 0
-                v_sorti  = float(vol_sortis[i])  if i < len(vol_sortis)  and vol_sortis[i]  else 0
-                niveau   = rebut_niveaux[i] if i < len(rebut_niveaux) else 'aucun'
+                v_entree   = float(vol_entrees[i])   if i < len(vol_entrees)   and vol_entrees[i]   else 0
+                v_conforme = float(vol_conformes[i]) if i < len(vol_conformes) and vol_conformes[i] else 0
+                v_declass  = float(vol_declass[i])   if i < len(vol_declass)   and vol_declass[i]   else 0
 
                 # Capturer le prix courant au moment de la soumission
                 from ..models import Parametre
@@ -59,10 +57,8 @@ def nouveau_poste():
                     equipe_id=equipe.id,
                     essence=essence,
                     volume_entree=v_entree,
-                    volume_sorti=v_sorti,
-                    rebut_niveau=niveau,
-                    nb_planches_conformes=int(nb_conformes[i]) if i < len(nb_conformes) and nb_conformes[i] else 0,
-                    nb_planches_defectueuses=int(nb_defectueux[i]) if i < len(nb_defectueux) and nb_defectueux[i] else 0,
+                    volume_conforme=v_conforme,
+                    volume_declass=v_declass,
                     prix_snapshot=prix_snap if prix_snap > 0 else None,
                 )
                 db.session.add(prod)

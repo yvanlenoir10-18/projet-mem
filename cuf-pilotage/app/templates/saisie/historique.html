@@ -17,8 +17,8 @@
                 <th>Date</th>
                 <th>Équipe</th>
                 <th>Essences</th>
-                <th>Scié (m³)</th>
-                <th>Rebut</th>
+                <th>Conforme (m³)</th>
+                <th>Déclassé</th>
                 <th>Arrêts (min)</th>
                 <th>TRS</th>
                 <th>Statut</th>
@@ -35,10 +35,10 @@
                     <span class="badge bg-secondary">{{ prod.essence }}</span>
                     {% endfor %}
                 </td>
-                <td>{{ p.volume_sorti }} m³</td>
+                <td>{{ p.volume_conforme }} m³</td>
                 <td>
-                    {% if p.volume_rebut > 0 %}
-                    <span class="text-danger">{{ p.volume_rebut }} m³</span>
+                    {% if p.volume_declass > 0 %}
+                    <span class="text-warning">{{ p.volume_declass }} m³</span>
                     {% else %}
                     <span class="text-muted">—</span>
                     {% endif %}

@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+{% block title %}Historique des équipes{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4><i class="bi bi-clock-history text-secondary"></i> Historique des équipes</h4>
+    <a href="{{ url_for('saisie.nouveau_poste') }}" class="btn btn-success">
+        <i class="bi bi-plus-circle"></i> Nouvelle équipe
+    </a>
+</div>
+
+{% if postes %}
+<div class="table-responsive">
+    <table class="table table-hover table-bordered align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th>Date</th>
+                <th>Équipe</th>
+                <th>Essences</th>
+                <th>Conforme (m³)</th>
+                <th>Déclassé</th>
+                <th>Arrêts (min)</th>
+                <th>TRS</th>
+                <th>Statut</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for p in postes %}
+            <tr {% if p.statut == 'brouillon' %}class="table-warning"{% endif %}>
+                <td>{{ p.date.strftime('%d/%m/%Y') }}</td>
+                <td>{{ p.numero_equipe }}</td>
+                <td>
+                    {% for prod in p.productions %}
+                    <span class="badge bg-secondary">{{ prod.essence }}</span>
+                    {% endfor %}
+                </td>
+                <td>{{ p.volume_conforme }} m³</td>
+                <td>
+                    {% if p.volume_declass > 0 %}
+                    <span class="text-warning">{{ p.volume_declass }} m³</span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td>{{ p.duree_totale_arrets }} min</td>
+                <td>
+                    {% if p.trs_global %}
+                    {% set c = 'success' if p.trs_global >= 70 else ('warning' if p.trs_global >= 50 else 'danger') %}
+                    <span class="badge bg-{{ c }}">{{ p.trs_global }}%</span>
+                    {% else %}
+                    <span class="text-muted">—</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if p.statut == 'verrouille' or p.est_verrouille %}
+                    <span class="badge bg-secondary"><i class="bi bi-lock"></i> Verrouillé</span>
+                    {% elif p.statut == 'soumis' %}
+                    <span class="badge bg-success">Soumis</span>
+                    {% else %}
+                    <span class="badge bg-warning text-dark"><i class="bi bi-pencil"></i> Brouillon</span>
+                    {% endif %}
+                </td>
+                <td class="text-nowrap">
+                    <a href="{{ url_for('saisie.detail_poste', poste_id=p.id) }}"
+                       class="btn btn-sm btn-outline-primary" title="Voir le détail">
+                        <i class="bi bi-eye"></i>
+                    </a>
+                    {% if p.statut == 'brouillon' and p.user_id == current_user.id %}
+                    <form method="POST"
+                          action="{{ url_for('saisie.soumettre_equipe', equipe_id=p.id) }}"
+                          class="d-inline"
+                          onsubmit="return confirm('Soumettre cette équipe ? Les prix seront figés.')">
+                        <button type="submit" class="btn btn-sm btn-success" title="Soumettre">
+                            <i class="bi bi-send-check"></i>
+                        </button>
+                    </form>
+                    <form method="POST"
+                          action="{{ url_for('saisie.supprimer_poste', poste_id=p.id) }}"
+                          class="d-inline"
+                          onsubmit="return confirm('Supprimer ce brouillon ?')">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Supprimer">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i>
+    Aucune équipe enregistrée. <a href="{{ url_for('saisie.nouveau_poste') }}">Saisir la première équipe</a>.
+</div>
+{% endif %}
+{% endblock %}

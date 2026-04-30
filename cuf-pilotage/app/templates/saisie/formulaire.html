@@ -1,0 +1,245 @@
+{% extends 'base.html' %}
+{% block title %}{% if equipe %}Modifier l'équipe{% else %}Saisie d'une équipe{% endif %}{% endblock %}
+
+{% block content %}
+<h4 class="mb-4">
+    {% if equipe %}
+    <i class="bi bi-pencil-square text-warning"></i>
+    Modifier l'équipe — {{ equipe.date.strftime('%d/%m/%Y') }} ({{ equipe.numero_equipe }})
+    {% else %}
+    <i class="bi bi-plus-circle text-success"></i>
+    Saisie d'une équipe — Chaîne 4
+    {% endif %}
+</h4>
+
+<form method="POST" action="{{ form_action }}" id="formEquipe">
+    <!-- BLOC 1 : En-tête de l'équipe -->
+    <div class="card mb-3">
+        <div class="card-header bg-dark text-white">
+            <i class="bi bi-calendar3"></i> Informations de l'équipe
+        </div>
+        <div class="card-body row g-3">
+            <div class="col-md-3">
+                <label class="form-label">Date <span class="text-danger">*</span></label>
+                <input type="date" name="date" class="form-control"
+                       value="{{ equipe.date.isoformat() if equipe else today }}" required>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Équipe <span class="text-danger">*</span></label>
+                <select name="numero_equipe" class="form-select" required>
+                    <option value="Matin"     {% if equipe and equipe.numero_equipe == 'Matin' %}selected{% endif %}>Matin</option>
+                    <option value="Apres-midi"{% if equipe and equipe.numero_equipe == 'Apres-midi' %}selected{% endif %}>Après-midi</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Effectif présent</label>
+                <input type="number" name="effectif" class="form-control"
+                       value="{{ equipe.effectif if equipe else 10 }}" min="1" max="30">
+            </div>
+        </div>
+    </div>
+
+    <!-- BLOC 2 : Productions par essence -->
+    <div class="card mb-3">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-boxes"></i> Productions (m³) — une ligne par essence</span>
+            <button type="button" class="btn btn-light btn-sm" onclick="ajouterProduction()">
+                <i class="bi bi-plus"></i> Ajouter une essence
+            </button>
+        </div>
+        <div class="card-body" id="conteneur-productions"></div>
+    </div>
+
+    <!-- BLOC 3 : Arrêts machine -->
+    <div class="card mb-3">
+        <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-exclamation-triangle"></i> Arrêts machine</span>
+            <button type="button" class="btn btn-light btn-sm" onclick="ajouterArret()">
+                <i class="bi bi-plus"></i> Ajouter un arrêt
+            </button>
+        </div>
+        <div class="card-body" id="conteneur-arrets">
+            <p class="text-muted" id="msg-aucun-arret">
+                <i class="bi bi-check-circle text-success"></i>
+                Aucun arrêt — cliquez "Ajouter un arrêt" si des pannes ont eu lieu.
+            </p>
+        </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="mb-3">
+        <label class="form-label">Notes / Observations</label>
+        <textarea name="notes" class="form-control" rows="2"
+                  placeholder="Observations particulières de l'équipe...">{{ equipe.notes if equipe else '' }}</textarea>
+    </div>
+
+    <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-success btn-lg">
+            <i class="bi bi-save"></i> {% if equipe %}Enregistrer les modifications{% else %}Enregistrer l'équipe{% endif %}
+        </button>
+        <a href="{{ url_for('saisie.historique') }}" class="btn btn-outline-secondary btn-lg">Annuler</a>
+    </div>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Templates HTML ────────────────────────────────────────────────────────────
+
+const essencesOptions = `
+    {% for e in essences %}
+    <option value="{{ e }}">{{ e }}</option>
+    {% endfor %}
+`;
+
+const templateProduction = (index) => `
+<div class="row g-2 mb-2 align-items-end border rounded p-2 bg-light" id="prod-${index}">
+    <div class="col-md-2">
+        <label class="form-label small fw-bold">Essence <span class="text-danger">*</span></label>
+        <select name="prod_essence[]" class="form-select form-select-sm" required>
+            ${essencesOptions}
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small">Grumes en entrée (m³) <span class="text-danger">*</span></label>
+        <input type="number" name="prod_volume_entree[]" class="form-control form-control-sm vol-entree-${index}"
+               step="0.1" min="0" placeholder="ex: 35.5" required oninput="majDechets(${index})">
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small">Planches conformes (m³) <span class="text-danger">*</span></label>
+        <input type="number" name="prod_volume_conforme[]" class="form-control form-control-sm vol-conforme-${index}"
+               step="0.001" min="0" placeholder="ex: 12.5" required oninput="majDechets(${index})">
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small">Bois déclassé — vente locale (m³)</label>
+        <input type="number" name="prod_volume_declass[]" class="form-control form-control-sm vol-declass-${index}"
+               step="0.001" min="0" placeholder="ex: 2.1" value="0" oninput="majDechets(${index})">
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small text-muted">Déchets estimés (m³)</label>
+        <input type="text" class="form-control form-control-sm bg-light text-muted"
+               id="dechets-${index}" placeholder="calculé auto" readonly>
+    </div>
+    <div class="col-md-1">
+        ${index > 0 ? `<button type="button" class="btn btn-outline-danger btn-sm w-100 mt-4"
+                onclick="supprimerProduction(${index})"><i class="bi bi-trash"></i></button>` : '<div class="mt-4">&nbsp;</div>'}
+    </div>
+</div>`;
+
+const templateArret = (index) => `
+<div class="row g-2 mb-2 align-items-end border rounded p-2" id="arret-${index}">
+    <div class="col-md-2">
+        <label class="form-label small">Machine</label>
+        <select name="arret_machine[]" class="form-select form-select-sm" required>
+            {% for m in machines %}
+            <option value="{{ m }}">{{ m }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small">Heure début</label>
+        <input type="time" name="arret_debut[]" class="form-control form-control-sm" required>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small">Heure fin</label>
+        <input type="time" name="arret_fin[]" class="form-control form-control-sm" required>
+    </div>
+    <div class="col-md-3">
+        <label class="form-label small">Cause de l'arrêt</label>
+        <input type="text" name="arret_cause[]" class="form-control form-control-sm"
+               placeholder="Décrivez la cause..." required>
+    </div>
+    <div class="col-md-2">
+        <label class="form-label small">Catégorie</label>
+        <select name="arret_categorie[]" class="form-select form-select-sm">
+            {% for c in categories %}
+            <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="col-md-1">
+        <button type="button" class="btn btn-outline-danger btn-sm w-100"
+                onclick="supprimerArret(${index})"><i class="bi bi-trash"></i></button>
+    </div>
+</div>`;
+
+// ── État ──────────────────────────────────────────────────────────────────────
+
+let compteurProd  = 0;
+let compteurArret = 0;
+
+function majDechets(index) {
+    const entree   = parseFloat(document.querySelector(`.vol-entree-${index}`)?.value)   || 0;
+    const conforme = parseFloat(document.querySelector(`.vol-conforme-${index}`)?.value) || 0;
+    const declass  = parseFloat(document.querySelector(`.vol-declass-${index}`)?.value)  || 0;
+    const dechets  = Math.max(0, entree - conforme - declass);
+    const champ    = document.getElementById(`dechets-${index}`);
+    if (champ) champ.value = dechets > 0 ? dechets.toFixed(3) + ' m³' : '—';
+}
+
+function ajouterProduction() {
+    document.getElementById('conteneur-productions')
+            .insertAdjacentHTML('beforeend', templateProduction(compteurProd));
+    compteurProd++;
+}
+
+function ajouterProductionAvecDonnees(data) {
+    ajouterProduction();
+    const idx = compteurProd - 1;
+    const row = document.getElementById('prod-' + idx);
+    if (!row) return;
+    row.querySelector('.vol-entree-'  + idx).value = data.volume_entree  || '';
+    row.querySelector('.vol-conforme-'+ idx).value = data.volume_conforme|| '';
+    row.querySelector('.vol-declass-' + idx).value = data.volume_declass || 0;
+    const sel = row.querySelector('select[name="prod_essence[]"]');
+    if (sel) sel.value = data.essence;
+    majDechets(idx);
+}
+
+function supprimerProduction(index) {
+    const el = document.getElementById('prod-' + index);
+    if (el) el.remove();
+}
+
+function ajouterArret() {
+    document.getElementById('msg-aucun-arret').style.display = 'none';
+    document.getElementById('conteneur-arrets')
+            .insertAdjacentHTML('beforeend', templateArret(compteurArret));
+    compteurArret++;
+}
+
+function ajouterArretAvecDonnees(data) {
+    ajouterArret();
+    const idx = compteurArret - 1;
+    const row = document.getElementById('arret-' + idx);
+    if (!row) return;
+    row.querySelector('select[name="arret_machine[]"]').value  = data.machine     || '';
+    row.querySelector('input[name="arret_debut[]"]').value     = data.heure_debut || '';
+    row.querySelector('input[name="arret_fin[]"]').value       = data.heure_fin   || '';
+    row.querySelector('input[name="arret_cause[]"]').value     = data.cause       || '';
+    row.querySelector('select[name="arret_categorie[]"]').value= data.categorie   || '';
+}
+
+function supprimerArret(index) {
+    const el = document.getElementById('arret-' + index);
+    if (el) el.remove();
+    if (document.querySelectorAll('[id^="arret-"]').length === 0) {
+        document.getElementById('msg-aucun-arret').style.display = 'block';
+    }
+}
+
+// ── Initialisation ───────────────────────────────────────────────────────────
+// En mode modification, pré-remplir avec les données existantes
+
+const productionsDonnees = {{ productions_data | tojson }};
+const arretsDonnees      = {{ arrets_data | tojson }};
+
+if (productionsDonnees.length > 0) {
+    productionsDonnees.forEach(p => ajouterProductionAvecDonnees(p));
+} else {
+    ajouterProduction();
+}
+
+arretsDonnees.forEach(a => ajouterArretAvecDonnees(a));
+</script>
+{% endblock %}

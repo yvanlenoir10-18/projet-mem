@@ -1,0 +1,109 @@
+version: "3.9"
+
+services:
+  # ─── Base de données PostgreSQL ───────────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg15        # pgvector requis par LightRAG
+    container_name: mem_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-memoir}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-memoir_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-projet_mem}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-memoir}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── LightRAG — moteur de recherche intelligent ───────────────────────────
+  lightrag:
+    image: mem_lightrag:local
+    build:
+      context: .
+      dockerfile: lightrag.Dockerfile
+    container_name: mem_lightrag
+    restart: unless-stopped
+    ports:
+      - "9621:9621"
+    environment:
+      # LLM (Ollama local — gratuit, aucune clé API requise)
+      LLM_BINDING: ollama
+      LLM_MODEL: ${LIGHTRAG_LLM_MODEL:-llama3.2}
+      LLM_BINDING_HOST: http://ollama:11434
+      # Embeddings
+      EMBEDDING_BINDING: ollama
+      EMBEDDING_MODEL: ${LIGHTRAG_EMBED_MODEL:-nomic-embed-text}
+      EMBEDDING_BINDING_HOST: http://ollama:11434
+      EMBEDDING_DIM: 768
+      # Stockage PostgreSQL
+      LIGHTRAG_KV_STORAGE: PGKVStorage
+      LIGHTRAG_VECTOR_STORAGE: PGVectorStorage
+      LIGHTRAG_GRAPH_STORAGE: PGGraphStorage
+      LIGHTRAG_DOC_STATUS_STORAGE: PGDocStatusStorage
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-memoir}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-memoir_secret}
+      POSTGRES_DATABASE: ${POSTGRES_DB:-projet_mem}
+      # Sécurité
+      LIGHTRAG_API_KEY: ${LIGHTRAG_API_KEY:-changeme_lightrag}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    volumes:
+      - lightrag_data:/app/data
+
+  # ─── Ollama — LLM local gratuit ───────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    container_name: mem_ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    # Pour GPU NVIDIA : décommente les lignes ci-dessous
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+  # ─── Backend Node.js ──────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: mem_api
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${POSTGRES_USER:-memoir}:${POSTGRES_PASSWORD:-memoir_secret}@postgres:5432/${POSTGRES_DB:-projet_mem}
+      JWT_SECRET: ${JWT_SECRET:-change_this_jwt_secret_in_production}
+      LIGHTRAG_URL: http://lightrag:9621
+      LIGHTRAG_API_KEY: ${LIGHTRAG_API_KEY:-changeme_lightrag}
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: [full]   # Lancé seulement avec: docker compose --profile full up
+
+volumes:
+  postgres_data:
+  lightrag_data:
+  ollama_data:

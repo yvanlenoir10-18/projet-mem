@@ -1,0 +1,55 @@
+{
+  "mcpServers": {
+    "excel": {
+      "command": "npx",
+      "args": ["-y", "@guillehr2/excel-mcp-server@latest"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "n8n": {
+      "command": "npx",
+      "args": ["-y", "@czlonkowski/n8n-mcp"],
+      "env": {
+        "N8N_API_URL": "http://localhost:5678",
+        "N8N_API_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIwZWE0OGU4Yy0yYTlhLTQzMmEtOWZhZS1hNTU2MTMzZTJmYTYiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiOTU5ZDQ2YjAtOTJhZS00YTM4LTllMjAtZjI1YjBmN2Q3YjQyIiwiaWF0IjoxNzc0NTA5MTA2LCJleHAiOjE3ODIyNzM2MDB9.XiRDRp1grs7sD5IWq3HGrmpvynDeBIQGn27lRwCkV8s",
+        "MCP_MODE": "stdio",
+        "N8N_MCP_TELEMETRY_DISABLED": "true"
+      }
+    },
+    "tavily": {
+      "command": "npx",
+      "args": ["-y", "tavily-mcp@latest"],
+      "env": {
+        "TAVILY_API_KEY": "${TAVILY_API_KEY}"
+      }
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"]
+    },
+    "task-master": {
+      "command": "npx",
+      "args": ["-y", "--package=task-master-ai", "task-master-ai"],
+      "env": {
+        "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY}"
+      }
+    },
+    "markdownify": {
+      "command": "npx",
+      "args": ["-y", "@zcaceres/markdownify-mcp@latest"]
+    },
+    "stealth-browser": {
+      "command": "npx",
+      "args": ["-y", "stealth-browser-mcp@latest"]
+    },
+    "token-savior": {
+      "command": "/root/.local/token-savior-venv/bin/token-savior",
+      "env": {
+        "WORKSPACE_ROOTS": "/home/user/projet-mem",
+        "TOKEN_SAVIOR_CLIENT": "claude"
+      }
+    }
+  }
+}

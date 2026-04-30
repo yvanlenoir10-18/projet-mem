@@ -1,0 +1,338 @@
+{% extends 'base.html' %}
+{% block title %}Analyse des pertes — {{ nom_mois }} {{ annee }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-currency-dollar text-danger"></i> Analyse des pertes — Chaîne 4</h4>
+    <div class="d-flex gap-2 align-items-center">
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                <i class="bi bi-calendar3"></i> {{ nom_mois }} {{ annee }}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end">
+                <li><h6 class="dropdown-header">Choisir le mois</h6></li>
+                {% for m in mois_options %}
+                <li>
+                    <a class="dropdown-item {% if m.mois == mois and m.annee == annee %}fw-bold{% endif %}"
+                       href="{{ url_for('dashboard.pertes', mois=m.mois, annee=m.annee) }}">
+                        {% if m.mois == mois and m.annee == annee %}<i class="bi bi-check2 text-success me-1"></i>{% else %}<span class="me-3"></span>{% endif %}
+                        {{ m.label }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+{% if nb_equipes == 0 %}
+<div class="alert alert-info">
+    <i class="bi bi-info-circle"></i> Aucune équipe enregistrée pour <strong>{{ nom_mois }} {{ annee }}</strong>.
+    <a href="{{ url_for('saisie.nouveau_poste') }}" class="alert-link">Saisir une équipe</a>.
+</div>
+{% else %}
+
+<!-- KPI cards D / P / Q / TOTAL -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-danger h-100">
+            <div class="card-body">
+                <div class="text-muted small fw-bold">TOTAL PERTES</div>
+                <div class="kpi-value text-danger">{{ "{:,.0f}".format(total_global).replace(",", " ") }}</div>
+                <div class="text-muted small">FCFA · {{ nb_equipes }} équipe(s)</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-muted small">PERTE D — Arrêts non planifiés</div>
+                <div class="kpi-value text-warning">{{ "{:,.0f}".format(total_d).replace(",", " ") }}</div>
+                <div class="text-muted small">FCFA{% if total_global > 0 %} · {{ (total_d / total_global * 100)|round(1) }}%{% endif %}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-muted small">PERTE P — Sous-performance</div>
+                <div class="kpi-value" style="color:#0dcaf0">{{ "{:,.0f}".format(total_p).replace(",", " ") }}</div>
+                <div class="text-muted small">FCFA{% if total_global > 0 %} · {{ (total_p / total_global * 100)|round(1) }}%{% endif %}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-body">
+                <div class="text-muted small">PERTE Q — Qualité matière</div>
+                <div class="kpi-value text-success">{{ "{:,.0f}".format(total_q).replace(",", " ") }}</div>
+                <div class="text-muted small">FCFA{% if total_global > 0 %} · {{ (total_q / total_global * 100)|round(1) }}%{% endif %}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-3">
+    <!-- Graphique donut répartition -->
+    <div class="col-md-3">
+        <div class="card h-100">
+            <div class="card-header fw-bold bg-dark text-white">Répartition D / P / Q</div>
+            <div class="card-body d-flex align-items-center justify-content-center">
+                <canvas id="chartDPQ" style="max-height:200px"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Perte P par shift -->
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header fw-bold" style="background:#e3f2fd">
+                <i class="bi bi-people"></i> Perte P par équipe (sous-performance)
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr><th>Équipe</th><th class="text-end">Perte FCFA</th><th class="text-end">Nb postes</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for shift_nom, data in par_shift.items() %}
+                        <tr>
+                            <td>{{ shift_nom if shift_nom != 'Apres-midi' else 'Après-midi' }}</td>
+                            <td class="text-end fw-bold" style="color:#0dcaf0">
+                                {{ "{:,.0f}".format(data.perte_p).replace(",", " ") }}
+                            </td>
+                            <td class="text-end text-muted">{{ data.nb }}</td>
+                        </tr>
+                        {% endfor %}
+                        <tr class="table-secondary fw-bold">
+                            <td>TOTAL</td>
+                            <td class="text-end">{{ "{:,.0f}".format(total_p).replace(",", " ") }}</td>
+                            <td class="text-end">{{ nb_equipes }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Perte Q par essence -->
+    <div class="col-md-5">
+        <div class="card h-100">
+            <div class="card-header fw-bold bg-success text-white">
+                <i class="bi bi-tree"></i> Perte Q par essence
+            </div>
+            <div class="card-body p-0">
+                {% if essences %}
+                <table class="table table-sm mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Essence</th>
+                            <th class="text-end">Déclassé (m³)</th>
+                            <th class="text-end">Déchets (m³)</th>
+                            <th class="text-end">Perte FCFA</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for essence, data in essences %}
+                        <tr>
+                            <td><span class="badge bg-success">{{ essence }}</span></td>
+                            <td class="text-end text-warning">{{ data.volume_declass|round(3) }}</td>
+                            <td class="text-end text-danger">{{ data.volume_dechets|round(3) }}</td>
+                            <td class="text-end fw-bold text-success">
+                                {{ "{:,.0f}".format(data.perte).replace(",", " ") }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted p-3 mb-0"><i class="bi bi-check-circle text-success"></i> Aucune perte qualité.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Perte D par machine (drill-down) -->
+<div class="card mb-3">
+    <div class="card-header fw-bold bg-warning text-dark">
+        <i class="bi bi-gear"></i> Perte D par machine — cliquez une ligne pour voir les arrêts
+    </div>
+    <div class="card-body p-0">
+        {% if machines %}
+        <table class="table table-sm table-hover mb-0">
+            <thead class="table-light">
+                <tr>
+                    <th></th>
+                    <th>Machine</th>
+                    <th class="text-end">Durée (min)</th>
+                    <th class="text-end">Nb arrêts</th>
+                    <th class="text-end">Perte FCFA</th>
+                    <th style="width:120px">Part</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for machine, data in machines %}
+                {% set mid = loop.index %}
+                {% set pct = (data.perte / total_d * 100)|round(1) if total_d > 0 else 0 %}
+                <tr class="cursor-pointer" onclick="toggleArrets({{ mid }})" style="cursor:pointer">
+                    <td class="text-muted"><i class="bi bi-chevron-right" id="chevron-{{ mid }}"></i></td>
+                    <td><i class="bi bi-gear text-muted"></i> {{ machine }}</td>
+                    <td class="text-end">{{ data.duree }}</td>
+                    <td class="text-end">{{ data.count }}</td>
+                    <td class="text-end fw-bold text-warning">{{ "{:,.0f}".format(data.perte).replace(",", " ") }}</td>
+                    <td>
+                        <div class="progress" style="height:8px">
+                            <div class="progress-bar bg-warning" style="width:{{ pct }}%"></div>
+                        </div>
+                        <small class="text-muted">{{ pct }}%</small>
+                    </td>
+                </tr>
+                <!-- Sous-table drill-down -->
+                <tr id="arrets-{{ mid }}" class="d-none">
+                    <td colspan="6" class="p-0 bg-light">
+                        <table class="table table-sm mb-0 ms-4">
+                            <thead class="table-secondary">
+                                <tr><th>Date</th><th>Équipe</th><th>Cause</th><th>Catégorie</th><th class="text-end">Min</th><th class="text-end">Perte FCFA</th></tr>
+                            </thead>
+                            <tbody>
+                                {% for a in data.arrets %}
+                                <tr>
+                                    <td class="text-muted">{{ a.date }}</td>
+                                    <td>{{ a.equipe }}</td>
+                                    <td>{{ a.cause }}</td>
+                                    <td><span class="badge bg-secondary">{{ a.categorie }}</span></td>
+                                    <td class="text-end">{{ a.duree }}</td>
+                                    <td class="text-end text-warning">{{ "{:,.0f}".format(a.perte).replace(",", " ") }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% else %}
+        <p class="text-muted p-3 mb-0"><i class="bi bi-check-circle text-success"></i> Aucun arrêt non planifié ce mois.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Pareto des arrêts -->
+<div class="card mb-3">
+    <div class="card-header fw-bold bg-danger text-white">
+        <i class="bi bi-bar-chart-line"></i> Pareto des causes d'arrêt
+        <span class="badge bg-light text-dark ms-2">Règle des 80/20</span>
+    </div>
+    <div class="card-body">
+        {% if pareto %}
+        <div class="row g-3">
+            <div class="col-md-7">
+                <canvas id="chartPareto" height="180"></canvas>
+            </div>
+            <div class="col-md-5">
+                <table class="table table-sm">
+                    <thead class="table-light">
+                        <tr><th>Cause</th><th class="text-end">Min</th><th class="text-end">% cum.</th></tr>
+                    </thead>
+                    <tbody>
+                        {% for item in pareto %}
+                        <tr {% if item.pct_cumule <= 80 %}class="table-warning"{% endif %}>
+                            <td>{{ item.cause[:40] }}</td>
+                            <td class="text-end">{{ item.duree }}</td>
+                            <td class="text-end">{{ item.pct_cumule }}%</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-muted mb-0"><i class="bi bi-check-circle text-success"></i> Aucun arrêt enregistré ce mois.</p>
+        {% endif %}
+    </div>
+</div>
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleArrets(id) {
+    const row = document.getElementById('arrets-' + id);
+    const chevron = document.getElementById('chevron-' + id);
+    if (row.classList.contains('d-none')) {
+        row.classList.remove('d-none');
+        chevron.classList.replace('bi-chevron-right', 'bi-chevron-down');
+    } else {
+        row.classList.add('d-none');
+        chevron.classList.replace('bi-chevron-down', 'bi-chevron-right');
+    }
+}
+
+{% if total_global > 0 %}
+new Chart(document.getElementById('chartDPQ'), {
+    type: 'doughnut',
+    data: {
+        labels: ['Perte D (arrêts)', 'Perte P (sous-perf.)', 'Perte Q (qualité)'],
+        datasets: [{
+            data: [{{ total_d }}, {{ total_p }}, {{ total_q }}],
+            backgroundColor: ['#ffc107', '#0dcaf0', '#198754'],
+            borderWidth: 2
+        }]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: { position: 'bottom', labels: { font: { size: 11 } } },
+            tooltip: {
+                callbacks: {
+                    label: (ctx) => {
+                        const v = ctx.parsed;
+                        const t = ctx.dataset.data.reduce((a,b)=>a+b,0);
+                        return ` ${v.toLocaleString('fr-FR')} FCFA (${(v/t*100).toFixed(1)}%)`;
+                    }
+                }
+            }
+        }
+    }
+});
+{% endif %}
+
+{% if pareto %}
+new Chart(document.getElementById('chartPareto'), {
+    type: 'bar',
+    data: {
+        labels: {{ pareto | map(attribute='cause') | list | tojson }},
+        datasets: [
+            {
+                label: 'Durée (min)',
+                data: {{ pareto | map(attribute='duree') | list | tojson }},
+                backgroundColor: '#dc3545',
+                yAxisID: 'y',
+            },
+            {
+                label: '% cumulé',
+                data: {{ pareto | map(attribute='pct_cumule') | list | tojson }},
+                type: 'line',
+                borderColor: '#fd7e14',
+                backgroundColor: 'transparent',
+                yAxisID: 'y2',
+                tension: 0.2,
+                pointRadius: 4,
+            }
+        ]
+    },
+    options: {
+        scales: {
+            y:  { title: { display: true, text: 'Minutes' } },
+            y2: { position: 'right', min: 0, max: 100,
+                  ticks: { callback: v => v + '%' },
+                  grid: { drawOnChartArea: false } }
+        }
+    }
+});
+{% endif %}
+</script>
+{% endblock %}

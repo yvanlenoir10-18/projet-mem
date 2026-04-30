@@ -10,6 +10,12 @@ if ! echo "$CMD" | grep -q 'git commit'; then
   exit 0
 fi
 
+# Skip meta-commits (memoir notes, chore) — avoids infinite loop
+LAST_MSG=$(git -C "$CLAUDE_PROJECT_DIR" log -1 --format="%s" 2>/dev/null)
+if echo "$LAST_MSG" | grep -qE '^docs\(memoir\):|^chore\(memoir\):|^docs\(notes\):'; then
+  exit 0
+fi
+
 # Check whether a global framing note already exists
 NOTES_DIR="$CLAUDE_PROJECT_DIR/documents/notes-impact"
 HAS_BASE="false"

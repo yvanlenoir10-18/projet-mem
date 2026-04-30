@@ -1,4 +1,11 @@
 {
+  "enableAllProjectMcpServers": true,
+  "permissions": {
+    "allow": [
+      "mcp__excel__*"
+    ],
+    "deny": []
+  },
   "hooks": {
     "SessionStart": [
       {

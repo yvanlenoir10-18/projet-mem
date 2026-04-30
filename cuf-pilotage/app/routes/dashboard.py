@@ -164,6 +164,84 @@ def vue_pdg():
                            mois_options=_mois_disponibles())
 
 
+@dashboard_bp.route('/pertes')
+@login_required
+def pertes():
+    """Page de drill-down des pertes financières D/P/Q."""
+    jours = int(request.args.get('jours', 30))
+    equipes = _get_equipes_periode(jours)
+
+    total_d = total_p = total_q = 0.0
+
+    # Pertes D agrégées par machine
+    par_machine = {}
+    # Pertes Q agrégées par essence
+    par_essence_q = {}
+    # Pertes D agrégées par cause d'arrêt
+    par_cause = {}
+
+    for e in equipes:
+        p = calcule_pertes_equipe(e)
+        total_d += p['perte_d']
+        total_p += p['perte_p']
+        total_q += p['perte_q']
+
+        # Prix moyen pondéré de cette équipe (pour attribuer Perte D à chaque machine)
+        vol_total = e.volume_sorti
+        if vol_total > 0 and e.productions:
+            from ..services.trs import _prix_production
+            prix_moyen = sum(_prix_production(pr) * pr.volume_sorti for pr in e.productions) / vol_total
+        else:
+            prix_moyen = 0.0
+
+        capacite_h = float(Parametre.get('capacite_equipe_h', 1.5625))
+
+        for a in e.arrets:
+            if not a.duree_min or a.categorie == 'Maintenance planifiée':
+                continue
+            perte_arret = (a.duree_min / 60) * capacite_h * prix_moyen
+
+            if a.machine not in par_machine:
+                par_machine[a.machine] = {'perte': 0.0, 'duree': 0, 'count': 0}
+            par_machine[a.machine]['perte']  += perte_arret
+            par_machine[a.machine]['duree']  += a.duree_min
+            par_machine[a.machine]['count']  += 1
+
+            cle_cause = a.cause[:50]
+            if cle_cause not in par_cause:
+                par_cause[cle_cause] = {'perte': 0.0, 'duree': 0, 'categorie': a.categorie}
+            par_cause[cle_cause]['perte'] += perte_arret
+            par_cause[cle_cause]['duree'] += a.duree_min
+
+        # Perte Q par essence
+        taux_revente = float(Parametre.get('taux_revente_rebut', 0.30))
+        from ..services.trs import _prix_production
+        for pr in e.productions:
+            pq = pr.volume_sorti * pr.rebut_pct * _prix_production(pr) * (1 - taux_revente)
+            if pr.essence not in par_essence_q:
+                par_essence_q[pr.essence] = {'perte': 0.0, 'volume_rebut': 0.0}
+            par_essence_q[pr.essence]['perte']       += pq
+            par_essence_q[pr.essence]['volume_rebut'] += pr.volume_rebut_calcule
+
+    # Tri par perte décroissante
+    machines_triees = sorted(par_machine.items(), key=lambda x: x[1]['perte'], reverse=True)
+    causes_triees   = sorted(par_cause.items(),   key=lambda x: x[1]['perte'], reverse=True)[:10]
+    essences_triees = sorted(par_essence_q.items(), key=lambda x: x[1]['perte'], reverse=True)
+
+    total_global = total_d + total_p + total_q
+
+    return render_template('dashboard/pertes.html',
+                           jours=jours,
+                           total_d=int(total_d),
+                           total_p=int(total_p),
+                           total_q=int(total_q),
+                           total_global=int(total_global),
+                           machines=machines_triees,
+                           causes=causes_triees,
+                           essences=essences_triees,
+                           nb_equipes=len(equipes))
+
+
 @dashboard_bp.route('/export/excel')
 @login_required
 def export_excel():

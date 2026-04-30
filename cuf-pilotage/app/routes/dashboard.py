@@ -51,10 +51,8 @@ def vue_chef():
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen    = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
     total_produit = sum(e.volume_sorti for e in equipes)
-    total_rebut   = sum(e.volume_rebut for e in equipes)
+    total_declass = round(sum(e.volume_declass for e in equipes), 2)
     total_arrets  = sum(e.duree_totale_arrets for e in equipes)
-
-    pareto = pareto_arrets(equipes)
 
     # TRS par essence (agrège sur les lignes de production)
     par_essence = {}
@@ -62,7 +60,7 @@ def vue_chef():
         for p in e.productions:
             if p.essence not in par_essence:
                 par_essence[p.essence] = {'volumes': [], 'trs': []}
-            par_essence[p.essence]['volumes'].append(p.volume_sorti)
+            par_essence[p.essence]['volumes'].append(p.volume_conforme + p.volume_declass)
         if e.trs_global:
             for p in e.productions:
                 par_essence[p.essence]['trs'].append(e.trs_global)
@@ -87,7 +85,7 @@ def vue_chef():
         'trs_moyen':        trs_moyen,
         'couleur_trs':      couleur_trs(trs_moyen),
         'total_produit':    round(total_produit, 2),
-        'total_rebut':      round(total_rebut, 2),
+        'total_declass':    total_declass,
         'total_arrets_h':   round(total_arrets / 60, 1),
         'nb_postes':        len(equipes),
         'trs_matin':        trs_moyen_groupe(matin),
@@ -108,7 +106,6 @@ def vue_chef():
 
     return render_template('chef/dashboard.html',
                            postes=equipes[:10],
-                           pareto=pareto[:8],
                            stats=stats,
                            jours=jours,
                            chart_labels=chart_labels,
@@ -167,78 +164,114 @@ def vue_pdg():
 @dashboard_bp.route('/pertes')
 @login_required
 def pertes():
-    """Page de drill-down des pertes financières D/P/Q."""
-    jours = int(request.args.get('jours', 30))
-    equipes = _get_equipes_periode(jours)
+    """Analyse mensuelle des pertes financières D/P/Q avec drill-down."""
+    from ..services.trs import _prix_production
+
+    aujourd_hui = date.today()
+    try:
+        mois  = int(request.args.get('mois',  aujourd_hui.month))
+        annee = int(request.args.get('annee', aujourd_hui.year))
+        if not (1 <= mois <= 12) or annee < 2020:
+            mois, annee = aujourd_hui.month, aujourd_hui.year
+    except (ValueError, TypeError):
+        mois, annee = aujourd_hui.month, aujourd_hui.year
+
+    debut = date(annee, mois, 1)
+    fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)
+
+    equipes = Equipe.query.filter(
+        Equipe.date >= debut, Equipe.date < fin
+    ).order_by(Equipe.date.asc()).all()
 
     total_d = total_p = total_q = 0.0
-
-    # Pertes D agrégées par machine
-    par_machine = {}
-    # Pertes Q agrégées par essence
+    par_machine   = {}
     par_essence_q = {}
-    # Pertes D agrégées par cause d'arrêt
-    par_cause = {}
+    par_shift     = {'Matin': {'perte_p': 0.0, 'nb': 0}, 'Apres-midi': {'perte_p': 0.0, 'nb': 0}}
+
+    capacite_h   = float(Parametre.get('capacite_equipe_h', 1.5625))
+    taux_revente = float(Parametre.get('taux_revente_rebut', 0.30))
 
     for e in equipes:
-        p = calcule_pertes_equipe(e)
-        total_d += p['perte_d']
-        total_p += p['perte_p']
-        total_q += p['perte_q']
+        pertes_e = calcule_pertes_equipe(e)
+        total_d += pertes_e['perte_d']
+        total_p += pertes_e['perte_p']
+        total_q += pertes_e['perte_q']
 
-        # Prix moyen pondéré de cette équipe (pour attribuer Perte D à chaque machine)
+        # Perte P ventilée par shift
+        shift = e.numero_equipe if e.numero_equipe in par_shift else 'Matin'
+        par_shift[shift]['perte_p'] += pertes_e['perte_p']
+        par_shift[shift]['nb']      += 1
+
+        # Prix moyen pondéré pour attribution Perte D par machine
         vol_total = e.volume_sorti
         if vol_total > 0 and e.productions:
-            from ..services.trs import _prix_production
-            prix_moyen = sum(_prix_production(pr) * pr.volume_sorti for pr in e.productions) / vol_total
+            prix_moyen = sum(
+                _prix_production(pr) * (pr.volume_conforme + pr.volume_declass)
+                for pr in e.productions
+            ) / vol_total
         else:
             prix_moyen = 0.0
-
-        capacite_h = float(Parametre.get('capacite_equipe_h', 1.5625))
 
         for a in e.arrets:
             if not a.duree_min or a.categorie == 'Maintenance planifiée':
                 continue
             perte_arret = (a.duree_min / 60) * capacite_h * prix_moyen
+            m = a.machine
+            if m not in par_machine:
+                par_machine[m] = {'perte': 0.0, 'duree': 0, 'count': 0, 'arrets': []}
+            par_machine[m]['perte'] += perte_arret
+            par_machine[m]['duree'] += a.duree_min
+            par_machine[m]['count'] += 1
+            par_machine[m]['arrets'].append({
+                'date':        e.date.strftime('%d/%m/%Y'),
+                'equipe':      e.numero_equipe,
+                'cause':       a.cause,
+                'categorie':   a.categorie,
+                'duree':       a.duree_min,
+                'perte':       int(perte_arret),
+            })
 
-            if a.machine not in par_machine:
-                par_machine[a.machine] = {'perte': 0.0, 'duree': 0, 'count': 0}
-            par_machine[a.machine]['perte']  += perte_arret
-            par_machine[a.machine]['duree']  += a.duree_min
-            par_machine[a.machine]['count']  += 1
-
-            cle_cause = a.cause[:50]
-            if cle_cause not in par_cause:
-                par_cause[cle_cause] = {'perte': 0.0, 'duree': 0, 'categorie': a.categorie}
-            par_cause[cle_cause]['perte'] += perte_arret
-            par_cause[cle_cause]['duree'] += a.duree_min
-
-        # Perte Q par essence
-        taux_revente = float(Parametre.get('taux_revente_rebut', 0.30))
-        from ..services.trs import _prix_production
+        # Perte Q par essence (déclassé + déchets séparés)
         for pr in e.productions:
-            pq = pr.volume_sorti * pr.rebut_pct * _prix_production(pr) * (1 - taux_revente)
-            if pr.essence not in par_essence_q:
-                par_essence_q[pr.essence] = {'perte': 0.0, 'volume_rebut': 0.0}
-            par_essence_q[pr.essence]['perte']       += pq
-            par_essence_q[pr.essence]['volume_rebut'] += pr.volume_rebut_calcule
+            pq_d  = pr.volume_declass  * _prix_production(pr) * (1 - taux_revente)
+            pq_ch = pr.volume_dechets  * _prix_production(pr)
+            ess   = pr.essence
+            if ess not in par_essence_q:
+                par_essence_q[ess] = {
+                    'perte': 0.0, 'perte_declass': 0.0, 'perte_dechets': 0.0,
+                    'volume_declass': 0.0, 'volume_dechets': 0.0,
+                }
+            par_essence_q[ess]['perte']          += pq_d + pq_ch
+            par_essence_q[ess]['perte_declass']  += pq_d
+            par_essence_q[ess]['perte_dechets']  += pq_ch
+            par_essence_q[ess]['volume_declass'] += pr.volume_declass
+            par_essence_q[ess]['volume_dechets'] += pr.volume_dechets
 
-    # Tri par perte décroissante
-    machines_triees = sorted(par_machine.items(), key=lambda x: x[1]['perte'], reverse=True)
-    causes_triees   = sorted(par_cause.items(),   key=lambda x: x[1]['perte'], reverse=True)[:10]
-    essences_triees = sorted(par_essence_q.items(), key=lambda x: x[1]['perte'], reverse=True)
+    pareto         = pareto_arrets(equipes)
+    machines_tri   = sorted(par_machine.items(),   key=lambda x: x[1]['perte'], reverse=True)
+    essences_tri   = sorted(par_essence_q.items(), key=lambda x: x[1]['perte'], reverse=True)
+    total_global   = total_d + total_p + total_q
 
-    total_global = total_d + total_p + total_q
+    # Arrondir pour affichage
+    for _, data in par_machine.items():
+        data['perte'] = int(data['perte'])
+    for _, data in par_essence_q.items():
+        data['perte']         = int(data['perte'])
+        data['perte_declass'] = int(data['perte_declass'])
+        data['perte_dechets'] = int(data['perte_dechets'])
 
     return render_template('dashboard/pertes.html',
-                           jours=jours,
+                           mois=mois, annee=annee,
+                           nom_mois=NOMS_MOIS[mois],
+                           mois_options=_mois_disponibles(),
                            total_d=int(total_d),
                            total_p=int(total_p),
                            total_q=int(total_q),
                            total_global=int(total_global),
-                           machines=machines_triees,
-                           causes=causes_triees,
-                           essences=essences_triees,
+                           machines=machines_tri,
+                           essences=essences_tri,
+                           par_shift=par_shift,
+                           pareto=pareto[:10],
                            nb_equipes=len(equipes))
 
 

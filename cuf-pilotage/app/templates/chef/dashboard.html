@@ -68,11 +68,11 @@
         </div>
     </div>
     <div class="col-md-3">
-        <div class="card kpi-card danger">
+        <div class="card kpi-card warning">
             <div class="card-body">
-                <div class="text-muted small">Volume rebut</div>
-                <div class="kpi-value text-danger">{{ stats.total_rebut }} m³</div>
-                <div class="small text-muted">Non conformités</div>
+                <div class="text-muted small">Bois déclassé</div>
+                <div class="kpi-value text-warning">{{ stats.total_declass }} m³</div>
+                <div class="small text-muted">Vendu localement (–70%)</div>
             </div>
         </div>
     </div>
@@ -109,26 +109,15 @@
 </div>
 
 <div class="row g-3">
-    <!-- Pareto arrêts -->
-    <div class="col-md-7">
+    <!-- TRS par essence (pleine largeur depuis retrait du Pareto) -->
+    <div class="col-12">
         <div class="card">
-            <div class="card-header">
-                Pareto des causes d'arrêt
-                <span class="badge bg-secondary ms-2">Règle des 80/20</span>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                TRS et volume par essence
+                <a href="{{ url_for('dashboard.pertes') }}" class="btn btn-sm btn-outline-danger">
+                    <i class="bi bi-currency-dollar"></i> Analyse des pertes
+                </a>
             </div>
-            <div class="card-body">
-                {% if pareto %}
-                <canvas id="chartPareto" height="150"></canvas>
-                {% else %}
-                <p class="text-muted">Aucun arrêt enregistré sur cette période.</p>
-                {% endif %}
-            </div>
-        </div>
-    </div>
-    <!-- TRS par essence -->
-    <div class="col-md-5">
-        <div class="card">
-            <div class="card-header">TRS et volume par essence</div>
             <div class="card-body p-0">
                 <table class="table table-sm mb-0">
                     <thead><tr><th>Essence</th><th>Volume (m³)</th><th>TRS moy.</th></tr></thead>
@@ -150,6 +139,7 @@
     </div>
 </div>
 {% endif %}
+
 {% endblock %}
 
 {% block scripts %}
@@ -181,43 +171,6 @@ new Chart(document.getElementById('chartTRS'), {
     }
 });
 
-// --- Graphique Pareto ---
-{% if pareto %}
-const paretoLabels = {{ pareto | map(attribute='cause') | list | tojson }};
-const paretoDurees = {{ pareto | map(attribute='duree') | list | tojson }};
-const paretoCumul  = {{ pareto | map(attribute='pct_cumule') | list | tojson }};
-
-new Chart(document.getElementById('chartPareto'), {
-    type: 'bar',
-    data: {
-        labels: paretoLabels,
-        datasets: [
-            {
-                label: 'Durée (min)',
-                data: paretoDurees,
-                backgroundColor: '#dc3545',
-                yAxisID: 'y',
-            },
-            {
-                label: '% cumulé',
-                data: paretoCumul,
-                type: 'line',
-                borderColor: '#fd7e14',
-                backgroundColor: 'transparent',
-                yAxisID: 'y2',
-                tension: 0.2,
-            }
-        ]
-    },
-    options: {
-        scales: {
-            y:  { title: { display: true, text: 'Minutes' } },
-            y2: { position: 'right', min: 0, max: 100,
-                  ticks: { callback: v => v + '%' } }
-        }
-    }
-});
-{% endif %}
 </script>
 {% endif %}
 {% endblock %}

@@ -32,10 +32,15 @@ def _mois_disponibles(n=12):
     return result
 
 
+_STATUTS_ANALYSES = ('soumis', 'verrouille')
+
+
 def _get_equipes_periode(jours=30):
     depuis = date.today() - timedelta(days=jours)
-    return Equipe.query.filter(Equipe.date >= depuis)\
-                       .order_by(Equipe.date.desc()).all()
+    return Equipe.query.filter(
+        Equipe.date >= depuis,
+        Equipe.statut.in_(_STATUTS_ANALYSES)
+    ).order_by(Equipe.date.desc()).all()
 
 
 @dashboard_bp.route('/chef')
@@ -118,7 +123,10 @@ def vue_chef():
 def vue_pdg():
     aujourd_hui = date.today()
     debut_mois  = aujourd_hui.replace(day=1)
-    equipes_mois = Equipe.query.filter(Equipe.date >= debut_mois).all()
+    equipes_mois = Equipe.query.filter(
+        Equipe.date >= debut_mois,
+        Equipe.statut.in_(_STATUTS_ANALYSES)
+    ).all()
 
     objectif   = float(Parametre.get('objectif_m3', 12.5))
     nb_postes  = len(equipes_mois)
@@ -141,7 +149,10 @@ def vue_pdg():
             fin = mois_ref.replace(year=mois_ref.year + 1, month=1, day=1)
         else:
             fin = mois_ref.replace(month=mois_ref.month + 1, day=1)
-        equipes_m = Equipe.query.filter(Equipe.date >= debut, Equipe.date < fin).all()
+        equipes_m = Equipe.query.filter(
+            Equipe.date >= debut, Equipe.date < fin,
+            Equipe.statut.in_(_STATUTS_ANALYSES)
+        ).all()
         vals = [e.trs_global for e in equipes_m if e.trs_global]
         tendance.append({
             'mois': debut.strftime('%b %Y'),
@@ -180,7 +191,8 @@ def pertes():
     fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)
 
     equipes = Equipe.query.filter(
-        Equipe.date >= debut, Equipe.date < fin
+        Equipe.date >= debut, Equipe.date < fin,
+        Equipe.statut.in_(_STATUTS_ANALYSES)
     ).order_by(Equipe.date.asc()).all()
 
     total_d = total_p = total_q = 0.0
@@ -291,7 +303,8 @@ def export_excel():
     fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)
 
     equipes = Equipe.query.filter(
-        Equipe.date >= debut, Equipe.date < fin
+        Equipe.date >= debut, Equipe.date < fin,
+        Equipe.statut.in_(_STATUTS_ANALYSES)
     ).order_by(Equipe.date.asc()).all()
 
     contenu = generer_rapport_excel(equipes, mois, annee)

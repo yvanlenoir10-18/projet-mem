@@ -85,11 +85,13 @@ class Equipe(db.Model):
     date = db.Column(db.Date, nullable=False, default=date.today)
     numero_equipe = db.Column(db.String(10), nullable=False)   # 'Matin' | 'Apres-midi'
     effectif = db.Column(db.Integer, default=10)
-    statut = db.Column(db.String(20), nullable=False, default='soumis')
+    statut = db.Column(db.String(20), nullable=False, default='brouillon')
     notes = db.Column(db.Text)
 
-    cree_le = db.Column(db.DateTime, default=datetime.utcnow)
-    soumis_le = db.Column(db.DateTime)
+    cree_le    = db.Column(db.DateTime, default=datetime.utcnow)
+    soumis_le  = db.Column(db.DateTime)
+    modifie_le  = db.Column(db.DateTime)
+    modifie_par = db.Column(db.String(100))
 
     trs_disponibilite = db.Column(db.Float)
     trs_performance = db.Column(db.Float)

@@ -1,10 +1,18 @@
 {% extends 'base.html' %}
-{% block title %}Saisie d'une équipe{% endblock %}
+{% block title %}{% if equipe %}Modifier l'équipe{% else %}Saisie d'une équipe{% endif %}{% endblock %}
 
 {% block content %}
-<h4 class="mb-4"><i class="bi bi-plus-circle text-success"></i> Saisie d'une équipe — Chaîne 4</h4>
+<h4 class="mb-4">
+    {% if equipe %}
+    <i class="bi bi-pencil-square text-warning"></i>
+    Modifier l'équipe — {{ equipe.date.strftime('%d/%m/%Y') }} ({{ equipe.numero_equipe }})
+    {% else %}
+    <i class="bi bi-plus-circle text-success"></i>
+    Saisie d'une équipe — Chaîne 4
+    {% endif %}
+</h4>
 
-<form method="POST" id="formEquipe">
+<form method="POST" action="{{ form_action }}" id="formEquipe">
     <!-- BLOC 1 : En-tête de l'équipe -->
     <div class="card mb-3">
         <div class="card-header bg-dark text-white">
@@ -14,19 +22,19 @@
             <div class="col-md-3">
                 <label class="form-label">Date <span class="text-danger">*</span></label>
                 <input type="date" name="date" class="form-control"
-                       value="{{ today }}" required>
+                       value="{{ equipe.date.isoformat() if equipe else today }}" required>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Équipe <span class="text-danger">*</span></label>
                 <select name="numero_equipe" class="form-select" required>
-                    <option value="Matin">Matin</option>
-                    <option value="Apres-midi">Après-midi</option>
+                    <option value="Matin"     {% if equipe and equipe.numero_equipe == 'Matin' %}selected{% endif %}>Matin</option>
+                    <option value="Apres-midi"{% if equipe and equipe.numero_equipe == 'Apres-midi' %}selected{% endif %}>Après-midi</option>
                 </select>
             </div>
             <div class="col-md-3">
                 <label class="form-label">Effectif présent</label>
                 <input type="number" name="effectif" class="form-control"
-                       value="10" min="1" max="30">
+                       value="{{ equipe.effectif if equipe else 10 }}" min="1" max="30">
             </div>
         </div>
     </div>
@@ -39,9 +47,7 @@
                 <i class="bi bi-plus"></i> Ajouter une essence
             </button>
         </div>
-        <div class="card-body" id="conteneur-productions">
-            <!-- La première ligne est ajoutée automatiquement -->
-        </div>
+        <div class="card-body" id="conteneur-productions"></div>
     </div>
 
     <!-- BLOC 3 : Arrêts machine -->
@@ -64,23 +70,21 @@
     <div class="mb-3">
         <label class="form-label">Notes / Observations</label>
         <textarea name="notes" class="form-control" rows="2"
-                  placeholder="Observations particulières de l'équipe..."></textarea>
+                  placeholder="Observations particulières de l'équipe...">{{ equipe.notes if equipe else '' }}</textarea>
     </div>
 
     <div class="d-flex gap-2">
         <button type="submit" class="btn btn-success btn-lg">
-            <i class="bi bi-save"></i> Enregistrer l'équipe
+            <i class="bi bi-save"></i> {% if equipe %}Enregistrer les modifications{% else %}Enregistrer l'équipe{% endif %}
         </button>
-        <a href="{{ url_for('saisie.historique') }}" class="btn btn-outline-secondary btn-lg">
-            Annuler
-        </a>
+        <a href="{{ url_for('saisie.historique') }}" class="btn btn-outline-secondary btn-lg">Annuler</a>
     </div>
 </form>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// ── Templates ────────────────────────────────────────────────────────────────
+// ── Templates HTML ────────────────────────────────────────────────────────────
 
 const essencesOptions = `
     {% for e in essences %}
@@ -99,20 +103,17 @@ const templateProduction = (index) => `
     <div class="col-md-2">
         <label class="form-label small">Grumes en entrée (m³) <span class="text-danger">*</span></label>
         <input type="number" name="prod_volume_entree[]" class="form-control form-control-sm vol-entree-${index}"
-               step="0.1" min="0" placeholder="ex: 35.5" required
-               oninput="majDechets(${index})">
+               step="0.1" min="0" placeholder="ex: 35.5" required oninput="majDechets(${index})">
     </div>
     <div class="col-md-2">
         <label class="form-label small">Planches conformes (m³) <span class="text-danger">*</span></label>
         <input type="number" name="prod_volume_conforme[]" class="form-control form-control-sm vol-conforme-${index}"
-               step="0.001" min="0" placeholder="ex: 12.5" required
-               oninput="majDechets(${index})">
+               step="0.001" min="0" placeholder="ex: 12.5" required oninput="majDechets(${index})">
     </div>
     <div class="col-md-2">
         <label class="form-label small">Bois déclassé — vente locale (m³)</label>
         <input type="number" name="prod_volume_declass[]" class="form-control form-control-sm vol-declass-${index}"
-               step="0.001" min="0" placeholder="ex: 2.1" value="0"
-               oninput="majDechets(${index})">
+               step="0.001" min="0" placeholder="ex: 2.1" value="0" oninput="majDechets(${index})">
     </div>
     <div class="col-md-2">
         <label class="form-label small text-muted">Déchets estimés (m³)</label>
@@ -158,15 +159,13 @@ const templateArret = (index) => `
     </div>
     <div class="col-md-1">
         <button type="button" class="btn btn-outline-danger btn-sm w-100"
-                onclick="supprimerArret(${index})">
-            <i class="bi bi-trash"></i>
-        </button>
+                onclick="supprimerArret(${index})"><i class="bi bi-trash"></i></button>
     </div>
 </div>`;
 
 // ── État ──────────────────────────────────────────────────────────────────────
 
-let compteurProd = 0;
+let compteurProd  = 0;
 let compteurArret = 0;
 
 function majDechets(index) {
@@ -184,6 +183,19 @@ function ajouterProduction() {
     compteurProd++;
 }
 
+function ajouterProductionAvecDonnees(data) {
+    ajouterProduction();
+    const idx = compteurProd - 1;
+    const row = document.getElementById('prod-' + idx);
+    if (!row) return;
+    row.querySelector('.vol-entree-'  + idx).value = data.volume_entree  || '';
+    row.querySelector('.vol-conforme-'+ idx).value = data.volume_conforme|| '';
+    row.querySelector('.vol-declass-' + idx).value = data.volume_declass || 0;
+    const sel = row.querySelector('select[name="prod_essence[]"]');
+    if (sel) sel.value = data.essence;
+    majDechets(idx);
+}
+
 function supprimerProduction(index) {
     const el = document.getElementById('prod-' + index);
     if (el) el.remove();
@@ -196,6 +208,18 @@ function ajouterArret() {
     compteurArret++;
 }
 
+function ajouterArretAvecDonnees(data) {
+    ajouterArret();
+    const idx = compteurArret - 1;
+    const row = document.getElementById('arret-' + idx);
+    if (!row) return;
+    row.querySelector('select[name="arret_machine[]"]').value  = data.machine     || '';
+    row.querySelector('input[name="arret_debut[]"]').value     = data.heure_debut || '';
+    row.querySelector('input[name="arret_fin[]"]').value       = data.heure_fin   || '';
+    row.querySelector('input[name="arret_cause[]"]').value     = data.cause       || '';
+    row.querySelector('select[name="arret_categorie[]"]').value= data.categorie   || '';
+}
+
 function supprimerArret(index) {
     const el = document.getElementById('arret-' + index);
     if (el) el.remove();
@@ -204,7 +228,18 @@ function supprimerArret(index) {
     }
 }
 
-// Ajouter la première ligne de production automatiquement
-ajouterProduction();
+// ── Initialisation ───────────────────────────────────────────────────────────
+// En mode modification, pré-remplir avec les données existantes
+
+const productionsDonnees = {{ productions_data | tojson }};
+const arretsDonnees      = {{ arrets_data | tojson }};
+
+if (productionsDonnees.length > 0) {
+    productionsDonnees.forEach(p => ajouterProductionAvecDonnees(p));
+} else {
+    ajouterProduction();
+}
+
+arretsDonnees.forEach(a => ajouterArretAvecDonnees(a));
 </script>
 {% endblock %}

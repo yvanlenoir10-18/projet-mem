@@ -27,7 +27,7 @@
         </thead>
         <tbody>
             {% for p in postes %}
-            <tr>
+            <tr {% if p.statut == 'brouillon' %}class="table-warning"{% endif %}>
                 <td>{{ p.date.strftime('%d/%m/%Y') }}</td>
                 <td>{{ p.numero_equipe }}</td>
                 <td>
@@ -58,20 +58,28 @@
                     {% elif p.statut == 'soumis' %}
                     <span class="badge bg-success">Soumis</span>
                     {% else %}
-                    <span class="badge bg-warning text-dark">Brouillon</span>
+                    <span class="badge bg-warning text-dark"><i class="bi bi-pencil"></i> Brouillon</span>
                     {% endif %}
                 </td>
-                <td>
+                <td class="text-nowrap">
                     <a href="{{ url_for('saisie.detail_poste', poste_id=p.id) }}"
-                       class="btn btn-sm btn-outline-primary">
+                       class="btn btn-sm btn-outline-primary" title="Voir le détail">
                         <i class="bi bi-eye"></i>
                     </a>
-                    {% if not p.est_verrouille %}
+                    {% if p.statut == 'brouillon' and p.user_id == current_user.id %}
+                    <form method="POST"
+                          action="{{ url_for('saisie.soumettre_equipe', equipe_id=p.id) }}"
+                          class="d-inline"
+                          onsubmit="return confirm('Soumettre cette équipe ? Les prix seront figés.')">
+                        <button type="submit" class="btn btn-sm btn-success" title="Soumettre">
+                            <i class="bi bi-send-check"></i>
+                        </button>
+                    </form>
                     <form method="POST"
                           action="{{ url_for('saisie.supprimer_poste', poste_id=p.id) }}"
                           class="d-inline"
-                          onsubmit="return confirm('Supprimer cette équipe ?')">
-                        <button type="submit" class="btn btn-sm btn-outline-danger">
+                          onsubmit="return confirm('Supprimer ce brouillon ?')">
+                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Supprimer">
                             <i class="bi bi-trash"></i>
                         </button>
                     </form>

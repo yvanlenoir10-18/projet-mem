@@ -307,7 +307,12 @@ def export_excel():
         Equipe.statut.in_(_STATUTS_ANALYSES)
     ).order_by(Equipe.date.asc()).all()
 
-    contenu = generer_rapport_excel(equipes, mois, annee)
+    nb_brouillons = Equipe.query.filter(
+        Equipe.date >= debut, Equipe.date < fin,
+        Equipe.statut == 'brouillon'
+    ).count()
+
+    contenu = generer_rapport_excel(equipes, mois, annee, nb_brouillons)
 
     noms_mois = ['', 'Janv', 'Fevr', 'Mars', 'Avri', 'Mai', 'Juin',
                  'Juil', 'Aout', 'Sept', 'Octo', 'Nove', 'Dece']

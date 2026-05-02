@@ -12,7 +12,7 @@ fi
 
 # Skip meta-commits (infrastructure, memoir notes) — avoids infinite loop
 LAST_MSG=$(git -C "$CLAUDE_PROJECT_DIR" log -1 --format="%s" 2>/dev/null)
-if echo "$LAST_MSG" | grep -qE '^(docs|chore|fix)\((memoir|notes-impact|ci|hooks|config)\):'; then
+if echo "$LAST_MSG" | grep -qE '^(docs|chore|fix)\((memoir|notes-impact|notes|ci|hooks|config|taches)\):'; then
   exit 0
 fi
 

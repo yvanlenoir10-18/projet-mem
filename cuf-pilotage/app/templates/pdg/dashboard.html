@@ -4,7 +4,7 @@
 {% block content %}
 
 {# ── Bannière prix manquants ──────────────────────────────────────────────── #}
-{% if prix_manquants %}
+{% if prix_manquants|default(false) %}
 <div class="alert alert-danger alert-dismissible fade show py-2 mb-3" role="alert">
     <i class="bi bi-exclamation-triangle-fill me-2"></i>
     <strong>Prix manquants</strong> — Des essences sans prix configuré : les pertes FCFA sont sous-estimées.
@@ -14,7 +14,7 @@
 {% endif %}
 
 {# ── Alerte brouillons (Option B : lien d'action selon rôle) ──────────────── #}
-{% if nb_brouillons > 0 %}
+{% if nb_brouillons|default(0) > 0 %}
 <div class="alert alert-warning alert-dismissible fade show py-2 mb-3" role="alert">
     <i class="bi bi-clock me-2"></i>
     <strong>{{ nb_brouillons }} poste{% if nb_brouillons > 1 %}s{% endif %} en brouillon</strong>

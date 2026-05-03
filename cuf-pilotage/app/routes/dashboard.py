@@ -121,55 +121,139 @@ def vue_chef():
 @dashboard_bp.route('/pdg')
 @login_required
 def vue_pdg():
+    from collections import defaultdict
+    from ..services.trs import _prix_production as _prix
+
     aujourd_hui = date.today()
-    debut_mois  = aujourd_hui.replace(day=1)
+
+    # ── Filtre : mois complet OU période libre ────────────────────────────
+    date_debut_s = request.args.get('date_debut', '').strip()
+    date_fin_s   = request.args.get('date_fin',   '').strip()
+    mode_libre   = False
+
+    if date_debut_s and date_fin_s:
+        try:
+            debut      = date.fromisoformat(date_debut_s)
+            fin        = date.fromisoformat(date_fin_s) + timedelta(days=1)
+            mode_libre = True
+        except ValueError:
+            pass
+
+    if not mode_libre:
+        try:
+            mois  = int(request.args.get('mois',  aujourd_hui.month))
+            annee = int(request.args.get('annee', aujourd_hui.year))
+            if not (1 <= mois <= 12) or annee < 2020:
+                mois, annee = aujourd_hui.month, aujourd_hui.year
+        except (ValueError, TypeError):
+            mois, annee = aujourd_hui.month, aujourd_hui.year
+        debut = date(annee, mois, 1)
+        fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)
+    else:
+        mois  = debut.month
+        annee = debut.year
+
+    # ── Équipes de la période ─────────────────────────────────────────────
     equipes_mois = Equipe.query.filter(
-        Equipe.date >= debut_mois,
+        Equipe.date >= debut, Equipe.date < fin,
         Equipe.statut.in_(_STATUTS_ANALYSES)
     ).all()
 
-    objectif   = float(Parametre.get('objectif_m3', 12.5))
-    nb_postes  = len(equipes_mois)
+    nb_brouillons = Equipe.query.filter(
+        Equipe.date >= debut, Equipe.date < fin,
+        Equipe.statut == 'brouillon'
+    ).count()
 
+    prix_manquants = any(
+        (p.volume_conforme + p.volume_declass) > 0 and _prix(p) == 0
+        for e in equipes_mois for p in e.productions
+    )
+
+    # ── KPIs ──────────────────────────────────────────────────────────────
+    objectif          = float(Parametre.get('objectif_m3', 12.5))
+    nb_postes         = len(equipes_mois)
     production_reelle = sum(e.volume_sorti for e in equipes_mois)
     production_cible  = objectif * nb_postes
 
-    trs_vals  = [e.trs_global for e in equipes_mois if e.trs_global]
+    trs_vals  = [e.trs_global for e in equipes_mois if e.trs_global is not None]
     trs_moyen = round(sum(trs_vals) / len(trs_vals), 1) if trs_vals else 0
-
     perte_totale = sum(calcule_pertes_fcfa(e) for e in equipes_mois)
 
-    pareto = pareto_arrets(equipes_mois)[:3]
+    # Delta TRS vs même durée précédente
+    duree      = (fin - debut).days
+    debut_prec = debut - timedelta(days=duree)
+    equipes_prec = Equipe.query.filter(
+        Equipe.date >= debut_prec, Equipe.date < debut,
+        Equipe.statut.in_(_STATUTS_ANALYSES)
+    ).all()
+    vals_prec = [e.trs_global for e in equipes_prec if e.trs_global is not None]
+    trs_prec  = round(sum(vals_prec) / len(vals_prec), 1) if vals_prec else None
+    delta_trs = round(trs_moyen - trs_prec, 1) if trs_prec is not None else None
 
+    # ── Rendement matière par essence ─────────────────────────────────────
+    ess_entree = defaultdict(float)
+    ess_sorti  = defaultdict(float)
+    for e in equipes_mois:
+        for p in e.productions:
+            ess_entree[p.essence] += p.volume_entree
+            ess_sorti[p.essence]  += p.volume_conforme + p.volume_declass
+
+    total_entree     = sum(ess_entree.values())
+    rendement_global = round(sum(ess_sorti.values()) / total_entree * 100, 1) if total_entree > 0 else 0
+
+    rendement_par_essence = []
+    for ess in sorted(ess_entree):
+        r = round(ess_sorti[ess] / ess_entree[ess] * 100, 1) if ess_entree[ess] > 0 else 0
+        rendement_par_essence.append({
+            'essence':   ess,
+            'rendement': r,
+            'couleur':   'success' if r >= 60 else ('warning' if r >= 40 else 'danger'),
+        })
+
+    # ── Pareto top 5 ─────────────────────────────────────────────────────
+    pareto = pareto_arrets(equipes_mois)[:5]
+
+    # ── Tendance TRS 12 derniers mois ─────────────────────────────────────
     tendance = []
-    for i in range(5, -1, -1):
-        mois_ref = (aujourd_hui.replace(day=1) - timedelta(days=30 * i))
-        debut = mois_ref.replace(day=1)
-        if mois_ref.month == 12:
-            fin = mois_ref.replace(year=mois_ref.year + 1, month=1, day=1)
-        else:
-            fin = mois_ref.replace(month=mois_ref.month + 1, day=1)
-        equipes_m = Equipe.query.filter(
-            Equipe.date >= debut, Equipe.date < fin,
+    for i in range(11, -1, -1):
+        m = aujourd_hui.month - i
+        a = aujourd_hui.year
+        while m <= 0:
+            m += 12
+            a -= 1
+        d_m = date(a, m, 1)
+        f_m = date(a, m + 1, 1) if m < 12 else date(a + 1, 1, 1)
+        eq_m = Equipe.query.filter(
+            Equipe.date >= d_m, Equipe.date < f_m,
             Equipe.statut.in_(_STATUTS_ANALYSES)
         ).all()
-        vals = [e.trs_global for e in equipes_m if e.trs_global]
-        tendance.append({
-            'mois': debut.strftime('%b %Y'),
-            'trs':  round(sum(vals) / len(vals), 1) if vals else 0
-        })
+        v = [e.trs_global for e in eq_m if e.trs_global is not None]
+        tendance.append({'mois': d_m.strftime('%b %y'), 'trs': round(sum(v) / len(v), 1) if v else 0})
+
+    if mode_libre:
+        label_periode = f"Du {debut.strftime('%d/%m/%Y')} au {(fin - timedelta(days=1)).strftime('%d/%m/%Y')}"
+    else:
+        label_periode = f"{NOMS_MOIS[mois]} {annee}"
 
     return render_template('pdg/dashboard.html',
                            trs_moyen=trs_moyen,
                            couleur_trs=couleur_trs(trs_moyen),
+                           delta_trs=delta_trs,
                            production_reelle=round(production_reelle, 1),
                            production_cible=round(production_cible, 1),
                            perte_fcfa=int(perte_totale),
                            nb_postes=nb_postes,
                            pareto=pareto,
                            tendance=tendance,
-                           mois_courant=aujourd_hui.strftime('%B %Y'),
-                           mois_options=_mois_disponibles())
+                           mois_courant=label_periode,
+                           mois_options=_mois_disponibles(),
+                           rendement_global=rendement_global,
+                           rendement_par_essence=rendement_par_essence,
+                           nb_brouillons=nb_brouillons,
+                           prix_manquants=prix_manquants,
+                           mode_libre=mode_libre,
+                           debut_filtre=debut.isoformat(),
+                           fin_filtre=(fin - timedelta(days=1)).isoformat())
 
 
 @dashboard_bp.route('/pertes')

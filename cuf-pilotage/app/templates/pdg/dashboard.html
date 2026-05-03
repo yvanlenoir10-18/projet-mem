@@ -13,7 +13,7 @@
 </div>
 {% endif %}
 
-{# ── Alerte brouillons (Option B : lien d'action selon rôle) ──────────────── #}
+{# ── Alerte brouillons — lien différencié selon rôle ──────────────────────── #}
 {% if nb_brouillons|default(0) > 0 %}
 <div class="alert alert-warning alert-dismissible fade show py-2 mb-3" role="alert">
     <i class="bi bi-clock me-2"></i>
@@ -21,6 +21,8 @@
     non inclus dans les calculs.
     {% if current_user.role in ('chef', 'admin') %}
     <a href="{{ url_for('saisie.historique') }}" class="alert-link ms-2">Voir et soumettre →</a>
+    {% else %}
+    <a href="{{ url_for('saisie.historique') }}" class="alert-link ms-2">Voir →</a>
     {% endif %}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>

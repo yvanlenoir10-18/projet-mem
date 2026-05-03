@@ -25,13 +25,7 @@ Write-Host "Activation de l'environnement virtuel..." -ForegroundColor Yellow
 Write-Host "Installation des dépendances..." -ForegroundColor Yellow
 pip install -r requirements.txt --quiet
 
-# 6. Supprimer l'ancienne base de données si elle existe
-if (Test-Path "instance\cuf.db") {
-    Remove-Item "instance\cuf.db"
-    Write-Host "Ancienne base supprimée." -ForegroundColor Yellow
-}
-
-# 7. Lancer Flask
+# 6. Lancer Flask
 Write-Host ""
 Write-Host "Lancement de Flask sur http://127.0.0.1:5000" -ForegroundColor Green
 Write-Host "Ouvre ce lien dans ton navigateur : http://127.0.0.1:5000" -ForegroundColor Cyan

@@ -34,6 +34,7 @@ def create_app():
     with app.app_context():
         db.create_all()
         _init_donnees_defaut()
+        _seed_donnees_demo()
 
     return app
 
@@ -73,5 +74,92 @@ def _init_donnees_defaut():
         ]
         for cle, valeur, desc in parametres:
             db.session.add(Parametre(cle=cle, valeur=valeur, description=desc))
+
+    db.session.commit()
+
+
+def _seed_donnees_demo():
+    """Crée des données de démonstration si aucune équipe n'existe."""
+    from datetime import date as d, datetime
+    from .models import Equipe, Production, Arret
+
+    if Equipe.query.first():
+        return
+
+    admin = User.query.filter_by(role='admin').first()
+    if not admin:
+        return
+
+    specs = [
+        # Mai 2026 — données courantes
+        (d(2026, 5, 1), 'Matin', 'soumis', 68.0,
+         [('Ayous', 8.0, 5.0, 0.5), ('Azobé', 5.0, 3.0, 0.3)],
+         [('Bicoupe', '08:15', '09:00', 'Remplacement courroie', 'Mécanique'),
+          ('Déligneuse', '10:30', '10:50', 'Attente opérateur', 'Organisationnelle')]),
+        (d(2026, 5, 1), 'Apres-midi', 'soumis', 72.0,
+         [('Iroko', 9.0, 6.0, 0.5)],
+         []),
+        (d(2026, 5, 2), 'Matin', 'soumis', 58.0,
+         [('Movingui', 6.0, 3.5, 0.5), ('Ayous', 5.0, 3.0, 0.3)],
+         [('Scie de tête', '07:30', '08:30', 'Tension lame', 'Mécanique'),
+          ('Bicoupe', '10:00', '10:30', 'Pause non planifiée', 'Organisationnelle')]),
+        (d(2026, 5, 2), 'Apres-midi', 'soumis', 74.0,
+         [('Azobé', 7.0, 4.5, 0.4)],
+         [('Ébouteuse', '15:00', '15:20', 'Réglage longueur', 'Maintenance planifiée')]),
+        (d(2026, 5, 3), 'Matin', 'brouillon', None,
+         [('Iroko', 5.0, 3.0, 0.3)],
+         []),
+        # Avril 2026 — pour le delta TRS et la tendance
+        (d(2026, 4, 1), 'Matin', 'soumis', 60.0,
+         [('Ayous', 8.0, 4.5, 0.4), ('Azobé', 5.0, 2.8, 0.3)],
+         [('Bicoupe', '08:00', '09:15', 'Blocage grumes', 'Approvisionnement')]),
+        (d(2026, 4, 1), 'Apres-midi', 'soumis', 65.0,
+         [('Iroko', 8.0, 5.0, 0.5)],
+         []),
+        (d(2026, 4, 15), 'Matin', 'soumis', 63.0,
+         [('Movingui', 7.0, 4.2, 0.4), ('Ayous', 4.0, 2.4, 0.2)],
+         [('Bicoupe', '09:00', '09:45', 'Remplacement lame', 'Mécanique')]),
+        # Mars 2026 — tendance
+        (d(2026, 3, 10), 'Matin', 'soumis', 55.0,
+         [('Ayous', 8.0, 4.0, 0.4)],
+         [('Bicoupe', '08:00', '09:30', 'Panne moteur', 'Mécanique')]),
+        # Février 2026 — tendance
+        (d(2026, 2, 15), 'Matin', 'soumis', 62.0,
+         [('Azobé', 9.0, 5.2, 0.5)],
+         []),
+    ]
+
+    for (date_eq, num_eq, statut, trs, prods, arrets) in specs:
+        eq = Equipe(
+            date=date_eq,
+            numero_equipe=num_eq,
+            statut=statut,
+            trs_global=trs,
+            user_id=admin.id,
+            soumis_le=datetime.utcnow() if statut in ('soumis', 'verrouille') else None,
+        )
+        db.session.add(eq)
+        db.session.flush()
+
+        for (essence, entree, conforme, declass) in prods:
+            db.session.add(Production(
+                equipe_id=eq.id,
+                essence=essence,
+                volume_entree=entree,
+                volume_conforme=conforme,
+                volume_declass=declass,
+            ))
+
+        for (machine, h_d, h_f, cause, categorie) in arrets:
+            a = Arret(
+                equipe_id=eq.id,
+                machine=machine,
+                heure_debut=h_d,
+                heure_fin=h_f,
+                cause=cause,
+                categorie=categorie,
+            )
+            a.calcule_duree()
+            db.session.add(a)
 
     db.session.commit()

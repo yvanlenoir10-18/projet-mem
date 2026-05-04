@@ -38,6 +38,30 @@
 **Règle :** Toute tâche impliquant 3+ étapes requiert : plan écrit → explication → validation explicite → puis code.
 **Commandes de validation :** `ok`, `vas-y`, `d'accord`, `go`, `✅`, `lance`, `continue`, `oui`
 
+### R7 — Ne jamais effacer la DB au démarrage de l'application
+**Contexte :** P5b — `start.ps1` supprimait `instance/cuf.db` à chaque lancement, laissant le dashboard vide à chaque redémarrage Windows. L'utilisateur ne voyait pas ses fonctionnalités P5.
+**Règle :** Le script de démarrage ne doit jamais supprimer de données utilisateur. La suppression doit être manuelle et explicite (`del instance\cuf.db` documenté en cas de migration de schéma — voir R1). Le seed doit utiliser un guard idempotent (`if Equipe.query.first(): return`) pour ne s'exécuter qu'une fois sur base vide.
+
+### R8 — Templates Jinja2 défensifs avec `|default()`
+**Contexte :** P5c — un crash `UndefinedError: 'nb_brouillons' is undefined` est apparu côté Windows après un `git pull` partiellement échoué (DNS error). Le template avait été mis à jour mais pas la route → désynchronisation.
+**Règle :** Toute variable de contexte référencée dans un template doit avoir un fallback `|default(valeur_neutre)`. Exemples : `{% if nb_brouillons|default(0) > 0 %}`, `{% if prix_manquants|default(false) %}`. Filet de sécurité contre les désynchronisations route/template, pas un substitut à la cohérence du code.
+
+### R9 — Contrôle d'accès par propriété, pas seulement par rôle
+**Contexte :** P5d — l'alerte brouillon devait mener à une vue lecture seule pour le PDG. Plutôt que d'ajouter `if role == 'pdg': hide_buttons`, on a constaté que le template existant `historique.html` masquait déjà les boutons via `if p.user_id == current_user.id`.
+**Règle :** Préférer un contrôle d'accès basé sur la propriété de l'objet (`obj.user_id == current_user.id`) à un contrôle basé sur le rôle. Plus robuste, plus testable, fonctionne même si un nouveau rôle est ajouté plus tard sans modifier les templates.
+
+### R10 — Fonctions pures vs fonctions à mutation : séparer
+**Contexte :** P6-F1 — `calcule_trs(equipe)` mute l'objet (assigne `equipe.trs_disponibilite`, etc.). Pour le dashboard en lecture seule, il fallait un (D, P, Q) sans dirtyfier la session SQLAlchemy.
+**Règle :** Quand un calcul est utilisé dans un contexte read-only (dashboard, export, stats), créer un helper pur séparé (ex. `decompose_dpq(equipe)` retourne `(d, p, q)` sans rien modifier). Garder la version à mutation pour les routes de soumission/écriture. Ne jamais appeler la version mutante depuis une route GET.
+
+### R11 — Toute arithmétique côté Python, jamais en Jinja2
+**Contexte :** P6-F2 — la matrice criticité affiche des durées formatées (`1h30`, `45min`). Tenté de faire la conversion minutes → format en Jinja2 : impossible (pas de `divmod`). 
+**Règle :** Pré-calculer toutes les valeurs d'affichage côté route Python (formats, pourcentages, couleurs CSS) et passer au template un dict prêt à l'emploi. Jinja2 ne doit faire que de l'itération et de l'affichage. Bénéfice secondaire : les valeurs sont testables sans lancer Flask.
+
+### R12 — Cascade multiplicative D × P × Q : jamais 3 barres de pourcentage juxtaposées
+**Contexte :** P6-F1 — réflexe initial : afficher D=89 %, P=86 %, Q=87 % comme trois barres côte à côte. Erreur cognitive : suggère une additivité fausse alors que TRS = D × P × Q (multiplicatif). La critique utilisateur a corrigé : afficher la cascade en m³ perdus.
+**Règle :** Pour toute visualisation TRS, utiliser la décomposition cascade `(1−D)·cap + D·(1−P)·cap + D·P·(1−Q)·cap + D·P·Q·cap = cap`. Une seule barre stacked à 4 segments, pas 3 barres distinctes. L'identité algébrique garantit qu'aucune perte n'est comptée deux fois.
+
 ---
 
 ## 📅 HISTORIQUE DES CORRECTIONS
@@ -50,3 +74,9 @@
 | 2026-04-30 | P2 sans cadrage | R4 |
 | 2026-04-30 | Modèle matière ambigu | R5 |
 | 2026-04-30 | Vibe Coding Protocol instauré | R6 |
+| 2026-05-03 | DB effacée à chaque lancement | R7 |
+| 2026-05-03 | UndefinedError sur désync template/route | R8 |
+| 2026-05-03 | Contrôle PDG basé sur rôle au lieu de propriété | R9 |
+| 2026-05-04 | Mutation d'équipe dans contexte read-only | R10 |
+| 2026-05-04 | Tentative de divmod en Jinja2 | R11 |
+| 2026-05-04 | TRS affiché comme 3 barres % juxtaposées | R12 |

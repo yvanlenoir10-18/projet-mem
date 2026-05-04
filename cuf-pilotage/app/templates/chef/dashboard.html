@@ -143,6 +143,60 @@
 </div>
 {% endif %}
 
+<!-- F5 — Scorecard semaine 6 jours (lun-sam) -->
+{% if scorecard %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-calendar-week text-primary me-1"></i> Scorecard semaine</span>
+        <small class="text-muted">{{ scorecard.week_label }}</small>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-sm table-bordered text-center mb-0" style="font-size:0.85rem;">
+                <thead class="table-light">
+                    <tr>
+                        <th class="text-start ps-2" style="min-width:110px;">Poste</th>
+                        {% for d in scorecard.days %}
+                        <th class="{% if d.is_today %}table-primary{% endif %}" style="min-width:80px;">
+                            {{ d.label_court }}<br>
+                            <small class="text-muted">{{ d.label_complet }}</small>
+                        </th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for shift in scorecard.shifts %}
+                    <tr>
+                        <td class="fw-semibold text-start ps-2">{{ shift }}</td>
+                        {% for d in scorecard.days %}
+                        {% set cell = d.shifts[shift] %}
+                        {% if cell.state == 'submitted' %}
+                        <td class="bg-{{ cell.couleur }}-subtle align-middle">
+                            <span class="fw-semibold text-{{ cell.couleur }}">{{ cell.display }}</span>
+                        </td>
+                        {% elif cell.state == 'brouillon' %}
+                        <td class="bg-warning-subtle align-middle" title="Brouillon en cours de saisie">
+                            <span style="font-size:1.1rem;">{{ cell.display }}</span>
+                        </td>
+                        {% else %}
+                        <td class="text-muted align-middle">{{ cell.display }}</td>
+                        {% endif %}
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="px-3 py-2 d-flex flex-wrap gap-3" style="font-size:0.75rem; color:#6c757d;">
+            <span><span class="badge bg-success-subtle text-success border border-success-subtle">XX%</span> TRS soumis</span>
+            <span><span class="badge bg-warning-subtle text-warning border border-warning-subtle">⏳</span> Brouillon en cours</span>
+            <span><span class="text-muted">—</span> Aucune équipe ce jour</span>
+            <span class="ms-auto">Seuils TRS : ≥70% vert · 50–70% orange · &lt;50% rouge</span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="row g-3 mb-4">
     <!-- Graphique TRS quotidien -->
     <div class="col-md-8">

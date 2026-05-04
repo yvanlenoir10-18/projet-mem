@@ -67,7 +67,7 @@ def vue_chef():
                                postes=[], pareto=[], stats={}, jours=jours,
                                matrice={}, machines=Config.MACHINES,
                                categories=Config.CATEGORIES_ARRET,
-                               decomposition=None)
+                               decomposition=None, scorecard=None)
 
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen    = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
@@ -158,6 +158,54 @@ def vue_chef():
         'pct_q':        _pct(perte_q_m3),
     }
 
+    # Scorecard semaine courante (lun-sam) — F5
+    aujourd_hui = date.today()
+    lundi    = aujourd_hui - timedelta(days=aujourd_hui.weekday())
+    samedi   = lundi + timedelta(days=5)
+    equipes_semaine = Equipe.query.filter(
+        Equipe.date >= lundi, Equipe.date <= samedi
+    ).all()
+    index_eq = {(e.date, e.numero_equipe): e for e in equipes_semaine}
+
+    LABELS_JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+    SHIFTS = ['Matin', 'Apres-midi']
+
+    scorecard_days = []
+    for i in range(6):
+        jour = lundi + timedelta(days=i)
+        cellules = {}
+        for shift in SHIFTS:
+            eq = index_eq.get((jour, shift))
+            if eq is None:
+                cellules[shift] = {'state': 'absent', 'display': '—', 'couleur': 'secondary'}
+            elif eq.statut == 'brouillon':
+                cellules[shift] = {'state': 'brouillon', 'display': '⏳', 'couleur': 'warning'}
+            else:
+                trs = eq.trs_global or 0
+                if trs >= 70:
+                    coul = 'success'
+                elif trs >= 50:
+                    coul = 'warning'
+                else:
+                    coul = 'danger'
+                cellules[shift] = {
+                    'state':   'submitted',
+                    'display': f"{trs:.0f}%",
+                    'couleur': coul,
+                }
+        scorecard_days.append({
+            'label_court':   LABELS_JOURS[i],
+            'label_complet': jour.strftime('%d/%m'),
+            'is_today':      (jour == aujourd_hui),
+            'shifts':        cellules,
+        })
+
+    scorecard = {
+        'week_label': f"Semaine du {lundi.strftime('%d/%m')} au {samedi.strftime('%d/%m')}",
+        'days':       scorecard_days,
+        'shifts':     SHIFTS,
+    }
+
     # Matrice criticité arrêts : machine × catégorie
     matrice_raw = defaultdict(lambda: {'duree': 0, 'count': 0})
     for e in equipes:
@@ -198,7 +246,8 @@ def vue_chef():
                            matrice=matrice,
                            machines=Config.MACHINES,
                            categories=Config.CATEGORIES_ARRET,
-                           decomposition=decomposition)
+                           decomposition=decomposition,
+                           scorecard=scorecard)
 
 
 @dashboard_bp.route('/pdg')

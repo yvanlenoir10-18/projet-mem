@@ -4,6 +4,7 @@ Routes des tableaux de bord.
 - Vue PDG         : synthèse financière (FCFA, objectifs, traffic light)
 - Export Excel    : rapport mensuel téléchargeable
 """
+from collections import defaultdict
 from flask import Blueprint, render_template, request, send_file, abort
 from flask_login import login_required
 from datetime import date, timedelta
@@ -11,11 +12,23 @@ import io
 from ..models import db, Equipe, Parametre
 from ..services.trs import pareto_arrets, couleur_trs, calcule_pertes_equipe, calcule_pertes_fcfa
 from ..services.export import generer_rapport_excel
+from config import Config
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
 
 NOMS_MOIS = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
              'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre']
+
+
+def _format_duree(minutes):
+    if not minutes:
+        return '—'
+    h, m = divmod(minutes, 60)
+    if h == 0:
+        return f"{m}min"
+    if m == 0:
+        return f"{h}h00"
+    return f"{h}h{m:02d}"
 
 
 def _mois_disponibles(n=12):
@@ -51,7 +64,9 @@ def vue_chef():
 
     if not equipes:
         return render_template('chef/dashboard.html',
-                               postes=[], pareto=[], stats={}, jours=jours)
+                               postes=[], pareto=[], stats={}, jours=jours,
+                               matrice={}, machines=Config.MACHINES,
+                               categories=Config.CATEGORIES_ARRET)
 
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen    = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
@@ -109,19 +124,51 @@ def vue_chef():
     chart_labels = list(trs_par_date.keys())
     chart_trs    = [round(sum(v) / len(v), 1) if v else 0 for v in trs_par_date.values()]
 
+    # Matrice criticité arrêts : machine × catégorie
+    matrice_raw = defaultdict(lambda: {'duree': 0, 'count': 0})
+    for e in equipes:
+        for arret in e.arrets:
+            if arret.duree_min:
+                cle = (arret.machine, arret.categorie)
+                matrice_raw[cle]['duree'] += arret.duree_min
+                matrice_raw[cle]['count'] += 1
+
+    matrice = {}
+    for m in Config.MACHINES:
+        matrice[m] = {}
+        for c in Config.CATEGORIES_ARRET:
+            data = matrice_raw.get((m, c), {'duree': 0, 'count': 0})
+            duree = data['duree']
+            if duree == 0:
+                couleur_cell = ''
+            elif duree > 120:
+                couleur_cell = 'table-danger'
+            elif duree >= 30:
+                couleur_cell = 'table-warning'
+            else:
+                couleur_cell = 'table-success'
+            matrice[m][c] = {
+                'duree': duree,
+                'duree_fmt': _format_duree(duree),
+                'count': data['count'],
+                'couleur': couleur_cell,
+            }
+
     return render_template('chef/dashboard.html',
                            postes=equipes[:10],
                            stats=stats,
                            jours=jours,
                            chart_labels=chart_labels,
                            chart_trs=chart_trs,
-                           mois_options=_mois_disponibles())
+                           mois_options=_mois_disponibles(),
+                           matrice=matrice,
+                           machines=Config.MACHINES,
+                           categories=Config.CATEGORIES_ARRET)
 
 
 @dashboard_bp.route('/pdg')
 @login_required
 def vue_pdg():
-    from collections import defaultdict
     from ..services.trs import _prix_production as _prix
 
     aujourd_hui = date.today()

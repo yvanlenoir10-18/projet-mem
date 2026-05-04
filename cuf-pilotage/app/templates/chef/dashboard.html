@@ -138,6 +138,60 @@
         </div>
     </div>
 </div>
+
+<!-- F2 — Matrice criticité arrêts : machine × catégorie -->
+<div class="row g-3 mt-0">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-grid-3x3-gap text-danger me-1"></i> Matrice criticité des arrêts</span>
+                <small class="text-muted">{{ jours }} derniers jours · durée totale et fréquence par machine × catégorie</small>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered mb-0" style="font-size:0.8rem;">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="text-nowrap" style="min-width:110px;">Machine</th>
+                                {% for cat in categories %}
+                                <th class="text-center text-nowrap" style="min-width:85px;">{{ cat }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for machine in machines %}
+                            <tr>
+                                <td class="fw-semibold text-nowrap">{{ machine }}</td>
+                                {% for cat in categories %}
+                                {% set cell = matrice[machine][cat] %}
+                                <td class="{{ cell.couleur }} text-center">
+                                    {% if cell.duree == 0 %}
+                                    <span class="text-muted">—</span>
+                                    {% else %}
+                                    <div>{{ cell.duree_fmt }}</div>
+                                    {% if cell.count >= 5 %}
+                                    <span class="badge bg-danger">×{{ cell.count }}</span>
+                                    {% else %}
+                                    <span class="text-muted" style="font-size:0.7rem;">×{{ cell.count }}</span>
+                                    {% endif %}
+                                    {% endif %}
+                                </td>
+                                {% endfor %}
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="px-3 py-2 d-flex gap-3" style="font-size:0.75rem; color:#6c757d;">
+                    <span><span class="badge bg-danger">&nbsp;&nbsp;</span> &gt; 120 min</span>
+                    <span><span class="badge bg-warning text-dark">&nbsp;&nbsp;</span> 30 – 120 min</span>
+                    <span><span class="badge bg-success">&nbsp;&nbsp;</span> &lt; 30 min</span>
+                    <span class="ms-auto">×N = nombre d'occurrences · <span class="badge bg-danger">×N</span> si ≥ 5</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endif %}
 
 {% endblock %}

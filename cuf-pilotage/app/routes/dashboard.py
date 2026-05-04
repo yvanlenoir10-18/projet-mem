@@ -69,7 +69,7 @@ def vue_chef():
                                matrice={}, machines=Config.MACHINES,
                                categories=Config.CATEGORIES_ARRET,
                                decomposition=None, scorecard=None,
-                               regularite=None)
+                               regularite=None, gain_potentiel=None)
 
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen    = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
@@ -193,6 +193,25 @@ def vue_chef():
         'pct_q':        _pct(perte_q_m3),
     }
 
+    # F3 — Calculateur potentiel gain FCFA
+    from ..services.trs import _prix_production
+    total_vol_prod = 0.0
+    total_val_prod = 0.0
+    for e in equipes:
+        for p in e.productions:
+            vol = p.volume_conforme + p.volume_declass
+            total_vol_prod += vol
+            total_val_prod += vol * _prix_production(p)
+
+    prix_moyen_fcfa = round(total_val_prod / total_vol_prod) if total_vol_prod > 0 else 0
+
+    gain_potentiel = {
+        'cap_total':  round(cap_total_m3, 1),
+        'vol_actuel': round(vol_produit, 1),
+        'trs_actuel': stats['trs_moyen'],
+        'prix_moyen': prix_moyen_fcfa,
+    }
+
     # Scorecard semaine courante (lun-sam) — F5
     aujourd_hui = date.today()
     lundi    = aujourd_hui - timedelta(days=aujourd_hui.weekday())
@@ -283,7 +302,8 @@ def vue_chef():
                            categories=Config.CATEGORIES_ARRET,
                            decomposition=decomposition,
                            scorecard=scorecard,
-                           regularite=regularite)
+                           regularite=regularite,
+                           gain_potentiel=gain_potentiel)
 
 
 @dashboard_bp.route('/pdg')

@@ -46,6 +46,18 @@
                 <div class="text-muted small">TRS moyen ({{ jours }} j)</div>
                 <div class="kpi-value text-{{ couleur }}">{{ stats.trs_moyen }}%</div>
                 <div class="small text-muted">Cible ≥ 70%</div>
+                {% if regularite %}
+                <hr class="my-2 opacity-25">
+                <div class="d-flex align-items-center gap-2">
+                  <span class="badge bg-{{ regularite.couleur }}">± {{ regularite.cv }}%</span>
+                  <span class="text-body-secondary small">{{ regularite.label }} — {{ regularite.n }} postes</span>
+                </div>
+                {% if regularite.essence_note %}
+                <div class="text-body-tertiary" style="font-size:0.75rem; margin-top:4px;">
+                  ℹ Présence Azobé/Iroko — variabilité naturelle attendue
+                </div>
+                {% endif %}
+                {% endif %}
             </div>
         </div>
     </div>

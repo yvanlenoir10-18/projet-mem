@@ -5,6 +5,7 @@ Routes des tableaux de bord.
 - Export Excel    : rapport mensuel téléchargeable
 """
 from collections import defaultdict
+import statistics
 from flask import Blueprint, render_template, request, send_file, abort
 from flask_login import login_required
 from datetime import date, timedelta
@@ -67,7 +68,8 @@ def vue_chef():
                                postes=[], pareto=[], stats={}, jours=jours,
                                matrice={}, machines=Config.MACHINES,
                                categories=Config.CATEGORIES_ARRET,
-                               decomposition=None, scorecard=None)
+                               decomposition=None, scorecard=None,
+                               regularite=None)
 
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen    = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
@@ -113,6 +115,39 @@ def vue_chef():
         'trs_apres_midi':   trs_moyen_groupe(apres_midi),
         'essence_stats':    essence_stats,
     }
+
+    # F4 — Score de régularité (CV du TRS)
+    trs_valides = [e.trs_global for e in equipes
+                   if e.trs_global is not None and e.trs_global > 0]
+    if len(trs_valides) >= 10:
+        moyenne    = statistics.mean(trs_valides)
+        ecart_type = statistics.stdev(trs_valides)  # n-1, écart-type échantillon
+        cv = (ecart_type / moyenne) * 100 if moyenne > 0 else 0
+
+        # SEUILS PROVISOIRES — recalibrer après 60 jours données CUF réelles
+        if cv < 10:
+            label_reg, couleur_reg = 'régulier', 'success'
+        elif cv < 25:
+            label_reg, couleur_reg = 'variable', 'warning'
+        else:
+            label_reg, couleur_reg = 'instable', 'danger'
+
+        essences_dures = {'Azobé', 'Iroko'}
+        a_essence_dure = any(
+            p.essence in essences_dures
+            for e in equipes
+            for p in e.productions
+        )
+
+        regularite = {
+            'cv':           round(cv, 1),
+            'n':            len(trs_valides),
+            'label':        label_reg,
+            'couleur':      couleur_reg,
+            'essence_note': a_essence_dure,
+        }
+    else:
+        regularite = None
 
     trs_par_date = {}
     for e in sorted(equipes, key=lambda x: x.date):
@@ -247,7 +282,8 @@ def vue_chef():
                            machines=Config.MACHINES,
                            categories=Config.CATEGORIES_ARRET,
                            decomposition=decomposition,
-                           scorecard=scorecard)
+                           scorecard=scorecard,
+                           regularite=regularite)
 
 
 @dashboard_bp.route('/pdg')

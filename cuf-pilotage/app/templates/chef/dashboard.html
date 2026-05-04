@@ -78,6 +78,71 @@
     </div>
 </div>
 
+<!-- F1 — Décomposition cascade D × P × Q en m³ perdus -->
+{% if decomposition %}
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-cup-straw text-info me-1"></i> Décomposition des pertes (cascade D × P × Q)</span>
+        <small class="text-muted">{{ jours }} derniers jours · capacité théorique {{ decomposition.cap_total }} m³ ({{ stats.nb_postes }} postes × {{ '%.1f'|format(decomposition.cap_total / stats.nb_postes) }} m³)</small>
+    </div>
+    <div class="card-body">
+        <div class="progress mb-3" style="height: 28px; font-weight: 600;">
+            <div class="progress-bar bg-success" role="progressbar" style="width: {{ decomposition.pct_produit }}%"
+                 title="Produit conforme : {{ decomposition.vol_produit }} m³">
+                {% if decomposition.pct_produit > 8 %}{{ decomposition.pct_produit }}%{% endif %}
+            </div>
+            <div class="progress-bar bg-danger" role="progressbar" style="width: {{ decomposition.pct_d }}%"
+                 title="Perte D (arrêts) : {{ decomposition.perte_d }} m³">
+                {% if decomposition.pct_d > 5 %}D {{ decomposition.pct_d }}%{% endif %}
+            </div>
+            <div class="progress-bar bg-warning text-dark" role="progressbar" style="width: {{ decomposition.pct_p }}%"
+                 title="Perte P (sous-cadence) : {{ decomposition.perte_p }} m³">
+                {% if decomposition.pct_p > 5 %}P {{ decomposition.pct_p }}%{% endif %}
+            </div>
+            <div class="progress-bar bg-info" role="progressbar" style="width: {{ decomposition.pct_q }}%"
+                 title="Perte Q (déclassé/déchets) : {{ decomposition.perte_q }} m³">
+                {% if decomposition.pct_q > 5 %}Q {{ decomposition.pct_q }}%{% endif %}
+            </div>
+        </div>
+
+        <div class="row g-2">
+            <div class="col-md-3">
+                <div class="border-start border-success border-4 ps-2">
+                    <div class="text-muted small">Produit conforme</div>
+                    <div class="fs-5 fw-semibold text-success">{{ decomposition.vol_produit }} m³</div>
+                    <div class="small text-muted">{{ decomposition.pct_produit }}% de la capacité</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="border-start border-danger border-4 ps-2">
+                    <div class="text-muted small">Perte D (arrêts machine)</div>
+                    <div class="fs-5 fw-semibold text-danger">{{ decomposition.perte_d }} m³</div>
+                    <div class="small text-muted">{{ decomposition.pct_d }}% — temps machine perdu</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="border-start border-warning border-4 ps-2">
+                    <div class="text-muted small">Perte P (sous-cadence)</div>
+                    <div class="fs-5 fw-semibold text-warning">{{ decomposition.perte_p }} m³</div>
+                    <div class="small text-muted">{{ decomposition.pct_p }}% — cadence non atteinte</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="border-start border-info border-4 ps-2">
+                    <div class="text-muted small">Perte Q (déclassé/déchets)</div>
+                    <div class="fs-5 fw-semibold text-info">{{ decomposition.perte_q }} m³</div>
+                    <div class="small text-muted">{{ decomposition.pct_q }}% — bois non conforme</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-3 small text-muted">
+            <i class="bi bi-info-circle"></i> Cascade multiplicative : chaque perte ne consomme que ce qui restait après la précédente. Perte totale = <strong>{{ decomposition.perte_total }} m³</strong> sur {{ decomposition.cap_total }} m³ théoriques.
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <div class="row g-3 mb-4">
     <!-- Graphique TRS quotidien -->
     <div class="col-md-8">

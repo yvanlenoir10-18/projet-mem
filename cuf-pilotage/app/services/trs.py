@@ -63,6 +63,31 @@ def calcule_trs(equipe):
     }
 
 
+def decompose_dpq(equipe):
+    """
+    Retourne (D, P, Q) en proportions (0-1) sans muter l'équipe.
+    Utilise les valeurs stockées si présentes, sinon recalcule à partir
+    des volumes et arrêts. Contrairement à calcule_trs, ne modifie rien.
+    """
+    if (equipe.trs_disponibilite is not None and
+        equipe.trs_performance is not None and
+        equipe.trs_qualite is not None):
+        return (equipe.trs_disponibilite / 100,
+                equipe.trs_performance / 100,
+                equipe.trs_qualite / 100)
+
+    duree_poste  = float(Parametre.get('duree_poste', 480))
+    capacite_h   = float(Parametre.get('capacite_equipe_h', 1.5625))
+    duree_arrets = equipe.duree_totale_arrets
+    temps_utile  = max(0, duree_poste - duree_arrets)
+    d = temps_utile / duree_poste if duree_poste > 0 else 0
+    vol_theo  = capacite_h * (temps_utile / 60)
+    vol_sorti = equipe.volume_sorti
+    p = min(1.0, vol_sorti / vol_theo) if vol_theo > 0 else 0
+    q = (equipe.volume_conforme / vol_sorti) if vol_sorti > 0 else 0
+    return (d, p, q)
+
+
 # ── Pertes financières ────────────────────────────────────────────────────────
 
 def _prix_production(prod):

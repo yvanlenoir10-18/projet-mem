@@ -10,7 +10,7 @@ from flask_login import login_required
 from datetime import date, timedelta
 import io
 from ..models import db, Equipe, Parametre
-from ..services.trs import pareto_arrets, couleur_trs, calcule_pertes_equipe, calcule_pertes_fcfa
+from ..services.trs import pareto_arrets, couleur_trs, calcule_pertes_equipe, calcule_pertes_fcfa, decompose_dpq
 from ..services.export import generer_rapport_excel
 from config import Config
 
@@ -66,7 +66,8 @@ def vue_chef():
         return render_template('chef/dashboard.html',
                                postes=[], pareto=[], stats={}, jours=jours,
                                matrice={}, machines=Config.MACHINES,
-                               categories=Config.CATEGORIES_ARRET)
+                               categories=Config.CATEGORIES_ARRET,
+                               decomposition=None)
 
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen    = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
@@ -124,6 +125,39 @@ def vue_chef():
     chart_labels = list(trs_par_date.keys())
     chart_trs    = [round(sum(v) / len(v), 1) if v else 0 for v in trs_par_date.values()]
 
+    # Décomposition cascade D × P × Q en m³ perdus (F1)
+    duree_poste   = float(Parametre.get('duree_poste', 480))
+    capacite_h    = float(Parametre.get('capacite_equipe_h', 1.5625))
+    cap_par_poste = capacite_h * (duree_poste / 60)  # m³ produits si TRS=100%
+
+    cap_total_m3 = cap_par_poste * len(equipes)
+    perte_d_m3   = 0.0
+    perte_p_m3   = 0.0
+    perte_q_m3   = 0.0
+    for e in equipes:
+        d, p, q = decompose_dpq(e)
+        perte_d_m3 += (1 - d)         * cap_par_poste
+        perte_p_m3 += d * (1 - p)     * cap_par_poste
+        perte_q_m3 += d * p * (1 - q) * cap_par_poste
+
+    vol_produit = max(0.0, cap_total_m3 - perte_d_m3 - perte_p_m3 - perte_q_m3)
+
+    def _pct(part):
+        return round(part / cap_total_m3 * 100, 1) if cap_total_m3 > 0 else 0
+
+    decomposition = {
+        'cap_total':    round(cap_total_m3, 1),
+        'vol_produit':  round(vol_produit, 1),
+        'perte_d':      round(perte_d_m3, 1),
+        'perte_p':      round(perte_p_m3, 1),
+        'perte_q':      round(perte_q_m3, 1),
+        'perte_total':  round(perte_d_m3 + perte_p_m3 + perte_q_m3, 1),
+        'pct_produit':  _pct(vol_produit),
+        'pct_d':        _pct(perte_d_m3),
+        'pct_p':        _pct(perte_p_m3),
+        'pct_q':        _pct(perte_q_m3),
+    }
+
     # Matrice criticité arrêts : machine × catégorie
     matrice_raw = defaultdict(lambda: {'duree': 0, 'count': 0})
     for e in equipes:
@@ -163,7 +197,8 @@ def vue_chef():
                            mois_options=_mois_disponibles(),
                            matrice=matrice,
                            machines=Config.MACHINES,
-                           categories=Config.CATEGORIES_ARRET)
+                           categories=Config.CATEGORIES_ARRET,
+                           decomposition=decomposition)
 
 
 @dashboard_bp.route('/pdg')

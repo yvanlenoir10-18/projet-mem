@@ -27,8 +27,8 @@
             <div class="col-md-3">
                 <label class="form-label">Équipe <span class="text-danger">*</span></label>
                 <select name="numero_equipe" class="form-select" required>
-                    <option value="Matin"     {% if equipe and equipe.numero_equipe == 'Matin' %}selected{% endif %}>Matin</option>
-                    <option value="Apres-midi"{% if equipe and equipe.numero_equipe == 'Apres-midi' %}selected{% endif %}>Après-midi</option>
+                    <option value="Matin"     {% if (equipe and equipe.numero_equipe == 'Matin') or (not equipe and shift_initial == 'Matin') %}selected{% endif %}>Matin</option>
+                    <option value="Apres-midi"{% if (equipe and equipe.numero_equipe == 'Apres-midi') or (not equipe and shift_initial == 'Apres-midi') %}selected{% endif %}>Après-midi</option>
                 </select>
             </div>
             <div class="col-md-3">

@@ -7,7 +7,7 @@ Routes des tableaux de bord.
 from collections import defaultdict
 import statistics
 from flask import Blueprint, render_template, request, send_file, abort
-from flask_login import login_required
+from flask_login import login_required, current_user
 from datetime import date, timedelta
 import io
 from ..models import db, Equipe, Parametre
@@ -48,6 +48,63 @@ def _mois_disponibles(n=12):
 
 _STATUTS_ANALYSES = ('soumis', 'verrouille')
 
+_LABELS_JOURS_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+
+
+def _alertes_chef(aujourd_hui):
+    """P7 — Calcule les alertes du Chef : saisies manquantes (7j) + brouillons oubliés (>2j)."""
+    # P7-A1 — Saisies manquantes sur les 7 derniers jours ouvrés (lun-sam)
+    debut_check = aujourd_hui - timedelta(days=7)
+    postes_attendus = []
+    j = debut_check
+    while j < aujourd_hui:
+        if j.weekday() < 6:  # 0=lun ... 5=sam ; 6=dim exclu
+            for shift in ('Matin', 'Apres-midi'):
+                postes_attendus.append((j, shift))
+        j += timedelta(days=1)
+
+    postes_existants = {
+        (e.date, e.numero_equipe)
+        for e in Equipe.query.filter(
+            Equipe.date >= debut_check,
+            Equipe.date < aujourd_hui
+        ).all()
+    }
+
+    saisies_manquantes = [
+        {
+            'date':     d,
+            'shift':    s,
+            'date_iso': d.isoformat(),
+            'date_fmt': f"{_LABELS_JOURS_FR[d.weekday()]} {d.strftime('%d/%m')}",
+        }
+        for (d, s) in postes_attendus
+        if (d, s) not in postes_existants
+    ]
+
+    # P7-A2 — Brouillons oubliés (créés il y a plus de 2 jours par l'utilisateur courant)
+    seuil_brouillon = aujourd_hui - timedelta(days=2)
+    brouillons_oublies_q = Equipe.query.filter(
+        Equipe.user_id == current_user.id,
+        Equipe.statut == 'brouillon',
+        Equipe.date <= seuil_brouillon,
+    ).order_by(Equipe.date.asc()).all()
+
+    brouillons_oublies = [
+        {
+            'id':       e.id,
+            'date_fmt': f"{_LABELS_JOURS_FR[e.date.weekday()]} {e.date.strftime('%d/%m')}",
+            'shift':    e.numero_equipe,
+            'jours':    (aujourd_hui - e.date).days,
+        }
+        for e in brouillons_oublies_q
+    ]
+
+    return {
+        'saisies_manquantes': saisies_manquantes,
+        'brouillons_oublies': brouillons_oublies,
+    }
+
 
 def _get_equipes_periode(jours=30):
     depuis = date.today() - timedelta(days=jours)
@@ -69,7 +126,8 @@ def vue_chef():
                                matrice={}, machines=Config.MACHINES,
                                categories=Config.CATEGORIES_ARRET,
                                decomposition=None, scorecard=None,
-                               regularite=None, gain_potentiel=None)
+                               regularite=None, gain_potentiel=None,
+                               alertes=_alertes_chef(date.today()))
 
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen    = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
@@ -290,6 +348,8 @@ def vue_chef():
                 'couleur': couleur_cell,
             }
 
+    alertes = _alertes_chef(aujourd_hui)
+
     return render_template('chef/dashboard.html',
                            postes=equipes[:10],
                            stats=stats,
@@ -303,7 +363,8 @@ def vue_chef():
                            decomposition=decomposition,
                            scorecard=scorecard,
                            regularite=regularite,
-                           gain_potentiel=gain_potentiel)
+                           gain_potentiel=gain_potentiel,
+                           alertes=alertes)
 
 
 @dashboard_bp.route('/pdg')

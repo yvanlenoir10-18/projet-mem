@@ -21,6 +21,35 @@ saisie_bp = Blueprint('saisie', __name__, url_prefix='/saisie')
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+def _verifier_coherence(equipe):
+    """P7-V1 — Vérifie la cohérence métier d'une équipe avant soumission.
+
+    Retourne None si tout est cohérent, sinon un message d'erreur explicite.
+    Bloquant : empêche la soumission si une incohérence est détectée.
+    """
+    # Cohérence date : pas de saisie dans le futur
+    if equipe.date > date.today():
+        return (f"Incohérence : la date du poste ({equipe.date.strftime('%d/%m/%Y')}) "
+                f"est dans le futur. Corrigez la date avant de soumettre.")
+
+    # Cohérence volume : Σ(conforme + déclassé) ≤ Σ entrée
+    total_entree = sum(p.volume_entree for p in equipe.productions)
+    total_sorti  = sum(p.volume_conforme + p.volume_declass for p in equipe.productions)
+    if total_sorti > total_entree + 0.01:  # tolérance 0.01 m³ pour arrondis
+        return (f"Incohérence : volumes sortis ({total_sorti:.2f} m³) supérieurs au volume "
+                f"entré ({total_entree:.2f} m³). Vérifiez les saisies de production — "
+                f"les déchets doivent être positifs.")
+
+    # Cohérence durée arrêts : Σ duree_min ≤ duree_poste
+    duree_poste  = float(Parametre.get('duree_poste', 480))
+    total_arrets = sum(a.duree_min or 0 for a in equipe.arrets)
+    if total_arrets > duree_poste:
+        return (f"Incohérence : durée totale d'arrêts ({total_arrets} min) supérieure à "
+                f"la durée du poste ({duree_poste:.0f} min). Vérifiez les heures d'arrêt.")
+
+    return None
+
+
 def _peut_modifier(equipe):
     """Retourne True si l'utilisateur courant peut modifier cette équipe."""
     if equipe.statut == 'brouillon':
@@ -76,11 +105,18 @@ def _render_form(equipe=None):
         url_for('saisie.modifier_equipe', equipe_id=equipe.id)
         if equipe else url_for('saisie.nouveau_poste')
     )
+    # P7 — Pré-remplissage via query params (lien depuis bannière saisies manquantes)
+    date_initiale = request.args.get('date') if not equipe else None
+    shift_initial = request.args.get('shift') if not equipe else None
+    if shift_initial not in ('Matin', 'Apres-midi'):
+        shift_initial = 'Matin'
+
     return render_template('saisie/formulaire.html',
                            essences=Config.ESSENCES,
                            machines=Config.MACHINES,
                            categories=Config.CATEGORIES_ARRET,
-                           today=date.today().isoformat(),
+                           today=date_initiale or date.today().isoformat(),
+                           shift_initial=shift_initial,
                            equipe=equipe,
                            productions_data=productions_data,
                            arrets_data=arrets_data,
@@ -170,6 +206,12 @@ def soumettre_equipe(equipe_id):
     # Validation minimale : au moins une production avec volume > 0
     if not equipe.productions or all(p.volume_entree == 0 for p in equipe.productions):
         flash("Impossible de soumettre : aucune production avec des volumes saisis.", 'warning')
+        return redirect(url_for('saisie.detail_poste', poste_id=equipe_id))
+
+    # P7-V1 — Validations de cohérence (bloquantes)
+    erreur = _verifier_coherence(equipe)
+    if erreur:
+        flash(erreur, 'danger')
         return redirect(url_for('saisie.detail_poste', poste_id=equipe_id))
 
     # Figer les prix au moment de la soumission (première fois uniquement)

@@ -1,0 +1,52 @@
+{# P7 — Bannières d'alertes Chef (saisies manquantes + brouillons oubliés) #}
+{% if alertes and (alertes.saisies_manquantes or alertes.brouillons_oublies) %}
+<div class="mb-3">
+
+    {% if alertes.saisies_manquantes %}
+    <div class="alert alert-warning d-flex align-items-start gap-2 mb-2">
+        <i class="bi bi-calendar-x fs-5 mt-1"></i>
+        <div class="flex-grow-1">
+            <strong>{{ alertes.saisies_manquantes|length }} poste{% if alertes.saisies_manquantes|length > 1 %}s{% endif %} non saisi{% if alertes.saisies_manquantes|length > 1 %}s{% endif %}</strong>
+            sur les 7 derniers jours ouvrés.
+            <div class="small mt-1">
+                {% for s in alertes.saisies_manquantes %}
+                <a class="badge bg-warning text-dark text-decoration-none me-1 mb-1"
+                   href="{{ url_for('saisie.nouveau_poste') }}?date={{ s.date_iso }}&shift={{ s.shift }}"
+                   title="Saisir ce poste rétroactivement">
+                    {{ s.date_fmt }} · {{ s.shift }}
+                </a>
+                {% endfor %}
+            </div>
+            <div class="small text-muted mt-1">
+                <i class="bi bi-info-circle"></i>
+                Un poste oublié = des m³ produits non comptabilisés. Le TRS du dashboard est faussé tant que les saisies ne sont pas complètes.
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if alertes.brouillons_oublies %}
+    <div class="alert alert-info d-flex align-items-start gap-2 mb-0">
+        <i class="bi bi-hourglass-split fs-5 mt-1"></i>
+        <div class="flex-grow-1">
+            <strong>{{ alertes.brouillons_oublies|length }} brouillon{% if alertes.brouillons_oublies|length > 1 %}s{% endif %} en attente</strong>
+            depuis plus de 2 jours.
+            <div class="small mt-1">
+                {% for b in alertes.brouillons_oublies %}
+                <a class="badge bg-info text-dark text-decoration-none me-1 mb-1"
+                   href="{{ url_for('saisie.detail_poste', poste_id=b.id) }}"
+                   title="Ouvrir le brouillon pour le compléter ou le supprimer">
+                    {{ b.date_fmt }} · {{ b.shift }} · il y a {{ b.jours }} j
+                </a>
+                {% endfor %}
+            </div>
+            <div class="small text-muted mt-1">
+                <i class="bi bi-info-circle"></i>
+                Les brouillons ne sont pas comptés dans les KPI. Soumettez-les ou supprimez-les.
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endif %}

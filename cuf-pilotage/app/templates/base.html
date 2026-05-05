@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}CUF Pilotage{% endblock %} — Chaîne 4</title>
+    <title>{% block title %}WoodPilot{% endblock %} — CUF Chaîne 4</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Bootstrap Icons -->
@@ -17,29 +17,43 @@
         .kpi-card.danger  { border-color: #dc3545; }
         .kpi-card.info    { border-color: #0dcaf0; }
         .kpi-value { font-size: 2rem; font-weight: 700; }
-        .sidebar { min-height: calc(100vh - 56px); background: #212529; }
-        .sidebar .nav-link { color: #adb5bd; padding: 10px 20px; }
-        .sidebar .nav-link:hover, .sidebar .nav-link.active { color: #fff; background: #343a40; border-radius: 6px; }
-        .sidebar .nav-link i { margin-right: 8px; }
+        .sidebar { min-height: calc(100vh - 56px); background: #1a2332; }
+        .sidebar .nav-link { color: #a0aec0; padding: 9px 18px; font-size: .92rem; border-radius: 6px; margin: 1px 8px; }
+        .sidebar .nav-link:hover { color: #fff; background: #2d3f55; }
+        .sidebar .nav-link.active { color: #fff; background: #2563eb; }
+        .sidebar .nav-link i { margin-right: 7px; }
+        .sidebar .section-label { color: #4a6080; font-size: .68rem; font-weight: 700; letter-spacing: .1em; padding: 14px 18px 4px; display: block; }
+        .sidebar hr { border-color: #2d3f55; margin: 6px 12px; }
         .table-hover tbody tr:hover { background-color: #e9ecef; }
         .badge-trs { font-size: 1rem; padding: 6px 12px; }
+
+        /* Badge rôle dans la navbar */
+        .role-badge-pdg     { background: #1e3a5f; color: #60a5fa; }
+        .role-badge-chef    { background: #1a3a2a; color: #34d399; }
+        .role-badge-admin   { background: #3b1a1a; color: #f87171; }
+        .role-badge-operateur { background: #2a2a1a; color: #fbbf24; }
     </style>
 </head>
 <body>
 <!-- Barre de navigation -->
-<nav class="navbar navbar-dark bg-dark">
+<nav class="navbar navbar-dark" style="background:#0f1923;">
     <div class="container-fluid">
-        <a class="navbar-brand" href="#">
-            <i class="bi bi-tree-fill text-success"></i> CUF Pilotage — Chaîne 4
+        <a class="navbar-brand" href="{% if current_user.is_authenticated %}{{ url_for('auth.login') }}{% else %}{{ url_for('auth.login') }}{% endif %}">
+            <i class="bi bi-diagram-3-fill text-success me-1"></i>
+            <span style="color:#e2e8f0;">Wood</span><span style="color:#22c55e;font-weight:800;">Pilot</span>
+            <span class="text-muted small ms-2" style="font-size:.7rem;font-weight:400;">CUF · Chaîne 4</span>
         </a>
         {% if current_user.is_authenticated %}
         <div class="d-flex align-items-center gap-3">
-            <span class="text-light">
-                <i class="bi bi-person-circle"></i>
-                {{ current_user.nom }}
-                <span class="badge bg-secondary ms-1">{{ current_user.role|upper }}</span>
+            <span class="px-2 py-1 rounded small fw-bold
+                {% if current_user.role == 'pdg' %}role-badge-pdg
+                {% elif current_user.role == 'chef' %}role-badge-chef
+                {% elif current_user.role == 'admin' %}role-badge-admin
+                {% else %}role-badge-operateur{% endif %}">
+                <i class="bi bi-person-fill me-1"></i>{{ current_user.nom }}
+                <span class="opacity-75 ms-1">· {{ current_user.role|upper }}</span>
             </span>
-            <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-light btn-sm">
+            <a href="{{ url_for('auth.logout') }}" class="btn btn-outline-secondary btn-sm">
                 <i class="bi bi-box-arrow-right"></i> Déconnexion
             </a>
         </div>
@@ -50,41 +64,71 @@
 <div class="container-fluid">
     <div class="row">
         {% if current_user.is_authenticated %}
-        <!-- Sidebar de navigation -->
-        <div class="col-md-2 sidebar py-3">
+        <!-- Sidebar de navigation — affichage selon le rôle -->
+        <div class="col-md-2 sidebar py-2">
             <nav class="nav flex-column">
+
                 {% if current_user.role == 'pdg' %}
+                {# ── PDG : synthèse financière uniquement ── #}
+                <span class="section-label">Direction</span>
                 <a class="nav-link {% if request.endpoint == 'dashboard.vue_pdg' %}active{% endif %}"
                    href="{{ url_for('dashboard.vue_pdg') }}">
-                    <i class="bi bi-speedometer2"></i> Vue Direction
-                </a>
-                {% endif %}
-                {% if current_user.role in ('chef', 'pdg') %}
-                <a class="nav-link {% if request.endpoint == 'dashboard.vue_chef' %}active{% endif %}"
-                   href="{{ url_for('dashboard.vue_chef') }}">
-                    <i class="bi bi-bar-chart-line"></i> Analyse Production
-                </a>
-                <a class="nav-link {% if request.endpoint == 'dashboard.pertes' %}active{% endif %}"
-                   href="{{ url_for('dashboard.pertes') }}">
-                    <i class="bi bi-cash-stack text-danger"></i> Analyse des pertes
-                </a>
-                <a class="nav-link {% if request.endpoint == 'analyse.arrets' %}active{% endif %}"
-                   href="{{ url_for('analyse.arrets') }}">
-                    <i class="bi bi-exclamation-triangle"></i> Analyse des arrêts
-                </a>
-                {% endif %}
-                <a class="nav-link {% if request.endpoint == 'saisie.nouveau_poste' %}active{% endif %}"
-                   href="{{ url_for('saisie.nouveau_poste') }}">
-                    <i class="bi bi-plus-circle"></i> Saisir un poste
+                    <i class="bi bi-speedometer2"></i> Tableau de bord
                 </a>
                 <a class="nav-link {% if request.endpoint == 'saisie.historique' %}active{% endif %}"
                    href="{{ url_for('saisie.historique') }}">
+                    <i class="bi bi-clock-history"></i> Historique des postes
+                </a>
+                {% endif %}
+
+                {% if current_user.role in ('chef', 'admin') %}
+                {# ── CHEF / ADMIN : toutes les analyses ── #}
+                <span class="section-label">Analyses</span>
+                <a class="nav-link {% if request.endpoint == 'dashboard.vue_chef' %}active{% endif %}"
+                   href="{{ url_for('dashboard.vue_chef') }}">
+                    <i class="bi bi-bar-chart-line"></i> Tableau de bord
+                </a>
+                <a class="nav-link {% if request.endpoint == 'dashboard.pertes' %}active{% endif %}"
+                   href="{{ url_for('dashboard.pertes') }}">
+                    <i class="bi bi-cash-stack"></i> Pertes financières
+                </a>
+                <a class="nav-link {% if request.endpoint == 'analyse.arrets' %}active{% endif %}"
+                   href="{{ url_for('analyse.arrets') }}">
+                    <i class="bi bi-exclamation-triangle"></i> Causes d'arrêts
+                </a>
+                <hr>
+                {% endif %}
+
+                {% if current_user.role in ('operateur', 'chef', 'admin') %}
+                {# ── SAISIE : opérateur, chef, admin — PDG ne saisit pas ── #}
+                <span class="section-label">Saisie</span>
+                <a class="nav-link {% if request.endpoint == 'saisie.nouveau_poste' %}active{% endif %}"
+                   href="{{ url_for('saisie.nouveau_poste') }}">
+                    <i class="bi bi-plus-circle"></i> Nouveau poste
+                </a>
+                {% endif %}
+
+                <a class="nav-link {% if request.endpoint == 'saisie.historique' and current_user.role != 'pdg' %}active{% endif %}"
+                   href="{{ url_for('saisie.historique') }}">
                     <i class="bi bi-clock-history"></i> Historique
                 </a>
+
+                {% if current_user.role in ('chef', 'admin') %}
+                <hr>
+                <span class="section-label">Configuration</span>
                 <a class="nav-link {% if request.endpoint == 'admin.parametres' %}active{% endif %}"
                    href="{{ url_for('admin.parametres') }}">
                     <i class="bi bi-gear"></i> Paramètres
                 </a>
+                {% endif %}
+
+                {% if current_user.role == 'admin' %}
+                <a class="nav-link {% if request.endpoint and request.endpoint.startswith('admin.') and 'utilisateur' in request.endpoint %}active{% endif %}"
+                   href="{{ url_for('admin.liste_utilisateurs') }}">
+                    <i class="bi bi-people-fill"></i> Utilisateurs
+                </a>
+                {% endif %}
+
             </nav>
         </div>
         {% endif %}

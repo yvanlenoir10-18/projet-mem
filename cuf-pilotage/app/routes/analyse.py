@@ -6,6 +6,7 @@ from flask_login import login_required
 from datetime import date, timedelta
 from ..models import Equipe
 from ..services.trs import pareto_arrets
+from ..utils import roles_required
 from config import Config
 
 analyse_bp = Blueprint('analyse', __name__, url_prefix='/analyse')
@@ -13,6 +14,7 @@ analyse_bp = Blueprint('analyse', __name__, url_prefix='/analyse')
 
 @analyse_bp.route('/arrets')
 @login_required
+@roles_required('chef', 'admin')
 def arrets():
     jours     = int(request.args.get('jours', 30))
     machine   = request.args.get('machine', '').strip()

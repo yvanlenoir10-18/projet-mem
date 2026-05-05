@@ -13,6 +13,7 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from datetime import datetime, date
 from ..models import db, Equipe, Production, Arret, Parametre, normalise_essence
+from ..utils import roles_required
 from ..services.trs import calcule_trs, calcule_pertes_equipe, couleur_trs
 from config import Config
 
@@ -127,6 +128,7 @@ def _render_form(equipe=None):
 
 @saisie_bp.route('/nouveau', methods=['GET', 'POST'])
 @login_required
+@roles_required('operateur', 'chef', 'admin')
 def nouveau_poste():
     """Formulaire de saisie d'une nouvelle équipe — sauvegardée en brouillon."""
     if request.method == 'POST':
@@ -195,6 +197,7 @@ def nouveau_poste():
 
 @saisie_bp.route('/equipe/<int:equipe_id>/soumettre', methods=['POST'])
 @login_required
+@roles_required('operateur', 'chef', 'admin')
 def soumettre_equipe(equipe_id):
     """Transition brouillon → soumis. Fige les prix et recalcule le TRS final."""
     equipe = Equipe.query.get_or_404(equipe_id)
@@ -233,6 +236,7 @@ def soumettre_equipe(equipe_id):
 
 @saisie_bp.route('/equipe/<int:equipe_id>/modifier', methods=['GET', 'POST'])
 @login_required
+@roles_required('operateur', 'chef', 'admin')
 def modifier_equipe(equipe_id):
     """Formulaire pré-rempli pour modifier un brouillon ou un soumis récent (chef/admin)."""
     equipe = Equipe.query.get_or_404(equipe_id)
@@ -317,10 +321,9 @@ def modifier_equipe(equipe_id):
 
 @saisie_bp.route('/equipe/<int:equipe_id>/verrouiller', methods=['POST'])
 @login_required
+@roles_required('chef', 'admin')
 def verrouiller_equipe(equipe_id):
     """Transition soumis → verrouillé (chef ou admin)."""
-    if current_user.role not in ('chef', 'admin'):
-        abort(403)
     equipe = Equipe.query.get_or_404(equipe_id)
     if equipe.statut != 'soumis':
         flash("Seule une équipe soumise peut être verrouillée.", 'warning')
@@ -333,10 +336,9 @@ def verrouiller_equipe(equipe_id):
 
 @saisie_bp.route('/equipe/<int:equipe_id>/deverrouiller', methods=['POST'])
 @login_required
+@roles_required('admin')
 def deverrouiller_equipe(equipe_id):
     """Transition verrouillé → soumis (admin uniquement)."""
-    if current_user.role != 'admin':
-        abort(403)
     equipe = Equipe.query.get_or_404(equipe_id)
     if not equipe.est_verrouille:
         flash("Cette équipe n'est pas verrouillée.", 'warning')

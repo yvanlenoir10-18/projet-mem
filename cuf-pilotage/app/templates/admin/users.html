@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+{% block title %}Gestion des utilisateurs{% endblock %}
+
+{% block content %}
+
+{% if mode == 'liste' %}
+{# ── MODE LISTE ──────────────────────────────────────────────────────────── #}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0"><i class="bi bi-people-fill text-primary"></i> Gestion des utilisateurs</h4>
+    <a href="{{ url_for('admin.creer_utilisateur') }}" class="btn btn-success">
+        <i class="bi bi-person-plus-fill"></i> Nouvel utilisateur
+    </a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0 align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Nom</th>
+                    <th>Email</th>
+                    <th>Rôle</th>
+                    <th>Statut</th>
+                    <th>Créé le</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for u in utilisateurs %}
+            <tr>
+                <td>
+                    <i class="bi bi-person-circle text-muted me-1"></i>
+                    <strong>{{ u.nom }}</strong>
+                </td>
+                <td class="text-muted">{{ u.email }}</td>
+                <td>
+                    {% if u.role == 'admin' %}
+                    <span class="badge bg-danger">Admin</span>
+                    {% elif u.role == 'chef' %}
+                    <span class="badge bg-warning text-dark">Chef</span>
+                    {% elif u.role == 'pdg' %}
+                    <span class="badge bg-dark">PDG</span>
+                    {% else %}
+                    <span class="badge bg-secondary">Opérateur</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if u.actif %}
+                    <span class="badge bg-success"><i class="bi bi-check-circle"></i> Actif</span>
+                    {% else %}
+                    <span class="badge bg-secondary"><i class="bi bi-x-circle"></i> Inactif</span>
+                    {% endif %}
+                </td>
+                <td class="text-muted small">{{ u.cree_le.strftime('%d/%m/%Y') if u.cree_le else '—' }}</td>
+                <td class="text-end">
+                    <a href="{{ url_for('admin.modifier_utilisateur', user_id=u.id) }}"
+                       class="btn btn-outline-primary btn-sm me-1">
+                        <i class="bi bi-pencil"></i> Modifier
+                    </a>
+                    {% if u.id != current_user.id %}
+                    <form method="POST" action="{{ url_for('admin.supprimer_utilisateur', user_id=u.id) }}"
+                          class="d-inline"
+                          onsubmit="return confirm('Supprimer le compte de {{ u.nom }} ? Cette action est irréversible.')">
+                        <button class="btn btn-outline-danger btn-sm">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="text-center text-muted py-4">
+                    <i class="bi bi-people fs-3 d-block mb-2"></i>
+                    Aucun utilisateur trouvé.
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+
+{% elif mode == 'nouveau' %}
+{# ── MODE CRÉATION ───────────────────────────────────────────────────────── #}
+
+<div class="mb-4">
+    <a href="{{ url_for('admin.liste_utilisateurs') }}" class="text-decoration-none text-muted">
+        <i class="bi bi-arrow-left"></i> Retour à la liste
+    </a>
+</div>
+
+<div class="row justify-content-center">
+<div class="col-md-6">
+<div class="card shadow-sm">
+    <div class="card-header bg-success text-white">
+        <i class="bi bi-person-plus-fill"></i> Créer un nouvel utilisateur
+    </div>
+    <div class="card-body">
+        <form method="POST">
+            <div class="mb-3">
+                <label class="form-label fw-bold">Nom complet <span class="text-danger">*</span></label>
+                <input type="text" name="nom" class="form-control" placeholder="Ex : Jean Mbala" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold">Email <span class="text-danger">*</span></label>
+                <input type="email" name="email" class="form-control" placeholder="jean.mbala@cuf.cm" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-bold">Rôle <span class="text-danger">*</span></label>
+                <select name="role" class="form-select" required>
+                    {% for r in roles %}
+                    <option value="{{ r }}">
+                        {% if r == 'admin' %}Administrateur
+                        {% elif r == 'chef' %}Chef de production
+                        {% elif r == 'pdg' %}PDG / Direction
+                        {% else %}Opérateur (saisie){% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+                <div class="form-text text-muted">
+                    Opérateur : saisie + historique — Chef : analyses + paramètres — PDG : tableau financier — Admin : tout
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="form-label fw-bold">Mot de passe <span class="text-danger">*</span></label>
+                <input type="password" name="password" class="form-control"
+                       placeholder="Minimum 6 caractères" minlength="6" required>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-success">
+                    <i class="bi bi-check-lg"></i> Créer le compte
+                </button>
+                <a href="{{ url_for('admin.liste_utilisateurs') }}" class="btn btn-outline-secondary">
+                    Annuler
+                </a>
+            </div>
+        </form>
+    </div>
+</div>
+</div>
+</div>
+
+
+{% elif mode == 'modifier' %}
+{# ── MODE MODIFICATION ───────────────────────────────────────────────────── #}
+
+<div class="mb-4">
+    <a href="{{ url_for('admin.liste_utilisateurs') }}" class="text-decoration-none text-muted">
+        <i class="bi bi-arrow-left"></i> Retour à la liste
+    </a>
+</div>
+
+<div class="row justify-content-center">
+<div class="col-md-6">
+
+    <!-- Formulaire modifier compte -->
+    <div class="card shadow-sm mb-3">
+        <div class="card-header bg-warning text-dark">
+            <i class="bi bi-pencil-square"></i> Modifier le compte — {{ utilisateur.nom }}
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('admin.modifier_utilisateur', user_id=utilisateur.id) }}">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Nom complet</label>
+                    <input type="text" name="nom" class="form-control"
+                           value="{{ utilisateur.nom }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Email</label>
+                    <input type="email" name="email" class="form-control"
+                           value="{{ utilisateur.email }}" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Rôle</label>
+                    <select name="role" class="form-select">
+                        {% for r in roles %}
+                        <option value="{{ r }}" {% if r == utilisateur.role %}selected{% endif %}>
+                            {% if r == 'admin' %}Administrateur
+                            {% elif r == 'chef' %}Chef de production
+                            {% elif r == 'pdg' %}PDG / Direction
+                            {% else %}Opérateur (saisie){% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Statut du compte</label>
+                    <select name="actif" class="form-select">
+                        <option value="1" {% if utilisateur.actif %}selected{% endif %}>Actif</option>
+                        <option value="0" {% if not utilisateur.actif %}selected{% endif %}>Inactif (bloqué)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-warning text-dark">
+                    <i class="bi bi-save"></i> Enregistrer les modifications
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reset mot de passe -->
+    <div class="card shadow-sm border-danger">
+        <div class="card-header bg-danger text-white">
+            <i class="bi bi-shield-lock"></i> Réinitialiser le mot de passe
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{{ url_for('admin.reset_mot_de_passe', user_id=utilisateur.id) }}">
+                <div class="mb-3">
+                    <label class="form-label">Nouveau mot de passe</label>
+                    <input type="password" name="nouveau_mdp" class="form-control"
+                           placeholder="Minimum 6 caractères" minlength="6" required>
+                </div>
+                <button type="submit" class="btn btn-danger"
+                        onclick="return confirm('Réinitialiser le mot de passe de {{ utilisateur.nom }} ?')">
+                    <i class="bi bi-key"></i> Réinitialiser
+                </button>
+            </form>
+        </div>
+    </div>
+
+</div>
+</div>
+
+{% endif %}
+
+{% endblock %}

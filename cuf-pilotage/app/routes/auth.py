@@ -46,4 +46,7 @@ def _redirect_par_role(role):
         return redirect(url_for('dashboard.vue_pdg'))
     if role == 'chef':
         return redirect(url_for('dashboard.vue_chef'))
-    return redirect(url_for('saisie.nouveau_poste'))
+    if role == 'admin':
+        return redirect(url_for('dashboard.vue_chef'))
+    # operateur
+    return redirect(url_for('saisie.historique'))

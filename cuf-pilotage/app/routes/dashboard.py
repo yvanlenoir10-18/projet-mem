@@ -13,6 +13,7 @@ import io
 from ..models import db, Equipe, Parametre
 from ..services.trs import pareto_arrets, couleur_trs, calcule_pertes_equipe, calcule_pertes_fcfa, decompose_dpq
 from ..services.export import generer_rapport_excel
+from ..utils import roles_required
 from config import Config
 
 dashboard_bp = Blueprint('dashboard', __name__, url_prefix='/dashboard')
@@ -116,6 +117,7 @@ def _get_equipes_periode(jours=30):
 
 @dashboard_bp.route('/chef')
 @login_required
+@roles_required('chef', 'admin')
 def vue_chef():
     jours = int(request.args.get('jours', 30))
     equipes = _get_equipes_periode(jours)
@@ -369,6 +371,7 @@ def vue_chef():
 
 @dashboard_bp.route('/pdg')
 @login_required
+@roles_required('pdg', 'admin')
 def vue_pdg():
     from ..services.trs import _prix_production as _prix
 
@@ -506,6 +509,7 @@ def vue_pdg():
 
 @dashboard_bp.route('/pertes')
 @login_required
+@roles_required('chef', 'admin')
 def pertes():
     """Analyse mensuelle des pertes financières D/P/Q avec drill-down."""
     from ..services.trs import _prix_production
@@ -621,6 +625,7 @@ def pertes():
 
 @dashboard_bp.route('/export/excel')
 @login_required
+@roles_required('chef', 'admin')
 def export_excel():
     aujourd_hui = date.today()
     try:

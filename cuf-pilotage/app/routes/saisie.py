@@ -382,6 +382,31 @@ def detail_poste(poste_id):
                            ))
 
 
+# ── Feuille de relevé imprimable ──────────────────────────────────────────────
+
+@saisie_bp.route('/feuille-releve')
+@login_required
+def feuille_releve():
+    date_str = request.args.get('date', date.today().isoformat())
+    shift    = request.args.get('shift', 'Matin')
+    try:
+        date_obj = date.fromisoformat(date_str)
+        date_fmt = date_obj.strftime('%d/%m/%Y')
+    except ValueError:
+        date_obj = date.today()
+        date_fmt = date_obj.strftime('%d/%m/%Y')
+        date_str = date_obj.isoformat()
+    return render_template(
+        'saisie/feuille_releve.html',
+        date_str=date_str,
+        date_fmt=date_fmt,
+        shift=shift,
+        essences=Config.ESSENCES,
+        machines=Config.MACHINES,
+        categories=Config.CATEGORIES_ARRET,
+    )
+
+
 # ── Suppression ───────────────────────────────────────────────────────────────
 
 @saisie_bp.route('/poste/<int:poste_id>/supprimer', methods=['POST'])

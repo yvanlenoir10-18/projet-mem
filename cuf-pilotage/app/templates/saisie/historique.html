@@ -14,12 +14,20 @@
       Chaîne 4 · Scierie CUF Ebolowa
     </p>
   </div>
-  {% if current_user.role in ('operateur','chef','admin') %}
-  <a href="{{ url_for('saisie.nouveau_poste') }}"
-     class="btn btn-primary d-flex align-items-center gap-2">
-    <i class="bi bi-plus-circle"></i> Nouvelle saisie
-  </a>
-  {% endif %}
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('saisie.feuille_releve') }}"
+       target="_blank"
+       class="btn btn-outline-secondary d-flex align-items-center gap-2"
+       title="Ouvrir la feuille de relevé papier (pour impression terrain)">
+      <i class="bi bi-printer"></i> Feuille terrain
+    </a>
+    {% if current_user.role in ('operateur','chef','admin') %}
+    <a href="{{ url_for('saisie.nouveau_poste') }}"
+       class="btn btn-primary d-flex align-items-center gap-2">
+      <i class="bi bi-plus-circle"></i> Nouvelle saisie
+    </a>
+    {% endif %}
+  </div>
 </div>
 
 {% if postes %}

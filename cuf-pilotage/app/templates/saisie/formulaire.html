@@ -1,90 +1,132 @@
 {% extends 'base.html' %}
-{% block title %}{% if equipe %}Modifier l'équipe{% else %}Saisie d'une équipe{% endif %}{% endblock %}
+{% block title %}{% if equipe %}Modifier l'équipe{% else %}Saisie · Équipe{% endif %}{% endblock %}
+{% block page_title %}{% if equipe %}Modifier · {{ equipe.date.strftime('%d/%m/%Y') }}{% else %}Nouvelle saisie{% endif %}{% endblock %}
 
 {% block content %}
-<h4 class="mb-4">
-    {% if equipe %}
-    <i class="bi bi-pencil-square text-warning"></i>
-    Modifier l'équipe — {{ equipe.date.strftime('%d/%m/%Y') }} ({{ equipe.numero_equipe }})
-    {% else %}
-    <i class="bi bi-plus-circle text-success"></i>
-    Saisie d'une équipe — Chaîne 4
-    {% endif %}
-</h4>
+
+{# ── Header ── #}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('saisie.historique') }}"
+     class="wp-icon-btn" style="text-decoration:none;" aria-label="Retour">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <h1 style="font-size:1.35rem;font-weight:800;color:var(--wp-ink);margin:0;">
+      {% if equipe %}Modifier l'équipe{% else %}Nouvelle saisie{% endif %}
+    </h1>
+    <p style="color:var(--wp-muted);font-size:.82rem;margin:4px 0 0;">
+      {% if equipe %}
+        {{ equipe.date.strftime('%d/%m/%Y') }} — {{ equipe.numero_equipe }}
+      {% else %}
+        Chaîne 4 · CUF Ebolowa
+      {% endif %}
+    </p>
+  </div>
+</div>
 
 <form method="POST" action="{{ form_action }}" id="formEquipe">
-    <!-- BLOC 1 : En-tête de l'équipe -->
-    <div class="card mb-3">
-        <div class="card-header bg-dark text-white">
-            <i class="bi bi-calendar3"></i> Informations de l'équipe
-        </div>
-        <div class="card-body row g-3">
-            <div class="col-md-3">
-                <label class="form-label">Date <span class="text-danger">*</span></label>
-                <input type="date" name="date" class="form-control"
-                       value="{{ equipe.date.isoformat() if equipe else today }}" required>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Équipe <span class="text-danger">*</span></label>
-                <select name="numero_equipe" class="form-select" required>
-                    <option value="Matin"     {% if (equipe and equipe.numero_equipe == 'Matin') or (not equipe and shift_initial == 'Matin') %}selected{% endif %}>Matin</option>
-                    <option value="Apres-midi"{% if (equipe and equipe.numero_equipe == 'Apres-midi') or (not equipe and shift_initial == 'Apres-midi') %}selected{% endif %}>Après-midi</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Effectif présent</label>
-                <input type="number" name="effectif" class="form-control"
-                       value="{{ equipe.effectif if equipe else 10 }}" min="1" max="30">
-            </div>
-        </div>
-    </div>
 
-    <!-- BLOC 2 : Productions par essence -->
-    <div class="card mb-3">
-        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-boxes"></i> Productions (m³) — une ligne par essence</span>
-            <button type="button" class="btn btn-light btn-sm" onclick="ajouterProduction()">
-                <i class="bi bi-plus"></i> Ajouter une essence
-            </button>
+  {# ── BLOC 1 : En-tête équipe ── #}
+  <div class="wp-card mb-3">
+    <div class="wp-card-header">
+      <i class="bi bi-calendar3" style="color:var(--wp-emerald);"></i>
+      Informations de l'équipe
+    </div>
+    <div style="padding:20px;">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label">
+            Date <span style="color:var(--wp-terracotta);">*</span>
+          </label>
+          <input type="date" name="date" class="form-control"
+                 value="{{ equipe.date.isoformat() if equipe else today }}" required>
         </div>
-        <div class="card-body" id="conteneur-productions"></div>
-    </div>
-
-    <!-- BLOC 3 : Arrêts machine -->
-    <div class="card mb-3">
-        <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-exclamation-triangle"></i> Arrêts machine</span>
-            <button type="button" class="btn btn-light btn-sm" onclick="ajouterArret()">
-                <i class="bi bi-plus"></i> Ajouter un arrêt
-            </button>
+        <div class="col-md-3">
+          <label class="form-label">
+            Équipe <span style="color:var(--wp-terracotta);">*</span>
+          </label>
+          <select name="numero_equipe" class="form-select" required>
+            <option value="Matin"
+              {% if (equipe and equipe.numero_equipe == 'Matin') or (not equipe and shift_initial == 'Matin') %}selected{% endif %}>
+              Matin
+            </option>
+            <option value="Apres-midi"
+              {% if (equipe and equipe.numero_equipe == 'Apres-midi') or (not equipe and shift_initial == 'Apres-midi') %}selected{% endif %}>
+              Après-midi
+            </option>
+          </select>
         </div>
-        <div class="card-body" id="conteneur-arrets">
-            <p class="text-muted" id="msg-aucun-arret">
-                <i class="bi bi-check-circle text-success"></i>
-                Aucun arrêt — cliquez "Ajouter un arrêt" si des pannes ont eu lieu.
-            </p>
+        <div class="col-md-3">
+          <label class="form-label">Effectif présent</label>
+          <input type="number" name="effectif" class="form-control"
+                 value="{{ equipe.effectif if equipe else 10 }}" min="1" max="30">
         </div>
+      </div>
     </div>
+  </div>
 
-    <!-- Notes -->
-    <div class="mb-3">
-        <label class="form-label">Notes / Observations</label>
-        <textarea name="notes" class="form-control" rows="2"
-                  placeholder="Observations particulières de l'équipe...">{{ equipe.notes if equipe else '' }}</textarea>
+  {# ── BLOC 2 : Productions ── #}
+  <div class="wp-card mb-3">
+    <div class="wp-card-header" style="justify-content:space-between;">
+      <span style="display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-boxes" style="color:var(--wp-leaf);"></i>
+        Productions (m³) — une ligne par essence
+      </span>
+      <button type="button"
+              class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+              onclick="ajouterProduction()">
+        <i class="bi bi-plus"></i> Ajouter une essence
+      </button>
     </div>
+    <div style="padding:20px;" id="conteneur-productions"></div>
+  </div>
 
-    <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-success btn-lg">
-            <i class="bi bi-save"></i> {% if equipe %}Enregistrer les modifications{% else %}Enregistrer l'équipe{% endif %}
-        </button>
-        <a href="{{ url_for('saisie.historique') }}" class="btn btn-outline-secondary btn-lg">Annuler</a>
+  {# ── BLOC 3 : Arrêts ── #}
+  <div class="wp-card mb-3">
+    <div class="wp-card-header" style="justify-content:space-between;">
+      <span style="display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-exclamation-triangle" style="color:var(--wp-terracotta);"></i>
+        Arrêts machine
+      </span>
+      <button type="button"
+              class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+              onclick="ajouterArret()">
+        <i class="bi bi-plus"></i> Ajouter un arrêt
+      </button>
     </div>
+    <div style="padding:20px;" id="conteneur-arrets">
+      <p style="color:var(--wp-muted);margin:0;" id="msg-aucun-arret">
+        <i class="bi bi-check-circle" style="color:var(--wp-leaf);"></i>
+        Aucun arrêt — cliquez "Ajouter un arrêt" si des pannes ont eu lieu.
+      </p>
+    </div>
+  </div>
+
+  {# ── Notes ── #}
+  <div class="mb-4">
+    <label class="form-label">Notes / Observations</label>
+    <textarea name="notes" class="form-control" rows="2"
+              placeholder="Observations particulières de l'équipe...">{{ equipe.notes if equipe else '' }}</textarea>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button type="submit"
+            class="btn btn-primary btn-touch d-flex align-items-center gap-2">
+      <i class="bi bi-save"></i>
+      {% if equipe %}Enregistrer les modifications{% else %}Enregistrer l'équipe{% endif %}
+    </button>
+    <a href="{{ url_for('saisie.historique') }}"
+       class="btn btn-outline-secondary btn-touch">
+      Annuler
+    </a>
+  </div>
+
 </form>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// ── Templates HTML ────────────────────────────────────────────────────────────
+// ── Templates HTML ─────────────────────────────────────────────────────────
 
 const essencesOptions = `
     {% for e in essences %}
@@ -93,41 +135,58 @@ const essencesOptions = `
 `;
 
 const templateProduction = (index) => `
-<div class="row g-2 mb-2 align-items-end border rounded p-2 bg-light" id="prod-${index}">
+<div class="row g-2 mb-3 align-items-end p-2 rounded"
+     id="prod-${index}"
+     style="border:1px solid var(--wp-line);background:var(--wp-cream);">
     <div class="col-md-2">
-        <label class="form-label small fw-bold">Essence <span class="text-danger">*</span></label>
+        <label class="form-label">Essence <span style="color:var(--wp-terracotta);">*</span></label>
         <select name="prod_essence[]" class="form-select form-select-sm" required>
             ${essencesOptions}
         </select>
     </div>
     <div class="col-md-2">
-        <label class="form-label small">Grumes en entrée (m³) <span class="text-danger">*</span></label>
-        <input type="number" name="prod_volume_entree[]" class="form-control form-control-sm vol-entree-${index}"
-               step="0.1" min="0" placeholder="ex: 35.5" required oninput="majDechets(${index})">
+        <label class="form-label small">Grumes entrée (m³) <span style="color:var(--wp-terracotta);">*</span></label>
+        <input type="number" name="prod_volume_entree[]"
+               class="form-control form-control-sm vol-entree-${index}"
+               step="0.1" min="0" placeholder="ex: 35.5" required
+               oninput="majDechets(${index})">
     </div>
     <div class="col-md-2">
-        <label class="form-label small">Planches conformes (m³) <span class="text-danger">*</span></label>
-        <input type="number" name="prod_volume_conforme[]" class="form-control form-control-sm vol-conforme-${index}"
-               step="0.001" min="0" placeholder="ex: 12.5" required oninput="majDechets(${index})">
+        <label class="form-label small">Conformes (m³) <span style="color:var(--wp-terracotta);">*</span></label>
+        <input type="number" name="prod_volume_conforme[]"
+               class="form-control form-control-sm vol-conforme-${index}"
+               step="0.001" min="0" placeholder="ex: 12.5" required
+               oninput="majDechets(${index})">
     </div>
     <div class="col-md-2">
-        <label class="form-label small">Bois déclassé — vente locale (m³)</label>
-        <input type="number" name="prod_volume_declass[]" class="form-control form-control-sm vol-declass-${index}"
-               step="0.001" min="0" placeholder="ex: 2.1" value="0" oninput="majDechets(${index})">
+        <label class="form-label small">Déclassé (m³)</label>
+        <input type="number" name="prod_volume_declass[]"
+               class="form-control form-control-sm vol-declass-${index}"
+               step="0.001" min="0" placeholder="ex: 2.1" value="0"
+               oninput="majDechets(${index})">
     </div>
     <div class="col-md-2">
-        <label class="form-label small text-muted">Déchets estimés (m³)</label>
-        <input type="text" class="form-control form-control-sm bg-light text-muted"
-               id="dechets-${index}" placeholder="calculé auto" readonly>
+        <label class="form-label small" style="color:var(--wp-muted);">Déchets estimés</label>
+        <input type="text" class="form-control form-control-sm"
+               id="dechets-${index}" placeholder="calculé auto"
+               style="color:var(--wp-muted);" readonly>
     </div>
     <div class="col-md-1">
-        ${index > 0 ? `<button type="button" class="btn btn-outline-danger btn-sm w-100 mt-4"
-                onclick="supprimerProduction(${index})"><i class="bi bi-trash"></i></button>` : '<div class="mt-4">&nbsp;</div>'}
+        ${index > 0
+            ? `<button type="button"
+                       class="btn btn-sm w-100 mt-4"
+                       style="color:var(--wp-terracotta);border:1.5px solid var(--wp-terracotta);border-radius:8px;"
+                       onclick="supprimerProduction(${index})">
+                 <i class="bi bi-trash"></i>
+               </button>`
+            : '<div class="mt-4">&nbsp;</div>'}
     </div>
 </div>`;
 
 const templateArret = (index) => `
-<div class="row g-2 mb-2 align-items-end border rounded p-2" id="arret-${index}">
+<div class="row g-2 mb-3 align-items-end p-2 rounded"
+     id="arret-${index}"
+     style="border:1px solid var(--wp-line);background:var(--wp-cream);">
     <div class="col-md-2">
         <label class="form-label small">Machine</label>
         <select name="arret_machine[]" class="form-select form-select-sm" required>
@@ -158,12 +217,16 @@ const templateArret = (index) => `
         </select>
     </div>
     <div class="col-md-1">
-        <button type="button" class="btn btn-outline-danger btn-sm w-100"
-                onclick="supprimerArret(${index})"><i class="bi bi-trash"></i></button>
+        <button type="button"
+                class="btn btn-sm w-100"
+                style="color:var(--wp-terracotta);border:1.5px solid var(--wp-terracotta);border-radius:8px;"
+                onclick="supprimerArret(${index})">
+            <i class="bi bi-trash"></i>
+        </button>
     </div>
 </div>`;
 
-// ── État ──────────────────────────────────────────────────────────────────────
+// ── État ───────────────────────────────────────────────────────────────────
 
 let compteurProd  = 0;
 let compteurArret = 0;
@@ -188,9 +251,9 @@ function ajouterProductionAvecDonnees(data) {
     const idx = compteurProd - 1;
     const row = document.getElementById('prod-' + idx);
     if (!row) return;
-    row.querySelector('.vol-entree-'  + idx).value = data.volume_entree  || '';
-    row.querySelector('.vol-conforme-'+ idx).value = data.volume_conforme|| '';
-    row.querySelector('.vol-declass-' + idx).value = data.volume_declass || 0;
+    row.querySelector('.vol-entree-'   + idx).value = data.volume_entree   || '';
+    row.querySelector('.vol-conforme-' + idx).value = data.volume_conforme || '';
+    row.querySelector('.vol-declass-'  + idx).value = data.volume_declass  || 0;
     const sel = row.querySelector('select[name="prod_essence[]"]');
     if (sel) sel.value = data.essence;
     majDechets(idx);
@@ -213,11 +276,11 @@ function ajouterArretAvecDonnees(data) {
     const idx = compteurArret - 1;
     const row = document.getElementById('arret-' + idx);
     if (!row) return;
-    row.querySelector('select[name="arret_machine[]"]').value  = data.machine     || '';
-    row.querySelector('input[name="arret_debut[]"]').value     = data.heure_debut || '';
-    row.querySelector('input[name="arret_fin[]"]').value       = data.heure_fin   || '';
-    row.querySelector('input[name="arret_cause[]"]').value     = data.cause       || '';
-    row.querySelector('select[name="arret_categorie[]"]').value= data.categorie   || '';
+    row.querySelector('select[name="arret_machine[]"]').value   = data.machine     || '';
+    row.querySelector('input[name="arret_debut[]"]').value      = data.heure_debut || '';
+    row.querySelector('input[name="arret_fin[]"]').value        = data.heure_fin   || '';
+    row.querySelector('input[name="arret_cause[]"]').value      = data.cause       || '';
+    row.querySelector('select[name="arret_categorie[]"]').value = data.categorie   || '';
 }
 
 function supprimerArret(index) {
@@ -228,8 +291,7 @@ function supprimerArret(index) {
     }
 }
 
-// ── Initialisation ───────────────────────────────────────────────────────────
-// En mode modification, pré-remplir avec les données existantes
+// ── Initialisation ─────────────────────────────────────────────────────────
 
 const productionsDonnees = {{ productions_data | tojson }};
 const arretsDonnees      = {{ arrets_data | tojson }};

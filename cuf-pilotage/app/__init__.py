@@ -36,6 +36,16 @@ def create_app():
         _init_donnees_defaut()
         _seed_donnees_demo()
 
+    from flask import render_template
+
+    @app.errorhandler(404)
+    def page_introuvable(e):
+        return render_template('errors/404.html'), 404
+
+    @app.errorhandler(500)
+    def erreur_serveur(e):
+        return render_template('errors/500.html'), 500
+
     return app
 
 

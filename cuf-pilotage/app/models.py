@@ -51,6 +51,17 @@ class User(UserMixin, db.Model):
             self.password_hash.encode('utf-8')
         )
 
+    @property
+    def prenom(self):
+        return self.nom.split()[0].title() if self.nom else ''
+
+    @property
+    def initiales(self):
+        parts = self.nom.split()
+        if len(parts) >= 2:
+            return (parts[0][0] + parts[1][0]).upper()
+        return self.nom[:2].upper() if self.nom else '?'
+
     def __repr__(self):
         return f'<User {self.nom} ({self.role})>'
 

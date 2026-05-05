@@ -1,71 +1,124 @@
 {% extends 'base.html' %}
 {% block title %}Paramètres{% endblock %}
+{% block page_title %}Paramètres · Configuration{% endblock %}
 
 {% block content %}
-<h4 class="mb-4"><i class="bi bi-gear"></i> Paramètres de configuration — CUF Chaîne 4</h4>
+
+<div class="mb-4">
+  <h1 style="font-size:1.35rem;font-weight:800;color:var(--wp-ink);margin:0;">
+    Configuration CUF — Chaîne 4
+  </h1>
+  <p style="color:var(--wp-muted);font-size:.82rem;margin:4px 0 0;">
+    Prix de vente par essence et paramètres de production
+  </p>
+</div>
 
 <form method="POST">
-    <div class="row g-3">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-success text-white">Prix de vente par essence (FCFA/m³)</div>
-                <div class="card-body">
-                    {% for essence in ['ayous', 'azobe', 'iroko', 'movingui'] %}
-                    <div class="mb-3">
-                        <label class="form-label">{{ essence|capitalize }}</label>
-                        <div class="input-group">
-                            <input type="number" name="prix_{{ essence }}" class="form-control"
-                                   value="{{ params.get('prix_' + essence).valeur if params.get('prix_' + essence) else '' }}"
-                                   min="0" step="1000">
-                            <span class="input-group-text">FCFA/m³</span>
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
+<div class="row g-4">
+
+  {# ── Prix par essence ── #}
+  <div class="col-md-6">
+    <div class="wp-card h-100">
+      <div class="wp-card-header">
+        <i class="bi bi-cash-stack" style="color:var(--wp-emerald);"></i>
+        Prix de vente par essence (FCFA/m³)
+      </div>
+      <div style="padding:24px;">
+        {% for essence in ['ayous', 'azobe', 'iroko', 'movingui'] %}
+        {% set couleur_map = {'ayous': 'var(--wp-leaf)', 'azobe': 'var(--wp-bark)',
+                              'iroko': 'var(--wp-ochre)', 'movingui': 'var(--wp-emerald)'} %}
+        <div class="mb-4">
+          <label class="form-label d-flex align-items-center gap-2">
+            <span style="width:10px;height:10px;border-radius:50%;
+                         background:{{ couleur_map[essence] }};display:inline-block;"></span>
+            {{ essence | capitalize }}
+          </label>
+          <div class="input-group">
+            <input type="number" name="prix_{{ essence }}" class="form-control"
+                   value="{{ params.get('prix_' + essence).valeur
+                             if params.get('prix_' + essence) else '' }}"
+                   min="0" step="1000"
+                   placeholder="Ex : 85 000">
+            <span class="input-group-text"
+                  style="background:var(--wp-cream-2);color:var(--wp-muted);
+                         font-size:.8rem;font-weight:600;border-color:var(--wp-line);">
+              FCFA/m³
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+
+  {# ── Paramètres de production ── #}
+  <div class="col-md-6">
+    <div class="wp-card h-100">
+      <div class="wp-card-header">
+        <i class="bi bi-sliders" style="color:var(--wp-emerald);"></i>
+        Paramètres de production
+      </div>
+      <div style="padding:24px;">
+
+        <div class="mb-4">
+          <label class="form-label">Objectif production par poste (m³)</label>
+          <input type="number" name="objectif_m3" class="form-control"
+                 value="{{ params.get('objectif_m3').valeur
+                           if params.get('objectif_m3') else 25 }}"
+                 step="0.5" min="1">
+          <div class="form-text" style="color:var(--wp-muted);">
+            V1 provisoire : 12,5 m³ — à calibrer avec les fiches constructeur
+          </div>
         </div>
 
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header bg-dark text-white">Paramètres de production</div>
-                <div class="card-body">
-                    <div class="mb-3">
-                        <label class="form-label">Objectif production par poste (m³)</label>
-                        <input type="number" name="objectif_m3" class="form-control"
-                               value="{{ params.get('objectif_m3').valeur if params.get('objectif_m3') else 25 }}"
-                               step="0.5" min="1">
-                        <div class="form-text">Actuellement 25 m³ — à ajuster si la capacité théorique est recalculée</div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Durée officielle d'un poste (minutes)</label>
-                        <input type="number" name="duree_poste" class="form-control"
-                               value="{{ params.get('duree_poste').valeur if params.get('duree_poste') else 480 }}"
-                               min="60" max="720">
-                        <div class="form-text">480 min = 8 heures</div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Capacité théorique de la ligne (m³/heure)</label>
-                        <input type="number" name="capacite_equipe_h" class="form-control"
-                               value="{{ params.get('capacite_equipe_h').valeur if params.get('capacite_equipe_h') else 1.5625 }}"
-                               step="0.0001" min="0.1">
-                        <div class="form-text">Valeur V1 : 1.5625 m³/h = 12.5 m³ sur 8h (provisoire — à calibrer avec les fiches constructeur)</div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Taux de revente locale du bois rebut</label>
-                        <input type="number" name="taux_revente_rebut" class="form-control"
-                               value="{{ params.get('taux_revente_rebut').valeur if params.get('taux_revente_rebut') else 0.30 }}"
-                               step="0.01" min="0" max="1">
-                        <div class="form-text">Ex : 0.30 = 30% de la valeur initiale récupérée sur le rebut</div>
-                    </div>
-                </div>
-            </div>
+        <div class="mb-4">
+          <label class="form-label">Durée officielle d'un poste (minutes)</label>
+          <input type="number" name="duree_poste" class="form-control"
+                 value="{{ params.get('duree_poste').valeur
+                           if params.get('duree_poste') else 480 }}"
+                 min="60" max="720">
+          <div class="form-text" style="color:var(--wp-muted);">480 min = 8 heures</div>
         </div>
-    </div>
 
-    <div class="mt-3">
-        <button type="submit" class="btn btn-success">
-            <i class="bi bi-save"></i> Enregistrer les paramètres
-        </button>
+        <div class="mb-4">
+          <label class="form-label">Capacité théorique de la ligne (m³/heure)</label>
+          <input type="number" name="capacite_equipe_h" class="form-control"
+                 value="{{ params.get('capacite_equipe_h').valeur
+                           if params.get('capacite_equipe_h') else 1.5625 }}"
+                 step="0.0001" min="0.1">
+          <div class="form-text" style="color:var(--wp-muted);">
+            1,5625 m³/h = 12,5 m³ sur 8h — provient de la bicoupe goulot
+          </div>
+        </div>
+
+        <div class="mb-2">
+          <label class="form-label">Taux de revente locale du bois rebut</label>
+          <div class="input-group">
+            <input type="number" name="taux_revente_rebut" class="form-control"
+                   value="{{ params.get('taux_revente_rebut').valeur
+                             if params.get('taux_revente_rebut') else 0.30 }}"
+                   step="0.01" min="0" max="1">
+            <span class="input-group-text"
+                  style="background:var(--wp-cream-2);color:var(--wp-muted);
+                         font-size:.8rem;font-weight:600;border-color:var(--wp-line);">
+              ratio
+            </span>
+          </div>
+          <div class="form-text" style="color:var(--wp-muted);">
+            Ex : 0,30 = 30 % de la valeur initiale récupérée sur le rebut
+          </div>
+        </div>
+
+      </div>
     </div>
+  </div>
+
+</div>
+
+<div class="mt-4">
+  <button type="submit" class="btn btn-primary d-flex align-items-center gap-2">
+    <i class="bi bi-save"></i> Enregistrer les paramètres
+  </button>
+</div>
 </form>
 {% endblock %}

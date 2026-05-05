@@ -1,99 +1,179 @@
 {% extends 'base.html' %}
-{% block title %}Historique des équipes{% endblock %}
+{% block title %}Historique{% endblock %}
+{% block page_title %}Historique · Équipes{% endblock %}
 
 {% block content %}
+
+{# ── Header ── #}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h4><i class="bi bi-clock-history text-secondary"></i> Historique des équipes</h4>
-    <a href="{{ url_for('saisie.nouveau_poste') }}" class="btn btn-success">
-        <i class="bi bi-plus-circle"></i> Nouvelle équipe
-    </a>
+  <div>
+    <h1 style="font-size:1.35rem;font-weight:800;color:var(--wp-ink);margin:0;">
+      Équipes enregistrées
+    </h1>
+    <p style="color:var(--wp-muted);font-size:.82rem;margin:4px 0 0;">
+      Chaîne 4 · Scierie CUF Ebolowa
+    </p>
+  </div>
+  {% if current_user.role in ('operateur','chef','admin') %}
+  <a href="{{ url_for('saisie.nouveau_poste') }}"
+     class="btn btn-primary d-flex align-items-center gap-2">
+    <i class="bi bi-plus-circle"></i> Nouvelle saisie
+  </a>
+  {% endif %}
 </div>
 
 {% if postes %}
-<div class="table-responsive">
-    <table class="table table-hover table-bordered align-middle">
-        <thead class="table-dark">
-            <tr>
-                <th>Date</th>
-                <th>Équipe</th>
-                <th>Essences</th>
-                <th>Conforme (m³)</th>
-                <th>Déclassé</th>
-                <th>Arrêts (min)</th>
-                <th>TRS</th>
-                <th>Statut</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for p in postes %}
-            <tr {% if p.statut == 'brouillon' %}class="table-warning"{% endif %}>
-                <td>{{ p.date.strftime('%d/%m/%Y') }}</td>
-                <td>{{ p.numero_equipe }}</td>
-                <td>
-                    {% for prod in p.productions %}
-                    <span class="badge bg-secondary">{{ prod.essence }}</span>
-                    {% endfor %}
-                </td>
-                <td>{{ p.volume_conforme }} m³</td>
-                <td>
-                    {% if p.volume_declass > 0 %}
-                    <span class="text-warning">{{ p.volume_declass }} m³</span>
-                    {% else %}
-                    <span class="text-muted">—</span>
-                    {% endif %}
-                </td>
-                <td>{{ p.duree_totale_arrets }} min</td>
-                <td>
-                    {% if p.trs_global %}
-                    {% set c = 'success' if p.trs_global >= 70 else ('warning' if p.trs_global >= 50 else 'danger') %}
-                    <span class="badge bg-{{ c }}">{{ p.trs_global }}%</span>
-                    {% else %}
-                    <span class="text-muted">—</span>
-                    {% endif %}
-                </td>
-                <td>
-                    {% if p.statut == 'verrouille' or p.est_verrouille %}
-                    <span class="badge bg-secondary"><i class="bi bi-lock"></i> Verrouillé</span>
-                    {% elif p.statut == 'soumis' %}
-                    <span class="badge bg-success">Soumis</span>
-                    {% else %}
-                    <span class="badge bg-warning text-dark"><i class="bi bi-pencil"></i> Brouillon</span>
-                    {% endif %}
-                </td>
-                <td class="text-nowrap">
-                    <a href="{{ url_for('saisie.detail_poste', poste_id=p.id) }}"
-                       class="btn btn-sm btn-outline-primary" title="Voir le détail">
-                        <i class="bi bi-eye"></i>
-                    </a>
-                    {% if p.statut == 'brouillon' and p.user_id == current_user.id %}
-                    <form method="POST"
-                          action="{{ url_for('saisie.soumettre_equipe', equipe_id=p.id) }}"
-                          class="d-inline"
-                          onsubmit="return confirm('Soumettre cette équipe ? Les prix seront figés.')">
-                        <button type="submit" class="btn btn-sm btn-success" title="Soumettre">
-                            <i class="bi bi-send-check"></i>
-                        </button>
-                    </form>
-                    <form method="POST"
-                          action="{{ url_for('saisie.supprimer_poste', poste_id=p.id) }}"
-                          class="d-inline"
-                          onsubmit="return confirm('Supprimer ce brouillon ?')">
-                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Supprimer">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </form>
-                    {% endif %}
-                </td>
-            </tr>
+
+{# ── Mini KPI band ── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Total équipes</div>
+      <div class="wp-kpi-value">{{ postes | length }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Soumises</div>
+      <div class="wp-kpi-value">
+        {{ postes | selectattr('statut','equalto','soumis') | list | length }}
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Volume conforme</div>
+      <div class="wp-kpi-value" style="font-size:1.55rem;">
+        {{ (postes | sum(attribute='volume_conforme')) | round(1) }}<span class="unit"> m³</span>
+      </div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Brouillons</div>
+      <div class="wp-kpi-value">
+        {{ postes | selectattr('statut','equalto','brouillon') | list | length }}
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ── Table ── #}
+<div class="wp-card">
+  <div class="table-responsive">
+    <table class="wp-table">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Équipe</th>
+          <th>Essences</th>
+          <th>Conforme</th>
+          <th>Déclassé</th>
+          <th>Arrêts</th>
+          <th>TRS</th>
+          <th>Statut</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in postes %}
+        <tr>
+          <td style="font-weight:600;">{{ p.date.strftime('%d/%m/%Y') }}</td>
+          <td>
+            <span class="wp-pill wp-pill-neutral">{{ p.numero_equipe }}</span>
+          </td>
+          <td>
+            {% for prod in p.productions %}
+            <span class="wp-pill wp-pill-info" style="margin:1px;">{{ prod.essence }}</span>
             {% endfor %}
-        </tbody>
+          </td>
+          <td><strong>{{ p.volume_conforme }} m³</strong></td>
+          <td>
+            {% if p.volume_declass > 0 %}
+            <span style="color:var(--wp-ochre);font-weight:600;">{{ p.volume_declass }} m³</span>
+            {% else %}<span style="color:var(--wp-muted);">—</span>{% endif %}
+          </td>
+          <td>
+            {% if p.duree_totale_arrets > 0 %}
+            <span style="color:var(--wp-terracotta);font-weight:600;">
+              {{ p.duree_totale_arrets }} min
+            </span>
+            {% else %}<span style="color:var(--wp-muted);">—</span>{% endif %}
+          </td>
+          <td>
+            {% if p.trs_global %}
+              {% if p.trs_global >= 70 %}
+              <span class="wp-pill wp-pill-success">{{ p.trs_global }}%</span>
+              {% elif p.trs_global >= 50 %}
+              <span class="wp-pill wp-pill-warning">{{ p.trs_global }}%</span>
+              {% else %}
+              <span class="wp-pill wp-pill-danger">{{ p.trs_global }}%</span>
+              {% endif %}
+            {% else %}
+            <span style="color:var(--wp-muted);">—</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.statut == 'verrouille' or p.est_verrouille %}
+            <span class="wp-pill wp-pill-neutral">
+              <i class="bi bi-lock"></i> Verrouillé
+            </span>
+            {% elif p.statut == 'soumis' %}
+            <span class="wp-pill wp-pill-success">Soumis</span>
+            {% else %}
+            <span class="wp-pill wp-pill-warning">
+              <i class="bi bi-pencil"></i> Brouillon
+            </span>
+            {% endif %}
+          </td>
+          <td class="text-nowrap">
+            <a href="{{ url_for('saisie.detail_poste', poste_id=p.id) }}"
+               class="wp-icon-btn" title="Voir le détail"
+               style="text-decoration:none;display:inline-flex;">
+              <i class="bi bi-eye"></i>
+            </a>
+            {% if p.statut == 'brouillon' and p.user_id == current_user.id %}
+            <form method="POST"
+                  action="{{ url_for('saisie.soumettre_equipe', equipe_id=p.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('Soumettre cette équipe ? Les prix seront figés.')">
+              <button type="submit" class="wp-icon-btn border-0"
+                      title="Soumettre" style="color:var(--wp-leaf);">
+                <i class="bi bi-send-check"></i>
+              </button>
+            </form>
+            <form method="POST"
+                  action="{{ url_for('saisie.supprimer_poste', poste_id=p.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('Supprimer ce brouillon ?')">
+              <button type="submit" class="wp-icon-btn border-0"
+                      title="Supprimer" style="color:var(--wp-terracotta);">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
     </table>
+  </div>
 </div>
+
 {% else %}
-<div class="alert alert-info">
-    <i class="bi bi-info-circle"></i>
-    Aucune équipe enregistrée. <a href="{{ url_for('saisie.nouveau_poste') }}">Saisir la première équipe</a>.
+
+<div class="wp-card" style="text-align:center;padding:3.5rem 2rem;">
+  <i class="bi bi-inbox"
+     style="font-size:2.5rem;color:var(--wp-muted);display:block;margin-bottom:1rem;"></i>
+  <p style="color:var(--wp-muted);margin:0 0 1.25rem;font-size:.95rem;">
+    Aucune équipe enregistrée pour l'instant.
+  </p>
+  {% if current_user.role in ('operateur','chef','admin') %}
+  <a href="{{ url_for('saisie.nouveau_poste') }}" class="btn btn-primary">
+    <i class="bi bi-plus-circle me-1"></i> Saisir la première équipe
+  </a>
+  {% endif %}
 </div>
+
 {% endif %}
 {% endblock %}

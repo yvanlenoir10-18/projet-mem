@@ -1,211 +1,295 @@
 {% extends 'base.html' %}
-{% block title %}Détail équipe {{ poste.date }}{% endblock %}
+{% block title %}Équipe {{ poste.date.strftime('%d/%m/%Y') }}{% endblock %}
+{% block page_title %}Détail · {{ poste.date.strftime('%d/%m/%Y') }} {{ poste.numero_equipe }}{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
+
+{# Couleur TRS mappée sur Canopée #}
+{% if couleur_trs == 'success' %}{% set trs_color = 'var(--wp-leaf)' %}{% set trs_pill = 'success' %}
+{% elif couleur_trs == 'warning' %}{% set trs_color = 'var(--wp-ochre)' %}{% set trs_pill = 'warning' %}
+{% else %}{% set trs_color = 'var(--wp-terracotta)' %}{% set trs_pill = 'danger' %}{% endif %}
+
+{# ── Header ── #}
+<div class="d-flex justify-content-between align-items-start mb-4 gap-3 flex-wrap">
+  <div class="d-flex align-items-start gap-3">
+    <a href="{{ url_for('saisie.historique') }}"
+       class="wp-icon-btn" style="text-decoration:none;margin-top:2px;" aria-label="Retour">
+      <i class="bi bi-arrow-left"></i>
+    </a>
     <div>
-        <h4 class="mb-1"><i class="bi bi-file-text"></i> Équipe du {{ poste.date.strftime('%d/%m/%Y') }} — {{ poste.numero_equipe }}</h4>
-        <div class="d-flex align-items-center gap-2 small text-muted">
-            {% if poste.statut == 'verrouille' or poste.est_verrouille %}
-            <span class="badge bg-secondary"><i class="bi bi-lock"></i> Verrouillée</span>
-            {% elif poste.statut == 'soumis' %}
-            <span class="badge bg-success">Soumise</span>
-            {% else %}
-            <span class="badge bg-warning text-dark"><i class="bi bi-pencil"></i> Brouillon</span>
-            {% endif %}
-            {% if poste.soumis_le %}
-            <span>Soumise le {{ poste.soumis_le.strftime('%d/%m/%Y à %H:%M') }}</span>
-            {% endif %}
-            {% if poste.modifie_par %}
-            <span class="text-warning"><i class="bi bi-pencil-square"></i> Modifiée par {{ poste.modifie_par }} le {{ poste.modifie_le.strftime('%d/%m/%Y') }}</span>
-            {% endif %}
-        </div>
-    </div>
-    <div class="d-flex gap-2">
-        {% if peut_soumettre %}
-        <form method="POST" action="{{ url_for('saisie.soumettre_equipe', equipe_id=poste.id) }}"
-              onsubmit="return confirm('Soumettre cette équipe ? Les prix seront figés.')">
-            <button class="btn btn-success btn-sm"><i class="bi bi-send-check"></i> Soumettre</button>
-        </form>
-        {% endif %}
-        {% if peut_modifier %}
-        <a href="{{ url_for('saisie.modifier_equipe', equipe_id=poste.id) }}"
-           class="btn btn-warning btn-sm"><i class="bi bi-pencil"></i> Modifier</a>
-        {% endif %}
-        {% if peut_verrouiller %}
-        <form method="POST" action="{{ url_for('saisie.verrouiller_equipe', equipe_id=poste.id) }}"
-              onsubmit="return confirm('Verrouiller définitivement cette équipe ?')">
-            <button class="btn btn-secondary btn-sm"><i class="bi bi-lock"></i> Verrouiller</button>
-        </form>
-        {% endif %}
-        {% if peut_deverrouiller %}
-        <form method="POST" action="{{ url_for('saisie.deverrouiller_equipe', equipe_id=poste.id) }}"
-              onsubmit="return confirm('Déverrouiller cette équipe ? (Admin uniquement)')">
-            <button class="btn btn-outline-warning btn-sm"><i class="bi bi-unlock"></i> Déverrouiller</button>
-        </form>
-        {% endif %}
-        <a href="{{ url_for('saisie.historique') }}" class="btn btn-outline-secondary btn-sm">
-            <i class="bi bi-arrow-left"></i> Retour
-        </a>
-    </div>
-</div>
-
-<!-- KPIs TRS -->
-<div class="row g-3 mb-4">
-    <div class="col-md-3">
-        <div class="card kpi-card {{ couleur_trs }} h-100">
-            <div class="card-body text-center">
-                <div class="text-muted small">TRS Global</div>
-                <div class="kpi-value text-{{ couleur_trs }}">{{ poste.trs_global }}%</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <div class="text-muted small">Disponibilité</div>
-                <div class="kpi-value">{{ poste.trs_disponibilite }}%</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <div class="text-muted small">Performance</div>
-                <div class="kpi-value">{{ poste.trs_performance }}%</div>
-            </div>
-        </div>
-    </div>
-    <div class="col-md-3">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <div class="text-muted small">Qualité</div>
-                <div class="kpi-value">{{ poste.trs_qualite }}%</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div class="row g-3 mb-3">
-    <!-- Productions par essence -->
-    <div class="col-md-7">
-        <div class="card">
-            <div class="card-header">
-                <i class="bi bi-boxes"></i> Productions par essence
-                <span class="badge bg-secondary ms-2">{{ poste.effectif }} opérateurs</span>
-            </div>
-            <div class="card-body p-0">
-                <table class="table table-sm mb-0">
-                    <thead class="table-light">
-                        <tr>
-                            <th>Essence</th>
-                            <th>Entrée (m³)</th>
-                            <th>Conforme (m³)</th>
-                            <th>Déclassé (m³)</th>
-                            <th>Déchets (m³)</th>
-                            <th>Rendement</th>
-                            <th>Prix/m³</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for prod in poste.productions %}
-                        <tr>
-                            <td><span class="badge bg-secondary">{{ prod.essence }}</span></td>
-                            <td>{{ prod.volume_entree }}</td>
-                            <td class="text-success fw-bold">{{ prod.volume_conforme }}</td>
-                            <td class="text-warning">{{ prod.volume_declass }}</td>
-                            <td class="text-danger">{{ prod.volume_dechets }}</td>
-                            <td>{{ prod.rendement_matiere }}%</td>
-                            <td class="text-muted small">
-                                {% if prod.prix_snapshot %}
-                                {{ "{:,.0f}".format(prod.prix_snapshot) }} FCFA
-                                {% else %}—{% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                    <tfoot class="table-secondary fw-bold">
-                        <tr>
-                            <td>Total</td>
-                            <td>{{ poste.volume_entree }} m³</td>
-                            <td class="text-success">{{ poste.volume_conforme }} m³</td>
-                            <td class="text-warning">{{ poste.volume_declass }} m³</td>
-                            <td class="text-danger">{{ poste.volume_dechets }} m³</td>
-                            <td colspan="2"></td>
-                        </tr>
-                    </tfoot>
-                </table>
-            </div>
-        </div>
-    </div>
-
-    <!-- Décomposition des pertes -->
-    <div class="col-md-5">
-        <div class="card border-danger h-100">
-            <div class="card-header bg-danger text-white">
-                <i class="bi bi-currency-dollar"></i> Pertes financières estimées
-            </div>
-            <div class="card-body p-0">
-                <table class="table table-sm mb-0">
-                    <tr class="table-warning">
-                        <td><strong>Perte Disponibilité (D)</strong></td>
-                        <td class="text-end fw-bold">{{ "{:,.0f}".format(pertes.perte_d) }} FCFA</td>
-                    </tr>
-                    <tr class="table-warning">
-                        <td><small class="text-muted">Arrêts non planifiés × capacité × prix</small></td>
-                        <td></td>
-                    </tr>
-                    <tr class="table-info">
-                        <td><strong>Perte Performance (P)</strong></td>
-                        <td class="text-end fw-bold">{{ "{:,.0f}".format(pertes.perte_p) }} FCFA</td>
-                    </tr>
-                    <tr class="table-info">
-                        <td><small class="text-muted">Sous-production vs capacité théorique</small></td>
-                        <td></td>
-                    </tr>
-                    <tr class="table-danger">
-                        <td><strong>Perte Qualité (Q)</strong></td>
-                        <td class="text-end fw-bold">{{ "{:,.0f}".format(pertes.perte_q) }} FCFA</td>
-                    </tr>
-                    <tr class="table-danger">
-                        <td><small class="text-muted">Déclassé (–70%) : {{ "{:,.0f}".format(pertes.perte_q_declass) }} + Déchets (–100%) : {{ "{:,.0f}".format(pertes.perte_q_dechets) }} FCFA</small></td>
-                        <td></td>
-                    </tr>
-                    <tr class="table-dark">
-                        <td><strong>TOTAL PERTES</strong></td>
-                        <td class="text-end text-danger fw-bold fs-5">{{ "{:,.0f}".format(pertes.total) }} FCFA</td>
-                    </tr>
-                </table>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Arrêts machine -->
-<div class="card">
-    <div class="card-header d-flex justify-content-between">
-        <span><i class="bi bi-tools"></i> Arrêts machine</span>
-        <span class="badge bg-danger">{{ poste.arrets|length }} arrêt(s) — {{ poste.duree_totale_arrets }} min</span>
-    </div>
-    <div class="card-body p-0">
-        {% if poste.arrets %}
-        <table class="table table-sm mb-0">
-            <thead><tr><th>Machine</th><th>Horaire</th><th>Durée</th><th>Cause</th><th>Catégorie</th></tr></thead>
-            <tbody>
-                {% for a in poste.arrets %}
-                <tr>
-                    <td>{{ a.machine }}</td>
-                    <td>{{ a.heure_debut }}–{{ a.heure_fin }}</td>
-                    <td><span class="badge bg-danger">{{ a.duree_min }} min</span></td>
-                    <td>{{ a.cause }}</td>
-                    <td><span class="badge bg-secondary">{{ a.categorie }}</span></td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+      <h1 style="font-size:1.35rem;font-weight:800;color:var(--wp-ink);margin:0;">
+        Équipe du {{ poste.date.strftime('%d/%m/%Y') }} — {{ poste.numero_equipe }}
+      </h1>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap;">
+        {% if poste.statut == 'verrouille' or poste.est_verrouille %}
+        <span class="wp-pill wp-pill-neutral"><i class="bi bi-lock"></i> Verrouillée</span>
+        {% elif poste.statut == 'soumis' %}
+        <span class="wp-pill wp-pill-success">Soumise</span>
         {% else %}
-        <p class="p-3 text-muted mb-0"><i class="bi bi-check-circle text-success"></i> Aucun arrêt cette équipe.</p>
+        <span class="wp-pill wp-pill-warning"><i class="bi bi-pencil"></i> Brouillon</span>
         {% endif %}
+        {% if poste.soumis_le %}
+        <span style="color:var(--wp-muted);font-size:.78rem;">
+          Soumise le {{ poste.soumis_le.strftime('%d/%m/%Y à %H:%M') }}
+        </span>
+        {% endif %}
+        {% if poste.modifie_par %}
+        <span style="color:var(--wp-ochre);font-size:.78rem;">
+          <i class="bi bi-pencil-square"></i>
+          Modifiée par {{ poste.modifie_par }} le {{ poste.modifie_le.strftime('%d/%m/%Y') }}
+        </span>
+        {% endif %}
+      </div>
     </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    {% if peut_soumettre %}
+    <form method="POST"
+          action="{{ url_for('saisie.soumettre_equipe', equipe_id=poste.id) }}"
+          onsubmit="return confirm('Soumettre cette équipe ? Les prix seront figés.')">
+      <button class="btn btn-primary d-flex align-items-center gap-1">
+        <i class="bi bi-send-check"></i> Soumettre
+      </button>
+    </form>
+    {% endif %}
+    {% if peut_modifier %}
+    <a href="{{ url_for('saisie.modifier_equipe', equipe_id=poste.id) }}"
+       class="btn btn-outline-primary d-flex align-items-center gap-1">
+      <i class="bi bi-pencil"></i> Modifier
+    </a>
+    {% endif %}
+    {% if peut_verrouiller %}
+    <form method="POST"
+          action="{{ url_for('saisie.verrouiller_equipe', equipe_id=poste.id) }}"
+          onsubmit="return confirm('Verrouiller définitivement cette équipe ?')">
+      <button class="btn btn-outline-secondary d-flex align-items-center gap-1">
+        <i class="bi bi-lock"></i> Verrouiller
+      </button>
+    </form>
+    {% endif %}
+    {% if peut_deverrouiller %}
+    <form method="POST"
+          action="{{ url_for('saisie.deverrouiller_equipe', equipe_id=poste.id) }}"
+          onsubmit="return confirm('Déverrouiller cette équipe ? (Admin uniquement)')">
+      <button class="btn btn-warning d-flex align-items-center gap-1">
+        <i class="bi bi-unlock"></i> Déverrouiller
+      </button>
+    </form>
+    {% endif %}
+  </div>
 </div>
+
+{# ── KPI TRS ── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="wp-kpi" style="border-top:3px solid {{ trs_color }};">
+      <div class="wp-kpi-label">TRS Global</div>
+      <div class="wp-kpi-value" style="color:{{ trs_color }};">
+        {{ poste.trs_global }}%
+      </div>
+      <div class="wp-kpi-sub">D × P × Q</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Disponibilité</div>
+      <div class="wp-kpi-value">{{ poste.trs_disponibilite }}%</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Performance</div>
+      <div class="wp-kpi-value">{{ poste.trs_performance }}%</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Qualité</div>
+      <div class="wp-kpi-value">{{ poste.trs_qualite }}%</div>
+    </div>
+  </div>
+</div>
+
+{# ── Productions + Pertes ── #}
+<div class="row g-3 mb-3">
+
+  {# Productions par essence #}
+  <div class="col-md-7">
+    <div class="wp-card h-100">
+      <div class="wp-card-header" style="justify-content:space-between;">
+        <span>
+          <i class="bi bi-boxes" style="color:var(--wp-leaf);"></i>
+          Productions par essence
+        </span>
+        <span class="wp-pill wp-pill-neutral">
+          <i class="bi bi-people"></i> {{ poste.effectif }} opérateurs
+        </span>
+      </div>
+      <div class="table-responsive">
+        <table class="wp-table">
+          <thead>
+            <tr>
+              <th>Essence</th>
+              <th class="text-end">Entrée (m³)</th>
+              <th class="text-end">Conforme</th>
+              <th class="text-end">Déclassé</th>
+              <th class="text-end">Déchets</th>
+              <th class="text-end">Rendement</th>
+              <th class="text-end">Prix/m³</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for prod in poste.productions %}
+            <tr>
+              <td>
+                <span class="wp-pill wp-pill-info">{{ prod.essence }}</span>
+              </td>
+              <td class="text-end">{{ prod.volume_entree }}</td>
+              <td class="text-end" style="color:var(--wp-leaf);font-weight:700;">
+                {{ prod.volume_conforme }}
+              </td>
+              <td class="text-end" style="color:var(--wp-ochre);">{{ prod.volume_declass }}</td>
+              <td class="text-end" style="color:var(--wp-terracotta);">{{ prod.volume_dechets }}</td>
+              <td class="text-end" style="font-weight:600;">{{ prod.rendement_matiere }}%</td>
+              <td class="text-end" style="color:var(--wp-muted);font-size:.82rem;">
+                {% if prod.prix_snapshot %}
+                {{ "{:,.0f}".format(prod.prix_snapshot).replace(",", " ") }}
+                {% else %}—{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr style="background:var(--wp-cream-2);font-weight:700;">
+              <td>Total</td>
+              <td class="text-end">{{ poste.volume_entree }} m³</td>
+              <td class="text-end" style="color:var(--wp-leaf);">{{ poste.volume_conforme }} m³</td>
+              <td class="text-end" style="color:var(--wp-ochre);">{{ poste.volume_declass }} m³</td>
+              <td class="text-end" style="color:var(--wp-terracotta);">{{ poste.volume_dechets }} m³</td>
+              <td colspan="2"></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  {# Pertes financières #}
+  <div class="col-md-5">
+    <div class="wp-card h-100"
+         style="border:1.5px solid rgba(216,113,73,0.3);">
+      <div class="wp-card-header" style="color:var(--wp-terracotta);">
+        <i class="bi bi-currency-dollar"></i> Pertes financières estimées
+      </div>
+      <div style="padding:0;">
+        <table class="wp-table">
+          <tbody>
+            <tr style="background:rgba(197,151,58,0.07);">
+              <td style="padding:14px 18px;">
+                <div style="font-weight:700;color:var(--wp-ink);">Perte Disponibilité (D)</div>
+                <div style="font-size:.76rem;color:var(--wp-muted);margin-top:2px;">
+                  Arrêts non planifiés × capacité × prix
+                </div>
+              </td>
+              <td class="text-end" style="padding:14px 18px;font-weight:800;font-size:1.05rem;
+                          color:var(--wp-ochre);white-space:nowrap;">
+                {{ "{:,.0f}".format(pertes.perte_d).replace(",", " ") }} FCFA
+              </td>
+            </tr>
+            <tr style="background:rgba(111,168,181,0.07);">
+              <td style="padding:14px 18px;">
+                <div style="font-weight:700;color:var(--wp-ink);">Perte Performance (P)</div>
+                <div style="font-size:.76rem;color:var(--wp-muted);margin-top:2px;">
+                  Sous-production vs capacité théorique
+                </div>
+              </td>
+              <td class="text-end" style="padding:14px 18px;font-weight:800;font-size:1.05rem;
+                          color:var(--wp-sky);white-space:nowrap;">
+                {{ "{:,.0f}".format(pertes.perte_p).replace(",", " ") }} FCFA
+              </td>
+            </tr>
+            <tr style="background:rgba(216,113,73,0.07);">
+              <td style="padding:14px 18px;">
+                <div style="font-weight:700;color:var(--wp-ink);">Perte Qualité (Q)</div>
+                <div style="font-size:.76rem;color:var(--wp-muted);margin-top:2px;">
+                  Déclassé : {{ "{:,.0f}".format(pertes.perte_q_declass).replace(",", " ") }}
+                  + Déchets : {{ "{:,.0f}".format(pertes.perte_q_dechets).replace(",", " ") }} FCFA
+                </div>
+              </td>
+              <td class="text-end" style="padding:14px 18px;font-weight:800;font-size:1.05rem;
+                          color:var(--wp-terracotta);white-space:nowrap;">
+                {{ "{:,.0f}".format(pertes.perte_q).replace(",", " ") }} FCFA
+              </td>
+            </tr>
+            <tr style="background:var(--wp-emerald);">
+              <td style="padding:16px 18px;color:var(--wp-cream);">
+                <div style="font-weight:800;font-size:.95rem;">TOTAL PERTES</div>
+              </td>
+              <td class="text-end" style="padding:16px 18px;color:var(--wp-cream);
+                          font-weight:800;font-size:1.2rem;white-space:nowrap;">
+                {{ "{:,.0f}".format(pertes.total).replace(",", " ") }} FCFA
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{# ── Arrêts machine ── #}
+<div class="wp-card">
+  <div class="wp-card-header" style="justify-content:space-between;">
+    <span>
+      <i class="bi bi-tools" style="color:var(--wp-terracotta);"></i>
+      Arrêts machine
+    </span>
+    {% if poste.arrets %}
+    <span class="wp-pill wp-pill-danger">
+      {{ poste.arrets | length }} arrêt{{ 's' if poste.arrets | length > 1 }}
+      — {{ poste.duree_totale_arrets }} min
+    </span>
+    {% endif %}
+  </div>
+  {% if poste.arrets %}
+  <table class="wp-table">
+    <thead>
+      <tr>
+        <th>Machine</th>
+        <th>Horaire</th>
+        <th class="text-end">Durée</th>
+        <th>Cause</th>
+        <th>Catégorie</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in poste.arrets %}
+      {% if a.categorie == 'Mécanique' %}{% set pill = 'danger' %}
+      {% elif a.categorie == 'Organisationnelle' %}{% set pill = 'warning' %}
+      {% elif a.categorie == 'Approvisionnement' %}{% set pill = 'info' %}
+      {% elif a.categorie == 'Maintenance planifiée' %}{% set pill = 'success' %}
+      {% else %}{% set pill = 'neutral' %}{% endif %}
+      <tr>
+        <td style="font-weight:600;">{{ a.machine }}</td>
+        <td style="color:var(--wp-muted);font-size:.84rem;">
+          {{ a.heure_debut }} → {{ a.heure_fin }}
+        </td>
+        <td class="text-end">
+          <span class="wp-pill wp-pill-danger">{{ a.duree_min }} min</span>
+        </td>
+        <td style="font-size:.865rem;">{{ a.cause }}</td>
+        <td><span class="wp-pill wp-pill-{{ pill }}">{{ a.categorie }}</span></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div style="padding:2rem;text-align:center;color:var(--wp-muted);">
+    <i class="bi bi-check-circle" style="color:var(--wp-leaf);font-size:1.4rem;"></i>
+    <p style="margin:8px 0 0;font-size:.9rem;">Aucun arrêt enregistré pour cette équipe.</p>
+  </div>
+  {% endif %}
+</div>
+
 {% endblock %}

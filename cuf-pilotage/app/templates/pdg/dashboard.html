@@ -94,7 +94,6 @@
 
 {# ── 4 KPI Cards ── #}
 <div class="row g-3 mb-4">
-  {# TRS + delta #}
   <div class="col-md-6 col-xl-3">
     <div class="wp-kpi h-100">
       <div class="wp-kpi-label">TRS Chaîne 4</div>
@@ -112,7 +111,6 @@
     </div>
   </div>
 
-  {# Production vs objectif #}
   <div class="col-md-6 col-xl-3">
     <div class="wp-kpi h-100">
       <div class="wp-kpi-label">Production</div>
@@ -127,7 +125,6 @@
     </div>
   </div>
 
-  {# Pertes FCFA #}
   <div class="col-md-6 col-xl-3">
     <div class="wp-kpi h-100">
       <div class="wp-kpi-label">Pertes financières</div>
@@ -142,7 +139,6 @@
     </div>
   </div>
 
-  {# Rendement matière #}
   {% set coul_rm_var = 'var(--wp-leaf)' if rendement_global >= 60 else ('var(--wp-ochre)' if rendement_global >= 40 else 'var(--wp-terracotta)') %}
   <div class="col-md-6 col-xl-3">
     <div class="wp-kpi h-100">

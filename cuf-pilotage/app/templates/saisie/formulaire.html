@@ -126,8 +126,6 @@
 
 {% block scripts %}
 <script>
-// ── Templates HTML ─────────────────────────────────────────────────────────
-
 const essencesOptions = `
     {% for e in essences %}
     <option value="{{ e }}">{{ e }}</option>
@@ -226,8 +224,6 @@ const templateArret = (index) => `
     </div>
 </div>`;
 
-// ── État ───────────────────────────────────────────────────────────────────
-
 let compteurProd  = 0;
 let compteurArret = 0;
 
@@ -290,8 +286,6 @@ function supprimerArret(index) {
         document.getElementById('msg-aucun-arret').style.display = 'block';
     }
 }
-
-// ── Initialisation ─────────────────────────────────────────────────────────
 
 const productionsDonnees = {{ productions_data | tojson }};
 const arretsDonnees      = {{ arrets_data | tojson }};

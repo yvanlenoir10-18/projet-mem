@@ -11,21 +11,27 @@ Set-Location $PSScriptRoot
 Write-Host "Mise à jour du code..." -ForegroundColor Yellow
 git pull origin claude/install-claude-excel-6MGzv
 
-# 3. Créer l'environnement virtuel si absent
+# 3. Créer le dossier instance/ si absent (SQLite ne peut pas créer cuf.db sans ce dossier)
+if (-not (Test-Path "instance")) {
+    Write-Host "Création du dossier instance/..." -ForegroundColor Yellow
+    New-Item -ItemType Directory -Path "instance" | Out-Null
+}
+
+# 4. Créer l'environnement virtuel si absent
 if (-not (Test-Path "venv")) {
     Write-Host "Création de l'environnement virtuel..." -ForegroundColor Yellow
     python -m venv venv
 }
 
-# 4. Activer l'environnement virtuel
+# 5. Activer l'environnement virtuel
 Write-Host "Activation de l'environnement virtuel..." -ForegroundColor Yellow
 & "venv\Scripts\Activate.ps1"
 
-# 5. Installer les dépendances
+# 6. Installer les dépendances
 Write-Host "Installation des dépendances..." -ForegroundColor Yellow
 pip install -r requirements.txt --quiet
 
-# 6. Lancer Flask
+# 7. Lancer Flask
 Write-Host ""
 Write-Host "Lancement de Flask sur http://127.0.0.1:5000" -ForegroundColor Green
 Write-Host "Ouvre ce lien dans ton navigateur : http://127.0.0.1:5000" -ForegroundColor Cyan

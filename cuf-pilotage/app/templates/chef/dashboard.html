@@ -85,6 +85,52 @@
   </div>
 </div>
 
+{# ── P12 · Anomalies de saisie à revoir (alertes non bloquantes) ── #}
+{% if anomalies_periode and anomalies_periode.nb_postes_concernes > 0 %}
+<div class="wp-card mb-4"
+     style="border-left:4px solid var(--wp-ochre);background:#fffaf0;">
+  <div class="wp-card-header" style="color:var(--wp-ochre);">
+    <i class="bi bi-shield-exclamation"></i>
+    Saisies à revoir · {{ jours }} j
+    <span class="ms-auto" style="font-weight:400;color:var(--wp-muted);font-size:.78rem;">
+      Contrôles qualité — alertes non bloquantes
+    </span>
+  </div>
+  <div class="p-3 d-flex align-items-center gap-4 flex-wrap">
+    <div>
+      <div class="wp-kpi-label">Postes concernés</div>
+      <div style="font-size:1.55rem;font-weight:800;color:var(--wp-ochre);">
+        {{ anomalies_periode.nb_postes_concernes }}
+      </div>
+      <div class="wp-kpi-sub">sur {{ manque_periode.nb_postes if manque_periode else postes | length }} postes</div>
+    </div>
+    <div style="border-left:1px solid #e5e0d6;padding-left:20px;">
+      <div class="wp-kpi-label">Anomalies au total</div>
+      <div style="font-size:1.55rem;font-weight:700;color:var(--wp-ink);">
+        {{ anomalies_periode.nb_anomalies_total }}
+      </div>
+    </div>
+    <div style="border-left:1px solid #e5e0d6;padding-left:20px;flex:1 1 auto;">
+      <div class="wp-kpi-label" style="margin-bottom:6px;">Répartition par règle</div>
+      <div class="d-flex gap-2 flex-wrap" style="font-size:.78rem;">
+        {% set libelle = {'R1': 'TRS bas sans arrêt', 'R2': 'Arrêt sans commentaire',
+                         'R3': 'Déclassé excessif', 'R4': 'Production absente'} %}
+        {% for code, n in anomalies_periode.par_code.items() if n > 0 %}
+        <span class="wp-pill" style="background:#fff4e0;color:var(--wp-ochre);">
+          <strong>{{ code }}</strong> · {{ libelle[code] }} : {{ n }}
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+    <div>
+      <a href="{{ url_for('saisie.historique') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-list-check"></i> Voir les postes
+      </a>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {# ── Manque à gagner estimé (P11 — indicateur principal) ── #}
 {% if manque_periode and manque_periode.nb_postes > 0 %}
 <div class="wp-card mb-4">

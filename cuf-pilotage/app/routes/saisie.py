@@ -15,6 +15,7 @@ from datetime import datetime, date
 from ..models import db, Equipe, Production, Arret, Parametre, normalise_essence
 from ..utils import roles_required
 from ..services.trs import calcule_trs, calcule_pertes_equipe, calcule_manque_gagner, couleur_trs
+from ..services.controles_saisie import detecte_anomalies
 from config import Config
 
 saisie_bp = Blueprint('saisie', __name__, url_prefix='/saisie')
@@ -355,7 +356,11 @@ def deverrouiller_equipe(equipe_id):
 @login_required
 def historique():
     equipes = Equipe.query.order_by(Equipe.date.desc(), Equipe.numero_equipe).all()
-    return render_template('saisie/historique.html', postes=equipes)
+    # P12 — pré-calcul des anomalies pour drapeau dans la liste
+    anomalies_par_poste = {e.id: detecte_anomalies(e) for e in equipes}
+    return render_template('saisie/historique.html',
+                           postes=equipes,
+                           anomalies_par_poste=anomalies_par_poste)
 
 
 @saisie_bp.route('/poste/<int:poste_id>')
@@ -365,12 +370,14 @@ def detail_poste(poste_id):
     pertes = calcule_pertes_equipe(equipe)
     manque = calcule_manque_gagner(equipe)  # P11 — indicateur principal
     couleur = couleur_trs(equipe.trs_global)
+    anomalies = detecte_anomalies(equipe)  # P12 — contrôles qualité
     return render_template('saisie/detail.html',
                            poste=equipe,
                            pertes=pertes,
                            manque=manque,
                            perte_fcfa=pertes['total'],
                            couleur_trs=couleur,
+                           anomalies=anomalies,
                            peut_soumettre=_peut_soumettre(equipe),
                            peut_modifier=_peut_modifier(equipe),
                            peut_verrouiller=(

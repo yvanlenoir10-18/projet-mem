@@ -89,6 +89,15 @@
           <td style="font-weight:600;">{{ p.date.strftime('%d/%m/%Y') }}</td>
           <td>
             <span class="wp-pill wp-pill-neutral">{{ p.numero_equipe }}</span>
+            {# P12 — Drapeau anomalies de saisie #}
+            {% set anos = anomalies_par_poste.get(p.id, []) %}
+            {% if anos %}
+            <span class="wp-pill"
+                  style="background:#fff4e0;color:var(--wp-ochre);font-size:.7rem;margin-left:4px;"
+                  title="{{ anos | length }} anomalie{{ 's' if anos | length > 1 }} à vérifier : {{ anos | map(attribute='code') | join(', ') }}">
+              <i class="bi bi-shield-exclamation"></i> {{ anos | length }}
+            </span>
+            {% endif %}
           </td>
           <td>
             {% for prod in p.productions %}

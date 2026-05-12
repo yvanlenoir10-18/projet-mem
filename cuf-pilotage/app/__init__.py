@@ -85,6 +85,17 @@ def _init_donnees_defaut():
         for cle, valeur, desc in parametres:
             db.session.add(Parametre(cle=cle, valeur=valeur, description=desc))
 
+    # P12 — Seuils des contrôles qualité de saisie (ajoutés sur instances existantes)
+    seuils_controles = [
+        ('seuil_trs_anomalie',               '40', 'TRS (%) sous lequel l\'absence d\'arrêt déclaré est suspecte'),
+        ('seuil_arret_long_minutes',         '60', 'Durée (min) à partir de laquelle un commentaire est attendu'),
+        ('seuil_arret_long_commentaire_min', '10', 'Longueur minimale (caractères) du commentaire pour un arrêt long'),
+        ('seuil_declass_pct',                '30', 'Part (%) de volume déclassé déclenchant une alerte qualité'),
+    ]
+    for cle, valeur, desc in seuils_controles:
+        if not Parametre.query.filter_by(cle=cle).first():
+            db.session.add(Parametre(cle=cle, valeur=valeur, description=desc))
+
     db.session.commit()
 
 

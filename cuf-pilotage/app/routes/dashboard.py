@@ -17,6 +17,7 @@ from ..services.trs import (
     calcule_manque_gagner, manque_a_gagner_agrege,
 )
 from ..services.export import generer_rapport_excel
+from ..services.controles_saisie import compte_anomalies_periode
 from ..utils import roles_required
 from config import Config
 
@@ -359,6 +360,9 @@ def vue_chef():
     # P11 — Manque à gagner estimé agrégé sur la période (CA potentiel − CA valorisé)
     manque_periode = manque_a_gagner_agrege(equipes)
 
+    # P12 — Compteur d'anomalies de saisie sur la période
+    anomalies_periode = compte_anomalies_periode(equipes)
+
     return render_template('chef/dashboard.html',
                            postes=equipes[:10],
                            stats=stats,
@@ -374,6 +378,7 @@ def vue_chef():
                            regularite=regularite,
                            gain_potentiel=gain_potentiel,
                            manque_periode=manque_periode,
+                           anomalies_periode=anomalies_periode,
                            alertes=alertes)
 
 

@@ -14,7 +14,7 @@ from flask_login import login_required, current_user
 from datetime import datetime, date
 from ..models import db, Equipe, Production, Arret, Parametre, normalise_essence
 from ..utils import roles_required
-from ..services.trs import calcule_trs, calcule_pertes_equipe, couleur_trs
+from ..services.trs import calcule_trs, calcule_pertes_equipe, calcule_manque_gagner, couleur_trs
 from config import Config
 
 saisie_bp = Blueprint('saisie', __name__, url_prefix='/saisie')
@@ -363,10 +363,12 @@ def historique():
 def detail_poste(poste_id):
     equipe = Equipe.query.get_or_404(poste_id)
     pertes = calcule_pertes_equipe(equipe)
+    manque = calcule_manque_gagner(equipe)  # P11 — indicateur principal
     couleur = couleur_trs(equipe.trs_global)
     return render_template('saisie/detail.html',
                            poste=equipe,
                            pertes=pertes,
+                           manque=manque,
                            perte_fcfa=pertes['total'],
                            couleur_trs=couleur,
                            peut_soumettre=_peut_soumettre(equipe),

@@ -1,5 +1,5 @@
 """
-Application Factory — CUF Pilotage Chaîne 4.
+Application Factory — Wood_Pilot_Ebolowa, Chaîne 4 CUF.
 """
 from flask import Flask
 from flask_login import LoginManager

@@ -85,11 +85,62 @@
   </div>
 </div>
 
-{# ── Décomposition D×P×Q ── #}
+{# ── Manque à gagner estimé (P11 — indicateur principal) ── #}
+{% if manque_periode and manque_periode.nb_postes > 0 %}
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-cash-coin" style="color:var(--wp-terracotta);"></i>
+    Manque à gagner estimé · {{ jours }} j
+    <span class="ms-auto" style="font-weight:400;color:var(--wp-muted);font-size:.78rem;">
+      Valeur potentielle − Valeur réelle valorisée
+    </span>
+  </div>
+  <div class="p-4">
+    <div class="row g-3 align-items-stretch">
+      <div class="col-md-4">
+        <div style="border-left:3px solid var(--wp-terracotta);padding-left:14px;">
+          <div class="wp-kpi-label">Manque à gagner estimé</div>
+          <div style="font-size:1.85rem;font-weight:800;color:var(--wp-terracotta);">
+            {{ "{:,.0f}".format(manque_periode.manque_a_gagner_estime).replace(",", " ") }}
+          </div>
+          <div class="wp-kpi-sub">FCFA · {{ manque_periode.nb_postes }} poste{{ 's' if manque_periode.nb_postes > 1 }}</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div style="border-left:3px solid var(--wp-ink);padding-left:14px;">
+          <div class="wp-kpi-label">Valeur potentielle</div>
+          <div style="font-size:1.4rem;font-weight:700;color:var(--wp-ink);">
+            {{ "{:,.0f}".format(manque_periode.valeur_potentielle).replace(",", " ") }}
+          </div>
+          <div class="wp-kpi-sub">FCFA · objectif × prix moyen</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div style="border-left:3px solid var(--wp-leaf);padding-left:14px;">
+          <div class="wp-kpi-label">Valeur réelle valorisée</div>
+          <div style="font-size:1.4rem;font-weight:700;color:var(--wp-leaf);">
+            {{ "{:,.0f}".format(manque_periode.valeur_reelle_valorisee).replace(",", " ") }}
+          </div>
+          <div class="wp-kpi-sub">FCFA · conforme + déclassé revendu</div>
+        </div>
+      </div>
+    </div>
+    <div class="mt-3" style="font-size:.72rem;color:var(--wp-muted);">
+      <i class="bi bi-info-circle"></i>
+      Estimation prudente — D/P/Q ci-dessous fournissent l'attribution causale.
+      <a href="{{ url_for('dashboard.pertes') }}" style="color:var(--wp-terracotta);">
+        Drill-down causes →
+      </a>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── Décomposition D×P×Q (causes probables) ── #}
 {% if decomposition %}
 <div class="wp-card mb-4">
   <div class="wp-card-header">
-    <i class="bi bi-layers"></i> Décomposition pertes — cascade D × P × Q
+    <i class="bi bi-layers"></i> Causes probables — cascade D × P × Q (m³)
     <span class="ms-auto" style="font-weight:400;">
       Cap. {{ decomposition.cap_total }} m³ · {{ stats.nb_postes }} postes
     </span>
@@ -323,7 +374,7 @@
         <i class="bi bi-tree"></i> TRS et volume par essence
         <a href="{{ url_for('dashboard.pertes') }}" class="btn btn-sm ms-auto"
            style="background:rgba(216,113,73,.1);color:var(--wp-terracotta);font-size:.75rem;padding:3px 10px;">
-          <i class="bi bi-currency-dollar"></i> Pertes FCFA
+          <i class="bi bi-cash-coin"></i> Manque à gagner
         </a>
       </div>
       <table class="wp-table">

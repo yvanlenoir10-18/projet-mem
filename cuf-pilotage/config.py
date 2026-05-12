@@ -1,5 +1,5 @@
 """
-Configuration de l'application CUF Pilotage.
+Configuration de l'application Wood_Pilot_Ebolowa.
 Les valeurs sensibles (SECRET_KEY) doivent être définies
 dans les variables d'environnement en production.
 """

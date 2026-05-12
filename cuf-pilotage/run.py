@@ -1,5 +1,5 @@
 """
-Point d'entrée de l'application CUF Pilotage.
+Point d'entrée de l'application Wood_Pilot_Ebolowa.
 Lance le serveur Flask en mode développement.
 
 Usage : python run.py

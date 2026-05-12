@@ -166,6 +166,100 @@ def calcule_pertes_fcfa(equipe):
     return calcule_pertes_equipe(equipe)['total']
 
 
+# ── Manque à gagner estimé (P11) ─────────────────────────────────────────────
+
+def calcule_manque_gagner(equipe):
+    """
+    Manque à gagner estimé = valeur potentielle cible − valeur réelle valorisée.
+
+    Approche économique directe (CA potentiel − CA valorisé), distincte de la
+    décomposition D/P/Q de calcule_pertes_equipe(). Évite le double comptage
+    car chaque m³ est compté dans UNE seule catégorie (conforme ou déclassé).
+
+    - valeur_potentielle = objectif_m3 × prix moyen pondéré des essences traitées
+    - valeur_conforme    = Σ (vol_conforme_essence_i × prix_snapshot_essence_i)
+    - valeur_declass     = Σ (vol_declass_essence_i × prix_snapshot_essence_i × taux_revente)
+    - valeur_reelle      = valeur_conforme + valeur_declass
+    - manque_a_gagner    = max(0, valeur_potentielle − valeur_reelle)
+
+    D/P/Q restent disponibles via calcule_pertes_equipe() pour l'attribution
+    causale (pourquoi le manque existe), pas comme indicateur principal.
+
+    Référence : Jonsson & Lesshammar (1999) — distinction "loss measurement"
+    (chiffrage direct) vs "loss attribution" (diagnostic D × P × Q).
+    """
+    objectif_m3  = float(Parametre.get('objectif_m3', 25.0))
+    taux_revente = float(Parametre.get('taux_revente_rebut', 0.30))
+
+    vol_total = equipe.volume_sorti
+    if vol_total > 0 and equipe.productions:
+        prix_ref = sum(
+            _prix_production(p) * (p.volume_conforme + p.volume_declass)
+            for p in equipe.productions
+        ) / vol_total
+    else:
+        prix_ref = 0.0
+
+    valeur_potentielle = objectif_m3 * prix_ref
+
+    valeur_conforme = sum(
+        p.volume_conforme * _prix_production(p)
+        for p in equipe.productions
+    )
+    valeur_declass = sum(
+        p.volume_declass * _prix_production(p) * taux_revente
+        for p in equipe.productions
+    )
+    valeur_reelle = valeur_conforme + valeur_declass
+    manque = max(0.0, valeur_potentielle - valeur_reelle)
+
+    detail = [
+        {
+            'essence': p.essence,
+            'volume_conforme': round(p.volume_conforme, 2),
+            'volume_declass':  round(p.volume_declass, 2),
+            'valeur_conforme': round(p.volume_conforme * _prix_production(p), 0),
+            'valeur_declass':  round(p.volume_declass * _prix_production(p) * taux_revente, 0),
+        }
+        for p in equipe.productions
+    ]
+
+    return {
+        'objectif_m3':             objectif_m3,
+        'prix_reference':          round(prix_ref, 0),
+        'valeur_potentielle':      round(valeur_potentielle, 0),
+        'valeur_conforme':         round(valeur_conforme, 0),
+        'valeur_declass':          round(valeur_declass, 0),
+        'valeur_reelle_valorisee': round(valeur_reelle, 0),
+        'manque_a_gagner_estime':  round(manque, 0),
+        'detail_par_essence':      detail,
+    }
+
+
+def manque_a_gagner_agrege(equipes):
+    """
+    Agrège le manque à gagner sur une liste d'équipes (jour/semaine/mois/an).
+    Retourne les mêmes clés que calcule_manque_gagner(), sommées.
+    """
+    cumul = {
+        'valeur_potentielle':      0.0,
+        'valeur_conforme':         0.0,
+        'valeur_declass':          0.0,
+        'valeur_reelle_valorisee': 0.0,
+        'manque_a_gagner_estime':  0.0,
+        'nb_postes':               0,
+    }
+    for e in equipes:
+        m = calcule_manque_gagner(e)
+        cumul['valeur_potentielle']      += m['valeur_potentielle']
+        cumul['valeur_conforme']         += m['valeur_conforme']
+        cumul['valeur_declass']          += m['valeur_declass']
+        cumul['valeur_reelle_valorisee'] += m['valeur_reelle_valorisee']
+        cumul['manque_a_gagner_estime']  += m['manque_a_gagner_estime']
+        cumul['nb_postes']               += 1
+    return {k: (round(v, 0) if isinstance(v, float) else v) for k, v in cumul.items()}
+
+
 # ── Pareto ────────────────────────────────────────────────────────────────────
 
 def pareto_arrets(equipes):

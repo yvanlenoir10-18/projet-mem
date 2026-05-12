@@ -8,7 +8,7 @@
 {% if prix_manquants|default(false) %}
 <div class="alert alert-warning alert-dismissible fade show mb-3" role="alert">
   <i class="bi bi-exclamation-triangle-fill me-2"></i>
-  <strong>Prix manquants</strong> — Pertes FCFA sous-estimées.
+  <strong>Prix manquants</strong> — Manque à gagner sous-estimé.
   <a href="{{ url_for('admin.parametres') }}" class="fw-bold" style="color:inherit;">Configurer les prix →</a>
   <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
 </div>
@@ -127,14 +127,17 @@
 
   <div class="col-md-6 col-xl-3">
     <div class="wp-kpi h-100">
-      <div class="wp-kpi-label">Pertes financières</div>
+      <div class="wp-kpi-label">Manque à gagner estimé</div>
       <div class="wp-kpi-value" style="color:var(--wp-terracotta);font-size:1.6rem;">
-        {{ "{:,}".format(perte_fcfa).replace(",", " ") }}
+        {{ "{:,.0f}".format(manque_periode.manque_a_gagner_estime).replace(",", " ") }}
       </div>
-      <div class="wp-kpi-sub">FCFA</div>
+      <div class="wp-kpi-sub">FCFA · valeur potentielle − réelle valorisée</div>
+      <div class="wp-kpi-sub" style="margin-top:6px;">
+        Réel valorisé : {{ "{:,.0f}".format(manque_periode.valeur_reelle_valorisee).replace(",", " ") }} FCFA
+      </div>
       <a href="{{ url_for('dashboard.pertes') }}" class="btn btn-sm mt-2"
          style="background:rgba(216,113,73,.1);color:var(--wp-terracotta);font-size:.73rem;padding:3px 10px;">
-        Détail D/P/Q →
+        Causes D/P/Q →
       </a>
     </div>
   </div>

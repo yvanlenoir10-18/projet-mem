@@ -10,7 +10,10 @@ from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
 from app.models import Parametre
-from app.services.trs import pareto_arrets, calcule_pertes_equipe, _prix_production
+from app.services.trs import (
+    pareto_arrets, calcule_pertes_equipe, _prix_production,
+    manque_a_gagner_agrege,
+)
 
 VERT_FONCE  = "1B5E20"
 VERT_CLAIR  = "C8E6C9"
@@ -121,6 +124,9 @@ def _feuille_resume(wb, equipes, mois, annee, nb_brouillons=0):
     total_p = sum(p['perte_p'] for p in pertes_list)
     total_q = sum(p['perte_q'] for p in pertes_list)
 
+    # P11 — Manque à gagner estimé agrégé (indicateur principal)
+    manque_periode = manque_a_gagner_agrege(equipes)
+
     def pct(val, tot):
         return f"{round(val / tot * 100, 1)}%" if tot > 0 else "—"
 
@@ -159,22 +165,50 @@ def _feuille_resume(wb, equipes, mois, annee, nb_brouillons=0):
 
     row += 1
 
-    # Section B — Pertes financières
+    # Section B — Manque à gagner estimé (P11 — indicateur principal)
     ws.merge_cells(f'A{row}:C{row}')
-    ws[f'A{row}'].value = "B — DÉCOMPOSITION DES PERTES FINANCIÈRES (FCFA)"
+    ws[f'A{row}'].value = "B — MANQUE À GAGNER ESTIMÉ (FCFA)"
     _style_entete(ws[f'A{row}'], bg_hex="B71C1C")
     ws.row_dimensions[row].height = 22
     row += 1
 
-    for j, hdr in enumerate(['Composante', 'Montant (FCFA)', '% du total'], start=1):
+    for j, hdr in enumerate(['Composante', 'Montant (FCFA)', 'Note'], start=1):
         _style_entete(ws.cell(row=row, column=j, value=hdr), bg_hex="37474F")
     ws.row_dimensions[row].height = 20
     row += 1
 
+    for label, val, note, bg in [
+        ("Valeur potentielle (objectif × prix moyen)",
+         int(manque_periode['valeur_potentielle']), "Cible théorique",        BLANC),
+        ("Valeur réelle valorisée (conforme + déclassé)",
+         int(manque_periode['valeur_reelle_valorisee']), "Production effective", VERT_CLAIR),
+        ("Manque à gagner estimé",
+         int(manque_periode['manque_a_gagner_estime']), "Potentielle − réelle", ROUGE_PALE),
+    ]:
+        _style_cellule(ws.cell(row=row, column=1, value=label), couleur_bg=bg, align='left')
+        _style_cellule(ws.cell(row=row, column=2, value=val), couleur_bg=bg)
+        _style_cellule(ws.cell(row=row, column=3, value=note), couleur_bg=bg)
+        ws.row_dimensions[row].height = 20
+        row += 1
+
+    row += 1
+
+    # Section B-bis — Causes probables D/P/Q (attribution causale, secondaire)
+    ws.merge_cells(f'A{row}:C{row}')
+    ws[f'A{row}'].value = "B-bis — CAUSES PROBABLES (attribution D / P / Q)"
+    _style_entete(ws[f'A{row}'], bg_hex="37474F")
+    ws.row_dimensions[row].height = 22
+    row += 1
+
+    for j, hdr in enumerate(['Cause', 'Montant (FCFA)', '% du total'], start=1):
+        _style_entete(ws.cell(row=row, column=j, value=hdr), bg_hex="546E7A")
+    ws.row_dimensions[row].height = 20
+    row += 1
+
     for label, val, bg in [
-        ("Perte D — Arrêts non planifiés", total_d, ROUGE_PALE),
-        ("Perte P — Sous-performance", total_p, ORANGE_PALE),
-        ("Perte Q — Qualité (déclassé + déchets)", total_q, JAUNE_PALE),
+        ("Cause D — Arrêts non planifiés", total_d, ROUGE_PALE),
+        ("Cause P — Sous-performance",     total_p, ORANGE_PALE),
+        ("Cause Q — Qualité matière",      total_q, JAUNE_PALE),
     ]:
         _style_cellule(ws.cell(row=row, column=1, value=label), couleur_bg=bg, align='left')
         _style_cellule(ws.cell(row=row, column=2, value=int(val)), couleur_bg=bg)
@@ -182,7 +216,15 @@ def _feuille_resume(wb, equipes, mois, annee, nb_brouillons=0):
         ws.row_dimensions[row].height = 20
         row += 1
 
-    _ligne_total(ws, row, {2: int(total_pertes), 3: '100%'})
+    # Note d'avertissement sur les chevauchements
+    ws.merge_cells(f'A{row}:C{row}')
+    note = ws[f'A{row}']
+    note.value = ("Attribution causale indicative — certaines causes peuvent se "
+                  "chevaucher. Indicateur principal : manque à gagner ci-dessus.")
+    note.font = Font(italic=True, size=9, color="616161", name='Calibri')
+    note.fill = PatternFill("solid", fgColor=GRIS_CLAIR)
+    note.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+    ws.row_dimensions[row].height = 28
     row += 2
 
     # Section C — Pareto top 5

@@ -1,5 +1,5 @@
 """
-Routes d'administration — WoodPilot CUF.
+Routes d'administration — Wood_Pilot_Ebolowa.
 - Paramètres métier : prix essences, objectif, capacité (chef + admin)
 - Gestion utilisateurs : CRUD complet (admin uniquement)
 """

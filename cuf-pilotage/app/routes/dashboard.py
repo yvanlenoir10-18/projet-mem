@@ -11,7 +11,11 @@ from flask_login import login_required, current_user
 from datetime import date, timedelta
 import io
 from ..models import db, Equipe, Parametre
-from ..services.trs import pareto_arrets, couleur_trs, calcule_pertes_equipe, calcule_pertes_fcfa, decompose_dpq
+from ..services.trs import (
+    pareto_arrets, couleur_trs,
+    calcule_pertes_equipe, calcule_pertes_fcfa, decompose_dpq,
+    calcule_manque_gagner, manque_a_gagner_agrege,
+)
 from ..services.export import generer_rapport_excel
 from ..utils import roles_required
 from config import Config
@@ -352,6 +356,9 @@ def vue_chef():
 
     alertes = _alertes_chef(aujourd_hui)
 
+    # P11 — Manque à gagner estimé agrégé sur la période (CA potentiel − CA valorisé)
+    manque_periode = manque_a_gagner_agrege(equipes)
+
     return render_template('chef/dashboard.html',
                            postes=equipes[:10],
                            stats=stats,
@@ -366,6 +373,7 @@ def vue_chef():
                            scorecard=scorecard,
                            regularite=regularite,
                            gain_potentiel=gain_potentiel,
+                           manque_periode=manque_periode,
                            alertes=alertes)
 
 
@@ -430,6 +438,9 @@ def vue_pdg():
     trs_moyen = round(sum(trs_vals) / len(trs_vals), 1) if trs_vals else 0
     perte_totale = sum(calcule_pertes_fcfa(e) for e in equipes_mois)
 
+    # P11 — Manque à gagner estimé sur la période (indicateur principal P11)
+    manque_periode = manque_a_gagner_agrege(equipes_mois)
+
     # Delta TRS vs même durée précédente
     duree      = (fin - debut).days
     debut_prec = debut - timedelta(days=duree)
@@ -493,6 +504,7 @@ def vue_pdg():
                            production_reelle=round(production_reelle, 1),
                            production_cible=round(production_cible, 1),
                            perte_fcfa=int(perte_totale),
+                           manque_periode=manque_periode,
                            nb_postes=nb_postes,
                            pareto=pareto,
                            tendance=tendance,
@@ -608,6 +620,10 @@ def pertes():
         data['perte_declass'] = int(data['perte_declass'])
         data['perte_dechets'] = int(data['perte_dechets'])
 
+    # P11 — Manque à gagner estimé sur la période (indicateur principal,
+    # D/P/Q deviennent les causes probables affichées en second plan)
+    manque_periode = manque_a_gagner_agrege(equipes)
+
     return render_template('dashboard/pertes.html',
                            mois=mois, annee=annee,
                            nom_mois=NOMS_MOIS[mois],
@@ -616,6 +632,7 @@ def pertes():
                            total_p=int(total_p),
                            total_q=int(total_q),
                            total_global=int(total_global),
+                           manque_periode=manque_periode,
                            machines=machines_tri,
                            essences=essences_tri,
                            par_shift=par_shift,

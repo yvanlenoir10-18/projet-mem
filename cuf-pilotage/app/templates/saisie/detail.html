@@ -174,64 +174,75 @@
     </div>
   </div>
 
-  {# Pertes financières #}
+  {# Manque à gagner estimé (P11) #}
   <div class="col-md-5">
     <div class="wp-card h-100"
          style="border:1.5px solid rgba(216,113,73,0.3);">
       <div class="wp-card-header" style="color:var(--wp-terracotta);">
-        <i class="bi bi-currency-dollar"></i> Pertes financières estimées
+        <i class="bi bi-cash-coin"></i> Manque à gagner estimé
       </div>
       <div style="padding:0;">
         <table class="wp-table">
           <tbody>
-            <tr style="background:rgba(197,151,58,0.07);">
+            <tr>
               <td style="padding:14px 18px;">
-                <div style="font-weight:700;color:var(--wp-ink);">Perte Disponibilité (D)</div>
-                <div style="font-size:.76rem;color:var(--wp-muted);margin-top:2px;">
-                  Arrêts non planifiés × capacité × prix
+                <div style="font-weight:600;color:var(--wp-muted);font-size:.85rem;">Valeur potentielle</div>
+                <div style="font-size:.72rem;color:var(--wp-muted);margin-top:2px;">
+                  {{ manque.objectif_m3 }} m³ × {{ "{:,.0f}".format(manque.prix_reference).replace(",", " ") }} FCFA/m³
                 </div>
               </td>
-              <td class="text-end" style="padding:14px 18px;font-weight:800;font-size:1.05rem;
-                          color:var(--wp-ochre);white-space:nowrap;">
-                {{ "{:,.0f}".format(pertes.perte_d).replace(",", " ") }} FCFA
+              <td class="text-end" style="padding:14px 18px;font-weight:700;color:var(--wp-ink);
+                          white-space:nowrap;">
+                {{ "{:,.0f}".format(manque.valeur_potentielle).replace(",", " ") }}
               </td>
             </tr>
-            <tr style="background:rgba(111,168,181,0.07);">
+            <tr>
               <td style="padding:14px 18px;">
-                <div style="font-weight:700;color:var(--wp-ink);">Perte Performance (P)</div>
-                <div style="font-size:.76rem;color:var(--wp-muted);margin-top:2px;">
-                  Sous-production vs capacité théorique
+                <div style="font-weight:600;color:var(--wp-muted);font-size:.85rem;">Valeur réelle valorisée</div>
+                <div style="font-size:.72rem;color:var(--wp-muted);margin-top:2px;">
+                  Conforme + déclassé revendu
                 </div>
               </td>
-              <td class="text-end" style="padding:14px 18px;font-weight:800;font-size:1.05rem;
-                          color:var(--wp-sky);white-space:nowrap;">
-                {{ "{:,.0f}".format(pertes.perte_p).replace(",", " ") }} FCFA
-              </td>
-            </tr>
-            <tr style="background:rgba(216,113,73,0.07);">
-              <td style="padding:14px 18px;">
-                <div style="font-weight:700;color:var(--wp-ink);">Perte Qualité (Q)</div>
-                <div style="font-size:.76rem;color:var(--wp-muted);margin-top:2px;">
-                  Déclassé : {{ "{:,.0f}".format(pertes.perte_q_declass).replace(",", " ") }}
-                  + Déchets : {{ "{:,.0f}".format(pertes.perte_q_dechets).replace(",", " ") }} FCFA
-                </div>
-              </td>
-              <td class="text-end" style="padding:14px 18px;font-weight:800;font-size:1.05rem;
-                          color:var(--wp-terracotta);white-space:nowrap;">
-                {{ "{:,.0f}".format(pertes.perte_q).replace(",", " ") }} FCFA
+              <td class="text-end" style="padding:14px 18px;font-weight:700;color:var(--wp-leaf);
+                          white-space:nowrap;">
+                {{ "{:,.0f}".format(manque.valeur_reelle_valorisee).replace(",", " ") }}
               </td>
             </tr>
             <tr style="background:var(--wp-emerald);">
               <td style="padding:16px 18px;color:var(--wp-cream);">
-                <div style="font-weight:800;font-size:.95rem;">TOTAL PERTES</div>
+                <div style="font-weight:800;font-size:.95rem;">MANQUE À GAGNER ESTIMÉ</div>
+                <div style="font-size:.72rem;opacity:.85;margin-top:2px;">FCFA · poste unique</div>
               </td>
               <td class="text-end" style="padding:16px 18px;color:var(--wp-cream);
                           font-weight:800;font-size:1.2rem;white-space:nowrap;">
-                {{ "{:,.0f}".format(pertes.total).replace(",", " ") }} FCFA
+                {{ "{:,.0f}".format(manque.manque_a_gagner_estime).replace(",", " ") }}
               </td>
             </tr>
           </tbody>
         </table>
+      </div>
+      <div style="padding:12px 18px;background:var(--wp-cream-2);">
+        <div style="font-size:.7rem;font-weight:700;text-transform:uppercase;
+                    letter-spacing:.06em;color:var(--wp-muted);margin-bottom:8px;">
+          Causes probables D/P/Q
+        </div>
+        <div style="font-size:.78rem;display:flex;flex-direction:column;gap:4px;">
+          <div class="d-flex justify-content-between">
+            <span style="color:var(--wp-ochre);">▎D — Arrêts</span>
+            <span style="font-weight:700;">{{ "{:,.0f}".format(pertes.perte_d).replace(",", " ") }} FCFA</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span style="color:var(--wp-sky);">▎P — Sous-performance</span>
+            <span style="font-weight:700;">{{ "{:,.0f}".format(pertes.perte_p).replace(",", " ") }} FCFA</span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span style="color:var(--wp-terracotta);">▎Q — Qualité matière</span>
+            <span style="font-weight:700;">{{ "{:,.0f}".format(pertes.perte_q).replace(",", " ") }} FCFA</span>
+          </div>
+        </div>
+        <div style="font-size:.68rem;color:var(--wp-muted);margin-top:8px;font-style:italic;">
+          Attribution causale indicative — certaines causes peuvent se chevaucher.
+        </div>
       </div>
     </div>
   </div>

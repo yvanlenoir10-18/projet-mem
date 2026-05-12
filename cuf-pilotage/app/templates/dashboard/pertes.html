@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
-{% block title %}Pertes — {{ nom_mois }} {{ annee }}{% endblock %}
-{% block page_title %}Pertes financières · {{ nom_mois }} {{ annee }}{% endblock %}
+{% block title %}Manque à gagner — {{ nom_mois }} {{ annee }}{% endblock %}
+{% block page_title %}Manque à gagner estimé · {{ nom_mois }} {{ annee }}{% endblock %}
 
 {% block content %}
 
@@ -8,10 +8,10 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
     <h1 style="font-size:1.35rem;font-weight:800;color:var(--wp-ink);margin:0;">
-      Analyse des pertes — Chaîne 4
+      Manque à gagner estimé — Chaîne 4
     </h1>
     <p style="color:var(--wp-muted);font-size:.82rem;margin:4px 0 0;">
-      Décomposition D × P × Q en FCFA
+      Valeur potentielle − Valeur réelle valorisée · D/P/Q en attribution causale
     </p>
   </div>
   <div class="dropdown">
@@ -66,47 +66,79 @@
 
 {% else %}
 
-{# ── KPI pertes D / P / Q / Total ── #}
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
+{# ── KPI principal : Manque à gagner estimé (P11) ── #}
+<div class="row g-3 mb-3">
+  <div class="col-md-4">
     <div class="wp-kpi" style="border-top:3px solid var(--wp-terracotta);">
-      <div class="wp-kpi-label">Total pertes</div>
-      <div class="wp-kpi-value" style="color:var(--wp-terracotta);font-size:1.6rem;">
-        {{ "{:,.0f}".format(total_global).replace(",", " ") }}
+      <div class="wp-kpi-label">Manque à gagner total estimé</div>
+      <div class="wp-kpi-value" style="color:var(--wp-terracotta);font-size:1.85rem;">
+        {{ "{:,.0f}".format(manque_periode.manque_a_gagner_estime).replace(",", " ") }}
       </div>
-      <div class="wp-kpi-sub">FCFA · {{ nb_equipes }} équipe{{ 's' if nb_equipes > 1 }}</div>
+      <div class="wp-kpi-sub">FCFA · {{ nb_equipes }} poste{{ 's' if nb_equipes > 1 }}</div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
+  <div class="col-md-4">
     <div class="wp-kpi">
-      <div class="wp-kpi-label">Perte D — Arrêts</div>
-      <div class="wp-kpi-value" style="color:var(--wp-ochre);font-size:1.6rem;">
-        {{ "{:,.0f}".format(total_d).replace(",", " ") }}
+      <div class="wp-kpi-label">Valeur potentielle</div>
+      <div class="wp-kpi-value" style="color:var(--wp-ink);font-size:1.6rem;">
+        {{ "{:,.0f}".format(manque_periode.valeur_potentielle).replace(",", " ") }}
       </div>
-      <div class="wp-kpi-sub">
-        FCFA{% if total_global > 0 %} · {{ (total_d / total_global * 100) | round(1) }}%{% endif %}
-      </div>
+      <div class="wp-kpi-sub">FCFA · objectif × prix moyen pondéré</div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
+  <div class="col-md-4">
     <div class="wp-kpi">
-      <div class="wp-kpi-label">Perte P — Sous-performance</div>
-      <div class="wp-kpi-value" style="color:var(--wp-sky);font-size:1.6rem;">
-        {{ "{:,.0f}".format(total_p).replace(",", " ") }}
+      <div class="wp-kpi-label">Valeur réelle valorisée</div>
+      <div class="wp-kpi-value" style="color:var(--wp-emerald);font-size:1.6rem;">
+        {{ "{:,.0f}".format(manque_periode.valeur_reelle_valorisee).replace(",", " ") }}
       </div>
-      <div class="wp-kpi-sub">
-        FCFA{% if total_global > 0 %} · {{ (total_p / total_global * 100) | round(1) }}%{% endif %}
-      </div>
+      <div class="wp-kpi-sub">FCFA · conforme + déclassé revendu</div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="wp-kpi">
-      <div class="wp-kpi-label">Perte Q — Qualité matière</div>
-      <div class="wp-kpi-value" style="color:var(--wp-leaf);font-size:1.6rem;">
-        {{ "{:,.0f}".format(total_q).replace(",", " ") }}
+</div>
+
+{# ── Causes probables (D/P/Q en attribution causale, secondaires) ── #}
+<div class="wp-card mb-4" style="padding:18px 22px;">
+  <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;
+              letter-spacing:.08em;color:var(--wp-muted);margin-bottom:14px;">
+    Causes probables — attribution D / P / Q
+    <span style="font-weight:500;text-transform:none;letter-spacing:0;font-size:.75rem;
+                 margin-left:8px;color:var(--wp-muted);">
+      (diagnostic indicatif, certaines causes peuvent se chevaucher)
+    </span>
+  </div>
+  <div class="row g-3">
+    <div class="col-md-4">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:8px;height:38px;background:var(--wp-ochre);border-radius:4px;"></div>
+        <div>
+          <div style="font-size:.78rem;color:var(--wp-muted);">Cause D — Arrêts</div>
+          <div style="font-size:1.2rem;font-weight:700;color:var(--wp-ochre);">
+            {{ "{:,.0f}".format(total_d).replace(",", " ") }} FCFA
+          </div>
+        </div>
       </div>
-      <div class="wp-kpi-sub">
-        FCFA{% if total_global > 0 %} · {{ (total_q / total_global * 100) | round(1) }}%{% endif %}
+    </div>
+    <div class="col-md-4">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:8px;height:38px;background:var(--wp-sky);border-radius:4px;"></div>
+        <div>
+          <div style="font-size:.78rem;color:var(--wp-muted);">Cause P — Sous-performance</div>
+          <div style="font-size:1.2rem;font-weight:700;color:var(--wp-sky);">
+            {{ "{:,.0f}".format(total_p).replace(",", " ") }} FCFA
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div style="width:8px;height:38px;background:var(--wp-leaf);border-radius:4px;"></div>
+        <div>
+          <div style="font-size:.78rem;color:var(--wp-muted);">Cause Q — Qualité matière</div>
+          <div style="font-size:1.2rem;font-weight:700;color:var(--wp-leaf);">
+            {{ "{:,.0f}".format(total_q).replace(",", " ") }} FCFA
+          </div>
+        </div>
       </div>
     </div>
   </div>

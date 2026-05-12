@@ -1,5 +1,5 @@
 """
-Utilitaires transversaux — WoodPilot CUF.
+Utilitaires transversaux — Wood_Pilot_Ebolowa.
 
 Décorateur RBAC : roles_required(*roles)
   Usage : @roles_required('chef', 'admin')

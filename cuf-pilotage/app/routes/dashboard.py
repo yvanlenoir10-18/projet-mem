@@ -18,6 +18,7 @@ from ..services.trs import (
 )
 from ..services.export import generer_rapport_excel
 from ..services.controles_saisie import compte_anomalies_periode
+from ..services.cumuls import vue_executive_pdg
 from ..utils import roles_required
 from config import Config
 
@@ -502,6 +503,9 @@ def vue_pdg():
     else:
         label_periode = f"{NOMS_MOIS[mois]} {annee}"
 
+    # P13 — Vue exécutive 4 horizons (jour / sem / mois / an) avec deltas
+    vue_executive = vue_executive_pdg(aujourd_hui)
+
     return render_template('pdg/dashboard.html',
                            trs_moyen=trs_moyen,
                            couleur_trs=couleur_trs(trs_moyen),
@@ -521,7 +525,8 @@ def vue_pdg():
                            prix_manquants=prix_manquants,
                            mode_libre=mode_libre,
                            debut_filtre=debut.isoformat(),
-                           fin_filtre=(fin - timedelta(days=1)).isoformat())
+                           fin_filtre=(fin - timedelta(days=1)).isoformat(),
+                           vue_executive=vue_executive)
 
 
 @dashboard_bp.route('/pertes')

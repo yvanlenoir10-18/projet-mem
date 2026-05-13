@@ -223,3 +223,9 @@ body {
   .wp-kpi-value { font-size: 1.7rem; }
   .wp-essence-grid { grid-template-columns: 1fr; }
 }
+
+/* P13 — Deltas (vue exécutive PDG : variation vs période précédente) */
+.wp-delta { display: inline-flex; align-items: center; gap: 1px; font-size: 0.72rem; font-weight: 700; padding: 2px 7px; border-radius: 6px; white-space: nowrap; line-height: 1.3; }
+.wp-delta-success { background: #e8f3e2; color: var(--wp-leaf); }
+.wp-delta-danger  { background: #fdecea; color: var(--wp-terracotta); }
+.wp-delta-muted   { background: #f4f0e6; color: var(--wp-muted); }

@@ -92,6 +92,123 @@
   </div>
 </div>
 
+{# ── P13 · Vue exécutive 4 horizons (jour / semaine / mois / année) ── #}
+{% if vue_executive %}
+{% set horizons = [('jour', 'Aujourd\'hui', 'bi-sun'),
+                   ('semaine', 'Cette semaine', 'bi-calendar-week'),
+                   ('mois', 'Ce mois', 'bi-calendar-month'),
+                   ('annee', 'Cette année', 'bi-calendar-range')] %}
+
+<div class="wp-card mb-4">
+  <div class="wp-card-header" style="justify-content:space-between;">
+    <span><i class="bi bi-eye-fill" style="color:var(--wp-ink);"></i>
+      Vue exécutive · 4 horizons
+    </span>
+    <span style="font-weight:400;color:var(--wp-muted);font-size:.78rem;">
+      Valeur courante <strong style="color:var(--wp-muted);">↗</strong> évolution vs période précédente
+    </span>
+  </div>
+
+  <div class="row g-0" style="border-top:1px solid #e9e3d5;">
+    {% for code, titre, icone in horizons %}
+    {% set h = vue_executive[code] %}
+    <div class="col-md-6 col-xl-3"
+         style="{% if not loop.last %}border-right:1px solid #e9e3d5;{% endif %}
+                padding:1rem 1.25rem;">
+
+      <div class="d-flex align-items-center gap-2 mb-3"
+           style="color:var(--wp-ink);font-weight:700;font-size:.85rem;">
+        <i class="bi {{ icone }}" style="color:var(--wp-leaf);"></i>
+        {{ titre }}
+        <span style="color:var(--wp-muted);font-weight:500;font-size:.72rem;">
+          ({{ h.label }})
+        </span>
+      </div>
+
+      {# Volume conforme #}
+      <div class="mb-3">
+        <div class="wp-kpi-label" style="font-size:.7rem;">Volume conforme</div>
+        <div style="display:flex;align-items:baseline;gap:8px;">
+          <span style="font-size:1.35rem;font-weight:800;color:var(--wp-ink);">
+            {{ h.courant.volume_conforme }} <span style="font-size:.72rem;font-weight:500;color:var(--wp-muted);">m³</span>
+          </span>
+          {% set d = h.deltas.volume_conforme %}
+          <span class="wp-delta wp-delta-{{ d.couleur }}">
+            {% if d.direction == 'up' %}<i class="bi bi-arrow-up-short"></i>
+            {% elif d.direction == 'down' %}<i class="bi bi-arrow-down-short"></i>
+            {% elif d.direction == 'stable' %}<i class="bi bi-dash"></i>
+            {% endif %}
+            {{ d.label }}
+          </span>
+        </div>
+      </div>
+
+      {# TRS moyen #}
+      <div class="mb-3">
+        <div class="wp-kpi-label" style="font-size:.7rem;">TRS moyen</div>
+        <div style="display:flex;align-items:baseline;gap:8px;">
+          {% set trs_v = h.courant.trs_moyen %}
+          <span style="font-size:1.35rem;font-weight:800;
+                       color:{% if trs_v is none %}var(--wp-muted)
+                             {% elif trs_v >= 70 %}var(--wp-leaf)
+                             {% elif trs_v >= 50 %}var(--wp-ochre)
+                             {% else %}var(--wp-terracotta){% endif %};">
+            {% if trs_v is none %}—{% else %}{{ trs_v }}<span style="font-size:.72rem;font-weight:500;">%</span>{% endif %}
+          </span>
+          {% set d = h.deltas.trs_moyen %}
+          <span class="wp-delta wp-delta-{{ d.couleur }}">
+            {% if d.direction == 'up' %}<i class="bi bi-arrow-up-short"></i>
+            {% elif d.direction == 'down' %}<i class="bi bi-arrow-down-short"></i>
+            {% elif d.direction == 'stable' %}<i class="bi bi-dash"></i>
+            {% endif %}
+            {{ d.label }}
+          </span>
+        </div>
+      </div>
+
+      {# Manque à gagner #}
+      <div class="mb-3">
+        <div class="wp-kpi-label" style="font-size:.7rem;">Manque à gagner estimé</div>
+        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:1.15rem;font-weight:700;color:var(--wp-terracotta);">
+            {{ "{:,.0f}".format(h.courant.manque_a_gagner).replace(",", " ") }}
+            <span style="font-size:.7rem;font-weight:500;color:var(--wp-muted);">FCFA</span>
+          </span>
+          {% set d = h.deltas.manque_a_gagner %}
+          <span class="wp-delta wp-delta-{{ d.couleur }}">
+            {% if d.direction == 'up' %}<i class="bi bi-arrow-up-short"></i>
+            {% elif d.direction == 'down' %}<i class="bi bi-arrow-down-short"></i>
+            {% elif d.direction == 'stable' %}<i class="bi bi-dash"></i>
+            {% endif %}
+            {{ d.label }}
+          </span>
+        </div>
+      </div>
+
+      {# Nombre de postes #}
+      <div>
+        <div class="wp-kpi-label" style="font-size:.7rem;">Postes saisis</div>
+        <div style="display:flex;align-items:baseline;gap:8px;">
+          <span style="font-size:1.1rem;font-weight:700;color:var(--wp-ink);">
+            {{ h.courant.nb_postes }}
+          </span>
+          {% set d = h.deltas.nb_postes %}
+          <span class="wp-delta wp-delta-{{ d.couleur }}">
+            {% if d.direction == 'up' %}<i class="bi bi-arrow-up-short"></i>
+            {% elif d.direction == 'down' %}<i class="bi bi-arrow-down-short"></i>
+            {% elif d.direction == 'stable' %}<i class="bi bi-dash"></i>
+            {% endif %}
+            {{ d.label }}
+          </span>
+        </div>
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {# ── 4 KPI Cards ── #}
 <div class="row g-3 mb-4">
   <div class="col-md-6 col-xl-3">

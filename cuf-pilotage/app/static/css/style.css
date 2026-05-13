@@ -229,3 +229,112 @@ body {
 .wp-delta-success { background: #e8f3e2; color: var(--wp-leaf); }
 .wp-delta-danger  { background: #fdecea; color: var(--wp-terracotta); }
 .wp-delta-muted   { background: #f4f0e6; color: var(--wp-muted); }
+
+/* P14 — Moteur de recommandations */
+/* Badges de priorité */
+.wp-reco-prio-haute   { background: #fdecea; color: var(--wp-terracotta); font-size: .65rem; padding: 2px 8px; border-radius: 20px; font-weight: 700; }
+.wp-reco-prio-moyenne { background: #fff4e0; color: var(--wp-ochre);       font-size: .65rem; padding: 2px 8px; border-radius: 20px; font-weight: 700; }
+.wp-reco-prio-basse   { background: #f4f0e6; color: var(--wp-muted);       font-size: .65rem; padding: 2px 8px; border-radius: 20px; font-weight: 700; }
+
+/* Numéro dans le Top 3 des dashboards */
+.wp-reco-top-num {
+  width: 28px; height: 28px; min-width: 28px;
+  border-radius: 50%; background: var(--wp-cream);
+  border: 2px solid var(--wp-ochre); color: var(--wp-ochre);
+  font-weight: 800; font-size: .78rem;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Label de section (Couche 1 / Couche 2) */
+.wp-reco-section-label {
+  font-size: .72rem; font-weight: 700; color: var(--wp-muted);
+  text-transform: uppercase; letter-spacing: .06em;
+  margin-bottom: .6rem;
+}
+
+/* Solution déterministe (Couche 1) */
+.wp-reco-solution {
+  display: flex; gap: 12px; align-items: flex-start;
+  padding: .65rem 0;
+  border-bottom: 1px solid #f0ebe2;
+}
+.wp-reco-solution:last-child { border-bottom: none; }
+.wp-reco-sol-num {
+  width: 22px; height: 22px; min-width: 22px;
+  border-radius: 50%; background: var(--wp-cream);
+  border: 1px solid #d4cfc4; color: var(--wp-muted);
+  font-weight: 700; font-size: .72rem;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Zone enrichissement IA */
+.wp-reco-ai-zone {
+  background: #f8f6f0;
+  border: 1px dashed #d4cfc4;
+  border-radius: 8px;
+  padding: .75rem 1rem;
+}
+
+/* Bouton "Analyser avec l'IA" */
+.wp-btn-ia {
+  background: linear-gradient(135deg, var(--wp-leaf), #5a9e6e);
+  color: #fff; border: none; font-size: .8rem; font-weight: 600;
+  border-radius: 6px; padding: 5px 14px;
+  transition: opacity .15s;
+}
+.wp-btn-ia:hover:not(:disabled) { opacity: .88; color: #fff; }
+.wp-btn-ia:disabled { opacity: .6; }
+
+/* Panneau résultat IA */
+.wp-reco-ai-panel {
+  margin-top: .75rem;
+  padding: .75rem;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #e0dbd0;
+}
+
+/* Badge "Généré par IA" */
+.wp-ai-badge {
+  font-size: .75rem; font-weight: 600;
+  color: var(--wp-leaf); display: flex; align-items: center; gap: 6px;
+  flex-wrap: wrap;
+}
+.wp-ai-source-badge {
+  font-size: .65rem; font-weight: 600; padding: 2px 8px; border-radius: 10px;
+  background: #f4f0e6; color: var(--wp-muted);
+}
+.wp-ai-source-fresh {
+  background: #e8f3e2; color: var(--wp-leaf);
+}
+
+/* Carte solution IA */
+.wp-reco-ai-card {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: .6rem 0;
+  border-bottom: 1px solid #f0ebe2;
+}
+.wp-reco-ai-card:last-child { border-bottom: none; }
+.wp-reco-ai-num {
+  width: 20px; height: 20px; min-width: 20px;
+  border-radius: 50%; background: #e8f3e2;
+  color: var(--wp-leaf); font-weight: 800; font-size: .7rem;
+  display: flex; align-items: center; justify-content: center;
+}
+.wp-reco-ai-exemple {
+  font-size: .78rem; color: var(--wp-muted);
+  background: #f8f6f0; border-radius: 5px;
+  padding: 4px 8px; margin-top: .25rem;
+}
+.wp-reco-ai-ref {
+  font-size: .72rem; color: var(--wp-leaf);
+  margin-top: .2rem;
+}
+
+/* KPI mini (métriques déclenchantes) */
+.wp-kpi-mini {
+  background: #f8f6f0; border-radius: 6px;
+  padding: 6px 12px; min-width: 100px;
+}
+.wp-kpi-mini-label { font-size: .65rem; color: var(--wp-muted); font-weight: 600; text-transform: uppercase; }
+.wp-kpi-mini-val   { font-size: 1rem; font-weight: 800; color: var(--wp-ink); }

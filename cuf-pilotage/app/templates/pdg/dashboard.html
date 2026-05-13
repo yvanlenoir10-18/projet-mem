@@ -209,6 +209,37 @@
 </div>
 {% endif %}
 
+{# ── P14 · Top 3 recommandations Direction ── #}
+{% if top_recos_pdg %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-terracotta);">
+  <div class="wp-card-header" style="background:#fff8f6;">
+    <i class="bi bi-lightbulb-fill" style="color:var(--wp-terracotta);"></i>
+    Recommandations prioritaires
+    <span class="wp-pill wp-pill-neutral ms-2" style="font-size:.65rem;">{{ top_recos_pdg|length }} action{{ 's' if top_recos_pdg|length > 1 }}</span>
+    <a href="{{ url_for('recommandations.index') }}" class="btn btn-sm btn-outline-secondary ms-auto" style="font-size:.72rem;">
+      Voir tout <i class="bi bi-arrow-right"></i>
+    </a>
+  </div>
+  <div class="p-3">
+    {% for reco in top_recos_pdg %}
+    {% set prio_label = 'Haute' if reco.priorite == 3 else ('Moyenne' if reco.priorite == 2 else 'Basse') %}
+    {% set prio_class = 'wp-reco-prio-haute' if reco.priorite == 3 else ('wp-reco-prio-moyenne' if reco.priorite == 2 else 'wp-reco-prio-basse') %}
+    <div class="d-flex align-items-start gap-3 {% if not loop.last %}mb-3 pb-3{% endif %}" style="{% if not loop.last %}border-bottom:1px solid #f0ebe2;{% endif %}">
+      <div class="wp-reco-top-num">{{ loop.index }}</div>
+      <div style="flex:1;">
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+          <i class="bi {{ reco.icone }}" style="color:var(--wp-terracotta);"></i>
+          <span style="font-weight:600;font-size:.88rem;color:var(--wp-ink);">{{ reco.titre }}</span>
+          <span class="wp-pill {{ prio_class }}">{{ prio_label }}</span>
+        </div>
+        <div style="font-size:.78rem;color:var(--wp-muted);">{{ reco.solutions[0].titre }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
 {# ── 4 KPI Cards ── #}
 <div class="row g-3 mb-4">
   <div class="col-md-6 col-xl-3">

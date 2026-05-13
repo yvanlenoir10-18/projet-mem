@@ -24,12 +24,14 @@ def create_app():
     from .routes.dashboard import dashboard_bp
     from .routes.admin import admin_bp
     from .routes.analyse import analyse_bp
+    from .routes.recommandations import recos_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(saisie_bp)
     app.register_blueprint(dashboard_bp)
     app.register_blueprint(admin_bp)
     app.register_blueprint(analyse_bp)
+    app.register_blueprint(recos_bp)
 
     with app.app_context():
         db.create_all()
@@ -93,6 +95,18 @@ def _init_donnees_defaut():
         ('seuil_declass_pct',                '30', 'Part (%) de volume déclassé déclenchant une alerte qualité'),
     ]
     for cle, valeur, desc in seuils_controles:
+        if not Parametre.query.filter_by(cle=cle).first():
+            db.session.add(Parametre(cle=cle, valeur=valeur, description=desc))
+
+    # P14 — Seuils du moteur de recommandations + sources IA
+    seuils_recos = [
+        ('seuil_trs_critique',   '50',       'TRS (%) sous lequel une recommandation TRS_CRITIQUE est générée'),
+        ('seuil_trs_moyen',      '60',       'TRS (%) sous lequel une recommandation TRS_MOYEN est générée'),
+        ('seuil_manque_eleve',   '500000',   'Manque à gagner (FCFA) au-delà duquel MANQUE_ELEVE est générée'),
+        ('seuil_anomalies_pct',  '30',       'Part (%) de postes avec anomalie déclenchant une recommandation'),
+        ('reco_sources_externes','[]',        'JSON — liste d\'URLs chargées par l\'IA pour enrichir ses réponses'),
+    ]
+    for cle, valeur, desc in seuils_recos:
         if not Parametre.query.filter_by(cle=cle).first():
             db.session.add(Parametre(cle=cle, valeur=valeur, description=desc))
 

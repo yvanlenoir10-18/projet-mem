@@ -19,6 +19,7 @@ from ..services.trs import (
 from ..services.export import generer_rapport_excel
 from ..services.controles_saisie import compte_anomalies_periode
 from ..services.cumuls import vue_executive_pdg
+from ..services.recommandations import top_n_recommandations
 from ..utils import roles_required
 from config import Config
 
@@ -364,6 +365,9 @@ def vue_chef():
     # P12 — Compteur d'anomalies de saisie sur la période
     anomalies_periode = compte_anomalies_periode(equipes)
 
+    # P14 — Top 3 recommandations pour le chef (30 derniers jours)
+    top_recos = top_n_recommandations(equipes, role='chef', n=3)
+
     return render_template('chef/dashboard.html',
                            postes=equipes[:10],
                            stats=stats,
@@ -380,6 +384,7 @@ def vue_chef():
                            gain_potentiel=gain_potentiel,
                            manque_periode=manque_periode,
                            anomalies_periode=anomalies_periode,
+                           top_recos=top_recos,
                            alertes=alertes)
 
 
@@ -506,6 +511,13 @@ def vue_pdg():
     # P13 — Vue exécutive 4 horizons (jour / sem / mois / an) avec deltas
     vue_executive = vue_executive_pdg(aujourd_hui)
 
+    # P14 — Top 3 recommandations pour le PDG (30 derniers jours)
+    equipes_30j = Equipe.query.filter(
+        Equipe.date >= aujourd_hui - timedelta(days=30),
+        Equipe.statut.in_(_STATUTS_ANALYSES)
+    ).all()
+    top_recos_pdg = top_n_recommandations(equipes_30j, role='pdg', n=3)
+
     return render_template('pdg/dashboard.html',
                            trs_moyen=trs_moyen,
                            couleur_trs=couleur_trs(trs_moyen),
@@ -526,7 +538,8 @@ def vue_pdg():
                            mode_libre=mode_libre,
                            debut_filtre=debut.isoformat(),
                            fin_filtre=(fin - timedelta(days=1)).isoformat(),
-                           vue_executive=vue_executive)
+                           vue_executive=vue_executive,
+                           top_recos_pdg=top_recos_pdg)
 
 
 @dashboard_bp.route('/pertes')

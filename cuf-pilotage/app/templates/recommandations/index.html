@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+{% block title %}Recommandations{% endblock %}
+{% block page_title %}Recommandations prioritaires{% endblock %}
+
+{% block content %}
+
+{# ── En-tête ── #}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <span style="font-size:.78rem;color:var(--wp-muted);">
+      Analyse des {{ contexte_global.nb_postes }} postes des {{ jours }} derniers jours
+      {% if contexte_global.trs_moyen %}
+      · TRS moyen {{ contexte_global.trs_moyen }}%
+      {% endif %}
+    </span>
+  </div>
+  <div class="btn-group">
+    <a href="?jours=7"  class="btn btn-sm btn-outline-primary {% if jours==7 %}active{% endif %}">7 j</a>
+    <a href="?jours=30" class="btn btn-sm btn-outline-primary {% if jours==30 %}active{% endif %}">30 j</a>
+    <a href="?jours=90" class="btn btn-sm btn-outline-primary {% if jours==90 %}active{% endif %}">90 j</a>
+  </div>
+</div>
+
+{% if not recommandations %}
+{# ── Aucune recommandation ── #}
+<div class="wp-card p-5 text-center">
+  <i class="bi bi-check2-circle fs-1 mb-3 d-block" style="color:var(--wp-leaf);"></i>
+  <div style="font-size:1.1rem;font-weight:600;color:var(--wp-ink);">Aucune recommandation active</div>
+  <div style="color:var(--wp-muted);margin-top:.5rem;">
+    Tous les indicateurs sont dans les seuils définis. Continuez ainsi.
+  </div>
+  {% if nb_total > 0 %}
+  <div class="mt-2" style="font-size:.78rem;color:var(--wp-muted);">
+    {{ nb_total }} recommandation{{ 's' if nb_total > 1 }} active{{ 's' if nb_total > 1 }}
+    pour d'autres rôles.
+  </div>
+  {% endif %}
+</div>
+
+{% else %}
+
+{# ── Bandeau récapitulatif ── #}
+<div class="wp-card mb-4 p-3" style="border-left:4px solid var(--wp-terracotta);background:#fff8f6;">
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <div>
+      <span style="font-size:2rem;font-weight:800;color:var(--wp-terracotta);">{{ recommandations|length }}</span>
+      <span style="font-size:.85rem;color:var(--wp-muted);margin-left:.3rem;">
+        action{{ 's' if recommandations|length > 1 }} prioritaire{{ 's' if recommandations|length > 1 }}
+      </span>
+    </div>
+    <div style="font-size:.78rem;color:var(--wp-muted);">
+      <i class="bi bi-stars me-1" style="color:var(--wp-leaf);"></i>
+      Chaque recommandation peut être enrichie par l'IA — cliquez « Analyser avec l'IA » pour
+      obtenir des solutions supplémentaires trouvées dans la littérature industrielle mondiale.
+    </div>
+  </div>
+</div>
+
+{# ── Cartes recommandations ── #}
+{% for reco in recommandations %}
+{% set couleur_css = 'var(--wp-terracotta)' if reco.couleur == 'terracotta' else 'var(--wp-ochre)' %}
+{% set bg_css = '#fff8f6' if reco.couleur == 'terracotta' else '#fffaf0' %}
+{% set prio_label = 'Haute' if reco.priorite == 3 else ('Moyenne' if reco.priorite == 2 else 'Basse') %}
+{% set prio_class = 'wp-reco-prio-haute' if reco.priorite == 3 else ('wp-reco-prio-moyenne' if reco.priorite == 2 else 'wp-reco-prio-basse') %}
+{% set contexte_json = reco.contexte | tojson %}
+
+<div class="wp-card mb-4" style="border-left:4px solid {{ couleur_css }};">
+
+  {# ── En-tête de carte ── #}
+  <div class="wp-card-header" style="background:{{ bg_css }};border-bottom:1px solid #eee;">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <i class="bi {{ reco.icone }} fs-5" style="color:{{ couleur_css }};"></i>
+      <span style="font-weight:700;font-size:.95rem;color:var(--wp-ink);">{{ reco.titre }}</span>
+      <span class="wp-pill {{ prio_class }}">{{ prio_label }}</span>
+      {% for role in reco.roles if role != 'admin' %}
+      <span class="wp-pill wp-pill-neutral" style="font-size:.65rem;">
+        {{ 'Chef' if role == 'chef' else 'Direction' }}
+      </span>
+      {% endfor %}
+      <span class="ms-auto" style="font-size:.7rem;color:var(--wp-muted);">
+        <i class="bi bi-code-slash me-1"></i>{{ reco.code }}
+      </span>
+    </div>
+  </div>
+
+  <div class="p-4">
+
+    {# ── Métriques déclenchantes ── #}
+    {% if reco.contexte %}
+    <div class="d-flex gap-3 mb-3 flex-wrap">
+      {% if reco.contexte.trs_moyen is not none %}
+      <div class="wp-kpi-mini">
+        <div class="wp-kpi-mini-label">TRS moyen</div>
+        <div class="wp-kpi-mini-val">{{ reco.contexte.trs_moyen }}%</div>
+      </div>
+      {% endif %}
+      {% if reco.contexte.manque and reco.contexte.manque > 0 %}
+      <div class="wp-kpi-mini">
+        <div class="wp-kpi-mini-label">Manque à gagner</div>
+        <div class="wp-kpi-mini-val">{{ '{:,.0f}'.format(reco.contexte.manque).replace(',', ' ') }} FCFA</div>
+      </div>
+      {% endif %}
+      <div class="wp-kpi-mini">
+        <div class="wp-kpi-mini-label">Postes analysés</div>
+        <div class="wp-kpi-mini-val">{{ reco.contexte.nb_postes }}</div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── Solutions déterministes (Couche 1) ── #}
+    <div class="mb-3">
+      <div class="wp-reco-section-label">
+        <i class="bi bi-list-check me-1"></i>Solutions validées — Couche 1
+      </div>
+      {% for sol in reco.solutions %}
+      <div class="wp-reco-solution">
+        <div class="wp-reco-sol-num">{{ loop.index }}</div>
+        <div>
+          <div class="fw-semibold" style="font-size:.9rem;color:var(--wp-ink);">{{ sol.titre }}</div>
+          <div style="font-size:.82rem;color:var(--wp-muted);margin-top:.25rem;line-height:1.55;">{{ sol.detail }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {# ── Couche 2 : enrichissement IA ── #}
+    <div class="wp-reco-ai-zone mt-3">
+      <div class="d-flex gap-2 align-items-center flex-wrap mb-2">
+        <button
+          id="btn-ai-{{ reco.code }}"
+          class="btn btn-sm wp-btn-ia"
+          onclick="analyserIA('{{ reco.code }}', {{ contexte_json }})">
+          <i class="bi bi-stars me-1"></i>Analyser avec l'IA
+        </button>
+        <span style="font-size:.72rem;color:var(--wp-muted);">
+          Recherche dans la littérature industrielle mondiale · résultat mis en cache 7 jours
+        </span>
+      </div>
+      <div id="panel-ai-{{ reco.code }}" class="wp-reco-ai-panel" style="display:none;"></div>
+    </div>
+
+  </div>
+</div>
+{% endfor %}
+
+{% endif %}
+
+{# ── Script AJAX ── #}
+<script>
+function analyserIA(code, contexte) {
+  const btn   = document.getElementById('btn-ai-' + code);
+  const panel = document.getElementById('panel-ai-' + code);
+  const force = btn.dataset.force === '1' ? '?force=1' : '';
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span>Analyse en cours&hellip;';
+
+  fetch('/recommandations/ai/' + code + force, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(contexte)
+  })
+  .then(r => r.json())
+  .then(data => {
+    btn.disabled = false;
+
+    if (data.erreur) {
+      panel.innerHTML = '<div class="alert alert-warning mb-0" style="font-size:.82rem;">'
+        + '<i class="bi bi-exclamation-triangle me-1"></i>' + escHtml(data.erreur) + '</div>';
+      btn.innerHTML = '<i class="bi bi-stars me-1"></i>Réessayer';
+      btn.dataset.force = '0';
+    } else {
+      const sourceLabel = data.source === 'cache'
+        ? '<span class="wp-ai-source-badge">Depuis le cache · 7 jours</span>'
+        : '<span class="wp-ai-source-badge wp-ai-source-fresh">Analyse fraîche · Internet</span>';
+
+      let html = '<div class="wp-ai-badge mb-3">'
+        + '<i class="bi bi-stars me-1"></i>'
+        + 'Suggestions IA · basées sur la littérature industrielle disponible en ligne'
+        + ' &nbsp;' + sourceLabel + '</div>';
+
+      (data.solutions || []).forEach((s, i) => {
+        html += '<div class="wp-reco-ai-card">'
+          + '<div class="wp-reco-ai-num">' + (i + 1) + '</div>'
+          + '<div style="flex:1;">'
+          + '<div class="fw-semibold" style="font-size:.88rem;color:var(--wp-ink);">' + escHtml(s.titre) + '</div>'
+          + '<p style="font-size:.81rem;color:var(--wp-muted);margin:.3rem 0 .25rem;line-height:1.55;">' + escHtml(s.justification) + '</p>'
+          + (s.exemple ? '<div class="wp-reco-ai-exemple"><i class="bi bi-building me-1"></i>' + escHtml(s.exemple) + '</div>' : '')
+          + (s.reference ? '<div class="wp-reco-ai-ref"><i class="bi bi-book me-1"></i>' + escHtml(s.reference) + '</div>' : '')
+          + '</div></div>';
+      });
+
+      panel.innerHTML = html;
+      btn.innerHTML = '<i class="bi bi-arrow-clockwise me-1"></i>Rafraîchir';
+      btn.dataset.force = '1';
+    }
+
+    panel.style.display = 'block';
+  })
+  .catch(err => {
+    btn.disabled = false;
+    panel.innerHTML = '<div class="alert alert-danger mb-0" style="font-size:.82rem;">'
+      + '<i class="bi bi-wifi-off me-1"></i>Erreur réseau : ' + escHtml(err.message) + '</div>';
+    panel.style.display = 'block';
+    btn.innerHTML = '<i class="bi bi-stars me-1"></i>Réessayer';
+    btn.dataset.force = '0';
+  });
+}
+
+function escHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+</script>
+
+{% endblock %}

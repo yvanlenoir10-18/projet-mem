@@ -6,10 +6,11 @@ Write-Host "=== CUF Pilotage - Démarrage ===" -ForegroundColor Green
 Write-Host ""
 Write-Host " Pour activer le module IA (recommandations P14) :" -ForegroundColor Gray
 Write-Host "   1. Créez un fichier .env dans ce dossier" -ForegroundColor Gray
-Write-Host "   2. Ajoutez ces deux lignes :" -ForegroundColor Gray
-Write-Host "        ANTHROPIC_API_KEY=sk-ant-xxxxx   (console.anthropic.com)" -ForegroundColor Gray
-Write-Host "        TAVILY_API_KEY=tvly-xxxxx         (app.tavily.com)" -ForegroundColor Gray
-Write-Host "   Sans ces clés : l'application fonctionne, le bouton IA est désactivé." -ForegroundColor Gray
+Write-Host "   2. Ajoutez UNE des clés suivantes :" -ForegroundColor Gray
+Write-Host "        GROQ_API_KEY=gsk_xxxxx   (console.groq.com — GRATUIT, recommandé)" -ForegroundColor Green
+Write-Host "        ANTHROPIC_API_KEY=sk-ant-xxxxx   (console.anthropic.com — payant)" -ForegroundColor Gray
+Write-Host "   + optionnel : TAVILY_API_KEY=tvly-xxxxx  (app.tavily.com — recherche web)" -ForegroundColor Gray
+Write-Host "   Sans clé IA : l'application fonctionne, le bouton IA est désactivé." -ForegroundColor Gray
 Write-Host ""
 
 # 1. Aller dans le bon dossier (là où ce script se trouve)

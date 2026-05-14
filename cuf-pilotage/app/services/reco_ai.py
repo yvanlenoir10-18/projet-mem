@@ -1,20 +1,16 @@
 """
 Moteur de recommandations — Couche 2 : enrichissement IA on-demand.
 
-Utilise Claude API (modèle Sonnet) + Tavily pour rechercher comment des problèmes
-similaires ont été résolus dans d'autres scieries industrielles, puis génère
-3 solutions supplémentaires avec justifications, exemples et références.
+Moteurs supportés (par ordre de priorité) :
+  1. Claude API  — ANTHROPIC_API_KEY  (console.anthropic.com) — payant
+  2. Groq        — GROQ_API_KEY       (console.groq.com)      — GRATUIT
+
++ Tavily pour la recherche web :
+  TAVILY_API_KEY (app.tavily.com) — optionnel dans les deux cas
 
 Cache : dict Python sauvegardé dans instance/reco_cache.json, TTL 7 jours.
 Cette approche n'introduit aucune nouvelle table DB (R7 respectée) et persiste
 entre redémarrages grâce au fichier JSON.
-
-Variables d'environnement requises :
-  ANTHROPIC_API_KEY — clé API Claude (console.anthropic.com)
-  TAVILY_API_KEY    — clé API Tavily (app.tavily.com) — optionnelle
-
-Si ANTHROPIC_API_KEY est absente, la fonction retourne une erreur explicite.
-Si TAVILY_API_KEY est absente, l'IA génère des solutions sans sources web.
 """
 import os
 import json
@@ -25,6 +21,12 @@ try:
     _ANTHROPIC_OK = True
 except ImportError:
     _ANTHROPIC_OK = False
+
+try:
+    import groq as _groq_mod
+    _GROQ_OK = True
+except ImportError:
+    _GROQ_OK = False
 
 try:
     from tavily import TavilyClient as _TavilyClient
@@ -141,35 +143,74 @@ def _charge_sources_externes(tavily_key):
         return []
 
 
+def _appel_anthropic(anthropic_key, prompt):
+    """Appelle Claude API et retourne le texte brut de la réponse."""
+    client = _anthropic_mod.Anthropic(api_key=anthropic_key)
+    message = client.messages.create(
+        model='claude-sonnet-4-6',
+        max_tokens=1800,
+        system=_SYSTEME,
+        messages=[{'role': 'user', 'content': prompt}],
+    )
+    return message.content[0].text.strip()
+
+
+def _appel_groq(groq_key, prompt):
+    """Appelle Groq API (Llama 3.3 70B) et retourne le texte brut de la réponse."""
+    client = _groq_mod.Groq(api_key=groq_key)
+    message = client.chat.completions.create(
+        model='llama-3.3-70b-versatile',
+        max_tokens=1800,
+        messages=[
+            {'role': 'system', 'content': _SYSTEME},
+            {'role': 'user', 'content': prompt},
+        ],
+    )
+    return message.choices[0].message.content.strip()
+
+
+def _nettoyer_json(contenu):
+    """Nettoie les balises markdown éventuelles autour du JSON."""
+    if '```' in contenu:
+        parts = contenu.split('```')
+        for p in parts:
+            cleaned = p.strip()
+            if cleaned.startswith('json'):
+                cleaned = cleaned[4:].strip()
+            if cleaned.startswith('{'):
+                return cleaned
+    return contenu
+
+
 def ai_enrichissement(code, contexte):
     """
-    Appelle Claude API + Tavily pour enrichir une recommandation.
+    Appelle un moteur IA (Claude ou Groq) + Tavily pour enrichir une recommandation.
+
+    Priorité : ANTHROPIC_API_KEY → GROQ_API_KEY (gratuit)
 
     Retourne un dict :
       solutions : liste de dicts (titre, justification, exemple, reference)
-      source    : 'cache' | 'api'
+      source    : 'cache' | 'api_anthropic' | 'api_groq'
       erreur    : str | None
     """
     anthropic_key = os.environ.get('ANTHROPIC_API_KEY', '').strip()
+    groq_key      = os.environ.get('GROQ_API_KEY', '').strip()
     tavily_key    = os.environ.get('TAVILY_API_KEY', '').strip()
 
-    if not _ANTHROPIC_OK:
+    # Sélection du moteur
+    if anthropic_key and _ANTHROPIC_OK:
+        moteur = 'anthropic'
+    elif groq_key and _GROQ_OK:
+        moteur = 'groq'
+    else:
+        manquants = []
+        if not _ANTHROPIC_OK and not _GROQ_OK:
+            manquants.append('pip install -r requirements.txt')
+        else:
+            manquants.append('ANTHROPIC_API_KEY (console.anthropic.com) ou GROQ_API_KEY (console.groq.com — gratuit)')
         return {
             'solutions': [],
-            'erreur': (
-                'Module anthropic non installé. Lancez : '
-                'pip install -r requirements.txt'
-            ),
-        }
-
-    if not anthropic_key:
-        return {
-            'solutions': [],
-            'erreur': (
-                'Variable ANTHROPIC_API_KEY non configurée. '
-                'Ajoutez-la dans le fichier .env ou avant de lancer l\'application. '
-                'Voir .env.example pour le format attendu.'
-            ),
+            'erreur': 'Aucun moteur IA configuré. Ajoutez dans .env : ' + ' | '.join(manquants),
         }
 
     # Vérification cache
@@ -179,13 +220,13 @@ def ai_enrichissement(code, contexte):
 
     # Recherche web via Tavily
     requete = _REQUETES.get(code, 'OEE sawmill improvement solutions Africa')
-    resultats_web = _recherche_tavily(requete, tavily_key)
+    resultats_web  = _recherche_tavily(requete, tavily_key)
     sources_extras = _charge_sources_externes(tavily_key)
 
-    all_sources = resultats_web + sources_extras
+    all_sources   = resultats_web + sources_extras
     sources_texte = '\n\n'.join(all_sources)[:3500] or 'Aucune source externe disponible.'
 
-    # Construction du contexte
+    # Construction du prompt
     trs_str    = f"{contexte.get('trs_moyen')}%" if contexte.get('trs_moyen') is not None else 'non calculé'
     manque_val = contexte.get('manque', 0)
     manque_str = f"{int(manque_val):,} FCFA".replace(',', ' ') if manque_val else 'N/A'
@@ -210,26 +251,14 @@ def ai_enrichissement(code, contexte):
     )
 
     try:
-        client = _anthropic_mod.Anthropic(api_key=anthropic_key)
-        message = client.messages.create(
-            model='claude-sonnet-4-6',
-            max_tokens=1800,
-            system=_SYSTEME,
-            messages=[{'role': 'user', 'content': prompt}],
-        )
-        contenu = message.content[0].text.strip()
+        if moteur == 'anthropic':
+            contenu = _appel_anthropic(anthropic_key, prompt)
+            source_label = 'api_anthropic'
+        else:
+            contenu = _appel_groq(groq_key, prompt)
+            source_label = 'api_groq'
 
-        # Nettoyer les balises markdown si présentes
-        if '```' in contenu:
-            parts = contenu.split('```')
-            for p in parts:
-                cleaned = p.strip()
-                if cleaned.startswith('json'):
-                    cleaned = cleaned[4:].strip()
-                if cleaned.startswith('{'):
-                    contenu = cleaned
-                    break
-
+        contenu = _nettoyer_json(contenu)
         data = json.loads(contenu)
         solutions = []
         for s in data.get('solutions', []):
@@ -242,12 +271,12 @@ def ai_enrichissement(code, contexte):
                 })
 
         _ecrire_cache(code, solutions)
-        return {'solutions': solutions, 'source': 'api', 'erreur': None}
+        return {'solutions': solutions, 'source': source_label, 'erreur': None}
 
     except json.JSONDecodeError as exc:
         return {'solutions': [], 'erreur': f'Réponse IA non parseable : {exc}'}
     except Exception as exc:
-        return {'solutions': [], 'erreur': f'Erreur API Claude : {str(exc)[:200]}'}
+        return {'solutions': [], 'erreur': f'Erreur API {moteur} : {str(exc)[:200]}'}
 
 
 def _ecrire_cache(code, data):

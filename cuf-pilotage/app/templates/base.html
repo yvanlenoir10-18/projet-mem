@@ -162,14 +162,6 @@
         <div class="wp-topbar-name">Bonjour, {{ current_user.prenom }}</div>
         <div class="wp-topbar-title">{% block page_title %}Wood_Pilot_Ebolowa{% endblock %}</div>
       </div>
-      <div class="wp-search d-none d-lg-block">
-        <i class="bi bi-search wp-search-icon"></i>
-        <input type="text" placeholder="Rechercher…" aria-label="Rechercher">
-      </div>
-      <button class="wp-icon-btn" aria-label="Notifications">
-        <i class="bi bi-bell"></i>
-        <span class="wp-notif-dot"></span>
-      </button>
     </header>
 
     {% with messages = get_flashed_messages(with_categories=true) %}

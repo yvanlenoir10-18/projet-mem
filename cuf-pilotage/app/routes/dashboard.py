@@ -126,8 +126,29 @@ def _get_equipes_periode(jours=30):
 @login_required
 @roles_required('chef', 'admin')
 def vue_chef():
+    aujourd_hui = date.today()
     jours = int(request.args.get('jours', 30))
-    equipes = _get_equipes_periode(jours)
+
+    try:
+        mois_sel  = int(request.args.get('mois',  0))
+        annee_sel = int(request.args.get('annee', 0))
+    except (ValueError, TypeError):
+        mois_sel = annee_sel = 0
+
+    if mois_sel and annee_sel and 1 <= mois_sel <= 12 and annee_sel >= 2020:
+        debut_m = date(annee_sel, mois_sel, 1)
+        fin_m   = date(annee_sel, mois_sel + 1, 1) if mois_sel < 12 else date(annee_sel + 1, 1, 1)
+        equipes = Equipe.query.filter(
+            Equipe.date >= debut_m, Equipe.date < fin_m,
+            Equipe.statut.in_(_STATUTS_ANALYSES)
+        ).order_by(Equipe.date.desc()).all()
+        label_periode = f"{NOMS_MOIS[mois_sel]} {annee_sel}"
+        mode_mois = True
+        jours = (fin_m - debut_m).days
+    else:
+        equipes = _get_equipes_periode(jours)
+        label_periode = f"{jours} derniers jours"
+        mode_mois = False
 
     if not equipes:
         return render_template('chef/dashboard.html',
@@ -136,7 +157,9 @@ def vue_chef():
                                categories=Config.CATEGORIES_ARRET,
                                decomposition=None, scorecard=None,
                                regularite=None, gain_potentiel=None,
-                               alertes=_alertes_chef(date.today()))
+                               mode_mois=mode_mois, label_periode=label_periode,
+                               mois_options=_mois_disponibles(),
+                               alertes=_alertes_chef(aujourd_hui))
 
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen    = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
@@ -280,7 +303,6 @@ def vue_chef():
     }
 
     # Scorecard semaine courante (lun-sam) — F5
-    aujourd_hui = date.today()
     lundi    = aujourd_hui - timedelta(days=aujourd_hui.weekday())
     samedi   = lundi + timedelta(days=5)
     equipes_semaine = Equipe.query.filter(
@@ -375,6 +397,8 @@ def vue_chef():
                            chart_labels=chart_labels,
                            chart_trs=chart_trs,
                            mois_options=_mois_disponibles(),
+                           mode_mois=mode_mois,
+                           label_periode=label_periode,
                            matrice=matrice,
                            machines=Config.MACHINES,
                            categories=Config.CATEGORIES_ARRET,

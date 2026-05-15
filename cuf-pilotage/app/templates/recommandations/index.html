@@ -129,7 +129,8 @@
         <button
           id="btn-ai-{{ reco.code }}"
           class="btn btn-sm wp-btn-ia"
-          onclick="analyserIA('{{ reco.code }}', {{ contexte_json }})">
+          data-code="{{ reco.code }}"
+          data-contexte='{{ contexte_json }}'>
           <i class="bi bi-stars me-1"></i>Analyser avec l'IA
         </button>
         <span style="font-size:.72rem;color:var(--wp-muted);">
@@ -147,6 +148,16 @@
 
 {# ── Script AJAX ── #}
 <script>
+document.addEventListener('DOMContentLoaded', function () {
+  document.querySelectorAll('.wp-btn-ia').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      const code     = btn.dataset.code;
+      const contexte = JSON.parse(btn.dataset.contexte || '{}');
+      analyserIA(code, contexte);
+    });
+  });
+});
+
 function analyserIA(code, contexte) {
   const btn   = document.getElementById('btn-ai-' + code);
   const panel = document.getElementById('panel-ai-' + code);

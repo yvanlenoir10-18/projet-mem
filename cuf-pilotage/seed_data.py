@@ -1,5 +1,5 @@
 """
-Génération de données fictives — 30 jours × 2 équipes = 60 équipes.
+Génération de données fictives — tout le mois d'avril 2026 × 2 équipes/jour = 60 équipes.
 Permet d'accéder à toutes les fonctionnalités de l'app sans saisie manuelle.
 
 Usage :
@@ -21,8 +21,12 @@ from app.services.trs import calcule_trs
 
 app = create_app()
 
-# Configuration de la génération
-NB_JOURS = 30
+# Mois ciblé pour les données fictives : avril 2026
+ANNEE_CIBLE = 2026
+MOIS_CIBLE  = 4
+JOUR_DEBUT  = date(ANNEE_CIBLE, MOIS_CIBLE, 1)
+JOUR_FIN    = date(ANNEE_CIBLE, MOIS_CIBLE, 30)
+NB_JOURS    = (JOUR_FIN - JOUR_DEBUT).days + 1
 ESSENCES_PONDEREES = (
     ['Ayous'] * 40 +
     ['Iroko'] * 25 +
@@ -140,13 +144,13 @@ def inserer_donnees():
         Production.query.delete()
         Equipe.query.delete()
         db.session.commit()
-        print(f"Base nettoyée. Génération de {NB_JOURS} jours × 2 équipes…\n")
+        print(f"Base nettoyée. Génération avril {ANNEE_CIBLE} : {NB_JOURS} jours × 2 équipes…\n")
 
         random.seed(42)  # reproductibilité (changer pour des données différentes)
         compteur = 0
 
-        for jour_offset in range(NB_JOURS, 0, -1):
-            jour = date.today() - timedelta(days=jour_offset)
+        for jour_offset in range(NB_JOURS):
+            jour = JOUR_DEBUT + timedelta(days=jour_offset)
 
             for numero in ['Matin', 'Apres-midi']:
                 equipe = Equipe(

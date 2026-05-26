@@ -418,6 +418,22 @@ def _libelle_correction_cible(valeur):
     return dict(CORRECTION_CIBLES).get(valeur, 'Production par essence')
 
 
+def _activer_correction(equipe, motif, cible):
+    """Expose le dernier renvoi actif sans remplacer l'audit complet."""
+    equipe.correction_motif = motif
+    equipe.correction_cible = cible
+    equipe.correction_demandee_par = current_user.nom
+    equipe.correction_demandee_le = datetime.utcnow()
+
+
+def _vider_correction_active(equipe):
+    """La correction n'est plus active après resoumission au chef."""
+    equipe.correction_motif = None
+    equipe.correction_cible = None
+    equipe.correction_demandee_par = None
+    equipe.correction_demandee_le = None
+
+
 def _texte_obligatoire(valeur, libelle):
     texte = (valeur or '').strip()
     if not texte:
@@ -819,14 +835,17 @@ def soumettre_equipe(equipe_id):
             prix = float(Parametre.get(f'prix_{normalise_essence(prod.essence)}', 0))
             prod.prix_snapshot = prix if prix > 0 else None
 
+    action = 'resoumission' if ancien_statut == STATUT_A_CORRIGER else 'soumission_initiale'
+    motif_correction = equipe.correction_motif if action == 'resoumission' else None
     equipe.statut    = STATUT_A_VERIFIER
     equipe.soumis_le = datetime.utcnow()
-    if equipe.correction_motif:
+    if motif_correction:
         equipe.modifie_le = datetime.utcnow()
         equipe.modifie_par = current_user.nom
     _recalculer_trs(equipe)
+    if action == 'resoumission':
+        _vider_correction_active(equipe)
     apres = _snapshot_equipe(equipe)
-    action = 'resoumission' if ancien_statut == STATUT_A_CORRIGER else 'soumission_initiale'
     resume = (
         "Fiche corrigée et renvoyée au chef pour validation."
         if action == 'resoumission'
@@ -837,7 +856,7 @@ def soumettre_equipe(equipe_id):
         action=action,
         ancien_statut=ancien_statut,
         nouveau_statut=equipe.statut,
-        motif=equipe.correction_motif if action == 'resoumission' else None,
+        motif=motif_correction,
         resume=resume,
         avant=avant,
         apres=apres,
@@ -1119,10 +1138,7 @@ def demander_correction(equipe_id):
 
     cible = _correction_cible_valide(request.form.get('correction_cible'))
     equipe.statut = STATUT_A_CORRIGER
-    equipe.correction_motif = motif
-    equipe.correction_cible = cible
-    equipe.correction_demandee_par = current_user.nom
-    equipe.correction_demandee_le = datetime.utcnow()
+    _activer_correction(equipe, motif, cible)
     equipe.modifie_le = datetime.utcnow()
     equipe.modifie_par = current_user.nom
     libelle_cible = _libelle_correction_cible(cible)

@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fiche remplie — wood_pilot — {{ poste.date.strftime('%d/%m/%Y') }}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 10.5pt;
+      color: #000;
+      background: #fff;
+      padding: 18px;
+      max-width: 210mm;
+      margin: 0 auto;
+    }
+    .actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 0 auto 18px auto;
+    }
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 22px;
+      background: #1F5C3D;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 11pt;
+      font-weight: bold;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .btn-action:hover { background: #174d33; color: #fff; }
+
+    .entete {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2.5px solid #000;
+      padding-bottom: 10px;
+      margin-bottom: 12px;
+      gap: 16px;
+    }
+    .entete h1 {
+      font-size: 14pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+    .entete p {
+      font-size: 8.5pt;
+      color: #444;
+      margin-top: 3px;
+      line-height: 1.35;
+    }
+    .logo {
+      font-size: 16pt;
+      font-weight: 900;
+      border: 2px solid #000;
+      padding: 6px 10px;
+      white-space: nowrap;
+    }
+    .statut {
+      display: inline-block;
+      border: 1px solid #000;
+      padding: 2px 7px;
+      margin-top: 5px;
+      font-size: 8pt;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+
+    .identite {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 7px;
+      margin-bottom: 13px;
+    }
+    .champ {
+      border: 1px solid #000;
+      padding: 5px 7px;
+      min-height: 44px;
+    }
+    .champ label {
+      display: block;
+      font-size: 7.2pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      color: #555;
+      margin-bottom: 4px;
+    }
+    .champ .valeur {
+      font-size: 10pt;
+      font-weight: bold;
+      word-break: break-word;
+    }
+
+    .section { margin-bottom: 13px; page-break-inside: avoid; }
+    .section-titre {
+      background: #000;
+      color: #fff;
+      font-size: 8.5pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: .7px;
+      padding: 4px 8px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 8.8pt;
+    }
+    th {
+      background: #eee;
+      border: 1px solid #000;
+      padding: 4px 5px;
+      text-align: center;
+      font-size: 8pt;
+      font-weight: bold;
+    }
+    td {
+      border: 1px solid #999;
+      padding: 4px 5px;
+      vertical-align: top;
+      min-height: 24px;
+    }
+    .text-end { text-align: right; }
+    .text-center { text-align: center; }
+    .muted { color: #555; font-size: 8pt; }
+    .total-row td {
+      background: #ddd;
+      font-weight: bold;
+    }
+    .empty {
+      text-align: center;
+      color: #555;
+      padding: 18px;
+      border: 1px solid #999;
+    }
+
+    .notes {
+      border: 1px solid #000;
+      padding: 8px;
+      min-height: 56px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
+    .signature-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-top: 13px;
+    }
+    .signature {
+      border: 1px solid #000;
+      padding: 8px;
+      min-height: 96px;
+    }
+    .signature label {
+      font-size: 8pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 28px;
+    }
+    .ligne {
+      border-bottom: 1px solid #000;
+      min-height: 20px;
+      margin-top: 8px;
+    }
+    .pied {
+      margin-top: 10px;
+      font-size: 7.5pt;
+      color: #777;
+      text-align: center;
+      border-top: 1px solid #ccc;
+      padding-top: 6px;
+    }
+
+    @media print {
+      .actions { display: none !important; }
+      body { padding: 0; }
+      @page { size: A4 portrait; margin: 10mm; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="actions">
+    <button class="btn-action" onclick="window.print()">
+      Imprimer / enregistrer en PDF
+    </button>
+  </div>
+
+  <div class="entete">
+    <div>
+      <h1>Fiche de production remplie</h1>
+      <p>Scierie industrielle CUF — Chaîne 4 — Ebolowa, Cameroun</p>
+      <p>Document de terrain généré depuis wood_pilot, sans informations économiques.</p>
+      <span class="statut">
+        {% if poste.statut == 'a_verifier' %}Chez le chef
+        {% elif poste.statut == 'valide_chef' or poste.statut == 'soumis' %}Validée chef
+        {% elif poste.statut == 'a_corriger' %}À corriger
+        {% elif poste.statut == 'verrouille' %}Verrouillée
+        {% else %}Brouillon{% endif %}
+      </span>
+    </div>
+    <div class="logo">wood_pilot</div>
+  </div>
+
+  <div class="identite">
+    <div class="champ">
+      <label>Date</label>
+      <div class="valeur">{{ poste.date.strftime('%d/%m/%Y') }}</div>
+    </div>
+    <div class="champ">
+      <label>Poste / Shift</label>
+      <div class="valeur">{{ 'Après-midi' if poste.numero_equipe == 'Apres-midi' else poste.numero_equipe }}</div>
+    </div>
+    <div class="champ">
+      <label>Responsable terrain</label>
+      <div class="valeur">{{ poste.operateur_nom or poste.saisie_par.nom }}</div>
+    </div>
+    <div class="champ">
+      <label>Effectif présent</label>
+      <div class="valeur">{{ poste.effectif }}</div>
+    </div>
+  </div>
+
+  <div class="identite">
+    <div class="champ">
+      <label>Origine de la saisie</label>
+      <div class="valeur">
+        {% if poste.mode_saisie == 'papier' %}Ressaisie depuis papier{% else %}Saisie directe{% endif %}
+      </div>
+    </div>
+    <div class="champ">
+      <label>Fiche remplie par</label>
+      <div class="valeur">{{ poste.rempli_par_nom or poste.saisie_par.nom }}</div>
+    </div>
+    <div class="champ">
+      <label>Fiche papier signée</label>
+      <div class="valeur">{% if poste.fiche_papier_signee %}Oui{% else %}Non{% endif %}</div>
+    </div>
+    <div class="champ">
+      <label>Pièce jointe</label>
+      <div class="valeur">
+        {% if poste.fiche_papier_fichier %}
+        Jointe
+        {% else %}
+        Aucune
+        {% endif %}
+      </div>
+    </div>
+    <div class="champ">
+      <label>Référence fiche</label>
+      <div class="valeur">{{ poste.id }}</div>
+    </div>
+  </div>
+
+  {% if poste.statut == 'a_corriger' and poste.correction_motif %}
+  <div class="section">
+    <div class="section-titre">Message du chef</div>
+    <div class="notes">{{ poste.correction_motif }}</div>
+  </div>
+  {% endif %}
+
+  <div class="section">
+    <div class="section-titre">1. Production saisie</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Essence</th>
+          <th>Début</th>
+          <th>Fin</th>
+          <th class="text-end">Entrée (m³)</th>
+          <th class="text-end">Conforme (m³)</th>
+          <th class="text-end">Déclassé (m³)</th>
+          <th class="text-end">Déchets estimés (m³)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for prod in poste.productions %}
+        <tr>
+          <td><strong>{{ prod.essence }}</strong></td>
+          <td class="text-center">{{ prod.heure_debut or '—' }}</td>
+          <td class="text-center">{{ prod.heure_fin or '—' }}</td>
+          <td class="text-end">{{ prod.volume_entree }}</td>
+          <td class="text-end">{{ prod.volume_conforme }}</td>
+          <td class="text-end">{{ prod.volume_declass }}</td>
+          <td class="text-end">{{ prod.volume_dechets }}</td>
+        </tr>
+        {% endfor %}
+        <tr class="total-row">
+          <td>Total</td>
+          <td class="text-center">—</td>
+          <td class="text-center">—</td>
+          <td class="text-end">{{ poste.volume_entree }}</td>
+          <td class="text-end">{{ poste.volume_conforme }}</td>
+          <td class="text-end">{{ poste.volume_declass }}</td>
+          <td class="text-end">{{ poste.volume_dechets }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <div class="section-titre">2. Arrêts et incidents saisis</div>
+    {% if poste.arrets %}
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Machine</th>
+          <th>Début</th>
+          <th>Fin</th>
+          <th class="text-end">Durée</th>
+          <th class="text-end">Prévu</th>
+          <th>Catégorie</th>
+          <th>Cause / commentaire</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for arret in poste.arrets %}
+        <tr>
+          <td class="text-center">{{ loop.index }}</td>
+          <td><strong>{{ arret.machine }}</strong></td>
+          <td class="text-center">{{ arret.heure_debut }}</td>
+          <td class="text-center">{{ arret.heure_fin }}</td>
+          <td class="text-end">{{ arret.duree_min }} min</td>
+          <td class="text-end">{% if arret.duree_prevue_min is not none %}{{ arret.duree_prevue_min }} min{% else %}—{% endif %}</td>
+          <td>{{ arret.categorie }}</td>
+          <td>
+            {{ arret.cause }}
+            {% if arret.notes %}
+            <div class="muted">{{ arret.notes }}</div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty">
+      {% if poste.aucun_arret_confirme %}
+      Aucun arrêt confirmé par l'opérateur.
+      {% else %}
+      Aucun arrêt saisi.
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="section">
+    <div class="section-titre">3. Notes / observations</div>
+    <div class="notes">{% if poste.notes %}{{ poste.notes }}{% else %}Aucune observation saisie.{% endif %}</div>
+  </div>
+
+  <div class="signature-grid">
+    <div class="signature">
+      <label>Opérateur / chef d'équipe</label>
+      <div class="muted">Nom, prénom :</div>
+      <div class="ligne">{{ poste.operateur_nom or poste.saisie_par.nom }}</div>
+      <div class="muted" style="margin-top:10px;">Signature :</div>
+      <div class="ligne"></div>
+    </div>
+    <div class="signature">
+      <label>Fiche remplie par</label>
+      <div class="muted">Nom, prénom :</div>
+      <div class="ligne">{{ poste.rempli_par_nom or poste.saisie_par.nom }}</div>
+      <div class="muted" style="margin-top:10px;">Signature :</div>
+      <div class="ligne"></div>
+    </div>
+    <div class="signature">
+      <label>Chef production — visa</label>
+      <div class="muted">Nom, prénom :</div>
+      <div class="ligne"></div>
+      <div class="muted" style="margin-top:10px;">Signature :</div>
+      <div class="ligne"></div>
+    </div>
+  </div>
+
+  <div class="pied">
+    wood_pilot &nbsp;|&nbsp;
+    Fiche générée le {{ generation.strftime('%d/%m/%Y à %H:%M') }} &nbsp;|&nbsp;
+    À conserver avec la fiche terrain signée si la saisie a été faite après coup
+  </div>
+
+</body>
+</html>

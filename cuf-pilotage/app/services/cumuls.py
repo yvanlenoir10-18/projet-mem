@@ -1,5 +1,5 @@
 """
-Cumuls et deltas par horizon temporel — Wood_Pilot_Ebolowa.
+Cumuls et deltas par horizon temporel — wood_pilot.
 
 Produit la vue exécutive PDG : pour chaque horizon (jour, semaine, mois, année),
 calcule les indicateurs clés sur la période courante ET sur la période précédente
@@ -10,11 +10,11 @@ efficaces affichent toujours valeur courante + delta vs période précédente,
 jamais juste la valeur seule. Sans delta, le PDG ne peut pas piloter une trajectoire.
 """
 from datetime import date, timedelta
-from ..models import Equipe
+from ..models import Equipe, STATUTS_ANALYSES
 from .trs import manque_a_gagner_agrege
 
 
-_STATUTS_ANALYSES = ('soumis', 'verrouille')
+_STATUTS_ANALYSES = STATUTS_ANALYSES
 
 
 def _bornes_horizons(reference):

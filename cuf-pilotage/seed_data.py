@@ -90,6 +90,7 @@ def _genere_arrets():
             'fin':       f"{h_f:02d}:{m_f:02d}",
             'cause':     random.choice(CAUSES_PAR_CATEGORIE[categorie]),
             'categorie': categorie,
+            'duree_prevue_min': random.randint(20, 45) if categorie == 'Maintenance planifiée' else None,
         })
         heure_courante += duree
     return arrets
@@ -131,12 +132,25 @@ def _genere_productions():
     return productions
 
 
+def _fmt_heure(minutes):
+    h, m = divmod(minutes, 60)
+    return f"{h:02d}:{m:02d}"
+
+
+def _creneaux_production(numero_equipe, nb_productions):
+    debut = 6 * 60 if numero_equipe == 'Matin' else 14 * 60
+    duree = 480 // max(1, nb_productions)
+    return [
+        (_fmt_heure(debut + i * duree), _fmt_heure(debut + (i + 1) * duree))
+        for i in range(nb_productions)
+    ]
+
 def inserer_donnees():
     with app.app_context():
         # Récupérer un utilisateur (saisie obligatoire)
         user = User.query.filter_by(role='operateur').first() or User.query.first()
         if not user:
-            print("❌  Aucun utilisateur en base. Lancez l'app une fois pour seed les users.")
+            print("ERREUR - Aucun utilisateur en base. Lancez l'app une fois pour seed les users.")
             return
 
         # Effacer les données existantes
@@ -157,6 +171,7 @@ def inserer_donnees():
                     date=jour,
                     numero_equipe=numero,
                     effectif=random.choice([8, 9, 10, 10, 10]),
+                    operateur_nom=random.choice(['Ateba Martin', 'Mvondo Paul', 'Nsame Jules', 'Bikoro Alain']),
                     statut='verrouille',
                     notes='',
                     cree_le=datetime.combine(jour, datetime.min.time()),
@@ -167,10 +182,15 @@ def inserer_donnees():
                 db.session.flush()
 
                 # Productions
-                for p in _genere_productions():
+                productions = _genere_productions()
+                creneaux = _creneaux_production(numero, len(productions))
+                for idx, p in enumerate(productions):
+                    h_debut, h_fin = creneaux[idx]
                     db.session.add(Production(
                         equipe_id=equipe.id,
                         essence=p['essence'],
+                        heure_debut=h_debut,
+                        heure_fin=h_fin,
                         volume_entree=p['volume_entree'],
                         volume_conforme=p['volume_conforme'],
                         volume_declass=p['volume_declass'],
@@ -186,6 +206,7 @@ def inserer_donnees():
                         heure_fin=a['fin'],
                         cause=a['cause'],
                         categorie=a['categorie'],
+                        duree_prevue_min=a['duree_prevue_min'],
                     )
                     arret.calcule_duree()
                     db.session.add(arret)
@@ -196,12 +217,12 @@ def inserer_donnees():
 
                 if compteur % 10 == 0 or compteur == NB_JOURS * 2:
                     print(f"  {compteur:02d}/{NB_JOURS * 2} | {jour} {numero:11s} | "
-                          f"vol_sorti={equipe.volume_sorti:5.1f} m³ | "
+                          f"vol_sorti={equipe.volume_sorti:5.1f} m3 | "
                           f"TRS={equipe.trs_global:5.1f}%")
 
         db.session.commit()
-        print(f"\n✅  {compteur} équipes insérées sur {NB_JOURS} jours.")
-        print("✅  Connecte-toi : chef/password ou pdg/password — toutes les fonctionnalités sont accessibles.")
+        print(f"\nOK - {compteur} equipes inserees sur {NB_JOURS} jours.")
+        print("OK - Connecte-toi : chef/password ou pdg/password - toutes les fonctionnalites sont accessibles.")
 
 
 if __name__ == '__main__':

@@ -10,14 +10,17 @@ from flask import Blueprint, render_template, request, send_file, abort
 from flask_login import login_required, current_user
 from datetime import date, timedelta
 import io
-from ..models import db, Equipe, Parametre
+from ..models import (
+    db, Equipe, Parametre, STATUT_A_CORRIGER, STATUT_A_VERIFIER,
+    STATUT_BROUILLON, STATUTS_ANALYSES, STATUTS_NON_ANALYSES,
+)
 from ..services.trs import (
     pareto_arrets, couleur_trs,
     calcule_pertes_equipe, calcule_pertes_fcfa, decompose_dpq,
-    calcule_manque_gagner, manque_a_gagner_agrege,
+    calcule_manque_gagner, manque_a_gagner_agrege, calcule_trs_par_essence,
 )
 from ..services.export import generer_rapport_excel
-from ..services.controles_saisie import compte_anomalies_periode
+from ..services.controles_saisie import compte_anomalies_periode, detecte_anomalies
 from ..services.cumuls import vue_executive_pdg
 from ..services.recommandations import top_n_recommandations
 from ..utils import roles_required
@@ -40,6 +43,21 @@ def _format_duree(minutes):
     return f"{h}h{m:02d}"
 
 
+def _commentaires_validation(equipe):
+    commentaires = []
+    if equipe.notes and equipe.notes.strip():
+        commentaires.append(equipe.notes.strip())
+    for arret in equipe.arrets:
+        if arret.notes and arret.notes.strip():
+            commentaires.append(
+                f"{arret.machine} {arret.heure_debut}-{arret.heure_fin} : {arret.notes.strip()}"
+            )
+    return {
+        'nb': len(commentaires),
+        'extrait': commentaires[0][:120] if commentaires else '',
+    }
+
+
 def _mois_disponibles(n=12):
     aujourd_hui = date.today()
     result = []
@@ -54,7 +72,7 @@ def _mois_disponibles(n=12):
     return result
 
 
-_STATUTS_ANALYSES = ('soumis', 'verrouille')
+_STATUTS_ANALYSES = STATUTS_ANALYSES
 
 _LABELS_JOURS_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 
@@ -94,7 +112,7 @@ def _alertes_chef(aujourd_hui):
     seuil_brouillon = aujourd_hui - timedelta(days=2)
     brouillons_oublies_q = Equipe.query.filter(
         Equipe.user_id == current_user.id,
-        Equipe.statut == 'brouillon',
+        Equipe.statut == STATUT_BROUILLON,
         Equipe.date <= seuil_brouillon,
     ).order_by(Equipe.date.asc()).all()
 
@@ -108,9 +126,30 @@ def _alertes_chef(aujourd_hui):
         for e in brouillons_oublies_q
     ]
 
+    fiches_a_verifier = []
+    for e in Equipe.query.filter(
+        Equipe.statut == STATUT_A_VERIFIER
+    ).order_by(Equipe.date.desc(), Equipe.cree_le.desc()).limit(20).all():
+        anomalies = detecte_anomalies(e)
+        commentaires = _commentaires_validation(e)
+        fiches_a_verifier.append({
+            'id':       e.id,
+            'date_fmt': f"{_LABELS_JOURS_FR[e.date.weekday()]} {e.date.strftime('%d/%m')}",
+            'shift':    e.numero_equipe,
+            'operateur': e.operateur_nom or e.saisie_par.nom,
+            'nb_commentaires': commentaires['nb'],
+            'commentaire_extrait': commentaires['extrait'],
+            'nb_anomalies': len(anomalies),
+            'codes_anomalies': ', '.join(a.get('code', '?') for a in anomalies[:3]),
+            'priorite': len(anomalies) * 2 + commentaires['nb'],
+        })
+    fiches_a_verifier.sort(key=lambda f: f['priorite'], reverse=True)
+    fiches_a_verifier = fiches_a_verifier[:8]
+
     return {
         'saisies_manquantes': saisies_manquantes,
         'brouillons_oublies': brouillons_oublies,
+        'fiches_a_verifier': fiches_a_verifier,
     }
 
 
@@ -167,25 +206,7 @@ def vue_chef():
     total_declass = round(sum(e.volume_declass for e in equipes), 2)
     total_arrets  = sum(e.duree_totale_arrets for e in equipes)
 
-    # TRS par essence (agrège sur les lignes de production)
-    par_essence = {}
-    for e in equipes:
-        for p in e.productions:
-            if p.essence not in par_essence:
-                par_essence[p.essence] = {'volumes': [], 'trs': []}
-            par_essence[p.essence]['volumes'].append(p.volume_conforme + p.volume_declass)
-        if e.trs_global:
-            for p in e.productions:
-                par_essence[p.essence]['trs'].append(e.trs_global)
-
-    essence_stats = []
-    for essence, data in par_essence.items():
-        trs_e = data['trs']
-        essence_stats.append({
-            'essence': essence,
-            'volume_total': round(sum(data['volumes']), 2),
-            'trs_moyen': round(sum(trs_e) / len(trs_e), 1) if trs_e else 0,
-        })
+    essence_stats = calcule_trs_par_essence(equipes)
 
     matin      = [e for e in equipes if e.numero_equipe == 'Matin']
     apres_midi = [e for e in equipes if e.numero_equipe == 'Apres-midi']
@@ -321,8 +342,12 @@ def vue_chef():
             eq = index_eq.get((jour, shift))
             if eq is None:
                 cellules[shift] = {'state': 'absent', 'display': '—', 'couleur': 'secondary'}
-            elif eq.statut == 'brouillon':
+            elif eq.statut == STATUT_BROUILLON:
                 cellules[shift] = {'state': 'brouillon', 'display': '⏳', 'couleur': 'warning'}
+            elif eq.statut == STATUT_A_VERIFIER:
+                cellules[shift] = {'state': 'a_verifier', 'display': 'À vérif.', 'couleur': 'info'}
+            elif eq.statut == STATUT_A_CORRIGER:
+                cellules[shift] = {'state': 'a_corriger', 'display': 'Corr.', 'couleur': 'warning'}
             else:
                 trs = eq.trs_global or 0
                 if trs >= 70:
@@ -455,7 +480,7 @@ def vue_pdg():
 
     nb_brouillons = Equipe.query.filter(
         Equipe.date >= debut, Equipe.date < fin,
-        Equipe.statut == 'brouillon'
+        Equipe.statut.in_(STATUTS_NON_ANALYSES)
     ).count()
 
     prix_manquants = any(
@@ -596,7 +621,8 @@ def pertes():
     par_shift     = {'Matin': {'perte_p': 0.0, 'nb': 0}, 'Apres-midi': {'perte_p': 0.0, 'nb': 0}}
 
     capacite_h   = float(Parametre.get('capacite_equipe_h', 1.5625))
-    taux_revente = float(Parametre.get('taux_revente_rebut', 0.30))
+    taux_revente = float(Parametre.get('taux_revente_rebut', 0.70))
+    valeur_dechets_m3 = float(Parametre.get('valeur_dechets_m3', 0))
 
     for e in equipes:
         pertes_e = calcule_pertes_equipe(e)
@@ -620,28 +646,31 @@ def pertes():
             prix_moyen = 0.0
 
         for a in e.arrets:
-            if not a.duree_min or a.categorie == 'Maintenance planifiée':
+            duree_impact = a.duree_impact_min
+            if not duree_impact:
                 continue
-            perte_arret = (a.duree_min / 60) * capacite_h * prix_moyen
+            perte_arret = (duree_impact / 60) * capacite_h * prix_moyen
             m = a.machine
             if m not in par_machine:
                 par_machine[m] = {'perte': 0.0, 'duree': 0, 'count': 0, 'arrets': []}
             par_machine[m]['perte'] += perte_arret
-            par_machine[m]['duree'] += a.duree_min
+            par_machine[m]['duree'] += duree_impact
             par_machine[m]['count'] += 1
             par_machine[m]['arrets'].append({
                 'date':        e.date.strftime('%d/%m/%Y'),
                 'equipe':      e.numero_equipe,
                 'cause':       a.cause,
                 'categorie':   a.categorie,
-                'duree':       a.duree_min,
+                'duree':       duree_impact,
+                'duree_reelle': a.duree_min,
+                'duree_prevue': a.duree_prevue_min,
                 'perte':       int(perte_arret),
             })
 
         # Perte Q par essence (déclassé + déchets séparés)
         for pr in e.productions:
             pq_d  = pr.volume_declass  * _prix_production(pr) * (1 - taux_revente)
-            pq_ch = pr.volume_dechets  * _prix_production(pr)
+            pq_ch = pr.volume_dechets  * max(0, _prix_production(pr) - valeur_dechets_m3)
             ess   = pr.essence
             if ess not in par_essence_q:
                 par_essence_q[ess] = {
@@ -710,7 +739,7 @@ def export_excel():
 
     nb_brouillons = Equipe.query.filter(
         Equipe.date >= debut, Equipe.date < fin,
-        Equipe.statut == 'brouillon'
+        Equipe.statut.in_(STATUTS_NON_ANALYSES)
     ).count()
 
     contenu = generer_rapport_excel(equipes, mois, annee, nb_brouillons)

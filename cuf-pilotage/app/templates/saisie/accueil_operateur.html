@@ -1,0 +1,195 @@
+{% extends 'base.html' %}
+{% block title %}Accueil opérateur{% endblock %}
+{% block page_title %}Accueil opérateur{% endblock %}
+
+{% block content %}
+
+{% set nouvelle_url = url_for('saisie.nouveau_poste', date=date_jour.isoformat(), shift=shift_suggere) %}
+{% set feuille_url = url_for('saisie.feuille_releve', date=date_jour.isoformat(), shift=shift_suggere) %}
+
+<div class="wp-operator-shell">
+  <div class="wp-operator-head">
+    <div>
+      <div class="wp-operator-kicker">{{ date_jour.strftime('%d/%m/%Y') }} · {{ current_user.nom }}</div>
+      <h1>Poste de saisie</h1>
+    </div>
+    <a href="{{ nouvelle_url }}" class="btn btn-primary btn-touch d-flex align-items-center gap-2">
+      <i class="bi bi-plus-circle"></i>
+      Nouvelle fiche
+    </a>
+  </div>
+
+  {% if a_corriger %}
+    {% set priorite = a_corriger[0] %}
+    {% set priorite_url = url_for('saisie.modifier_equipe', equipe_id=priorite.id) ~ ('#' ~ priorite.correction_cible if priorite.correction_cible else '') %}
+    {% set priorite_titre = 'Corriger une fiche' %}
+    {% set priorite_texte = priorite.date.strftime('%d/%m') ~ ' · ' ~ priorite.numero_equipe %}
+    {% set priorite_badge = a_corriger | length ~ ' à corriger' %}
+    {% set priorite_icon = 'bi-arrow-counterclockwise' %}
+    {% set priorite_tone = 'warning' %}
+  {% elif brouillons %}
+    {% set priorite = brouillons[0] %}
+    {% set priorite_url = url_for('saisie.modifier_equipe', equipe_id=priorite.id) %}
+    {% set priorite_titre = 'Continuer le brouillon' %}
+    {% set priorite_texte = priorite.date.strftime('%d/%m') ~ ' · ' ~ priorite.numero_equipe %}
+    {% set priorite_badge = brouillons | length ~ ' brouillon' ~ ('s' if brouillons | length > 1 else '') %}
+    {% set priorite_icon = 'bi-pencil-square' %}
+    {% set priorite_tone = 'neutral' %}
+  {% else %}
+    {% set priorite_url = nouvelle_url %}
+    {% set priorite_titre = 'Créer la fiche du poste' %}
+    {% set priorite_texte = 'Poste suggéré : ' ~ ('Après-midi' if shift_suggere == 'Apres-midi' else shift_suggere) %}
+    {% set priorite_badge = 'Action du moment' %}
+    {% set priorite_icon = 'bi-plus-circle' %}
+    {% set priorite_tone = 'success' %}
+  {% endif %}
+
+  <a href="{{ priorite_url }}" class="wp-operator-priority wp-operator-priority-{{ priorite_tone }}">
+    <span class="wp-operator-priority-icon">
+      <i class="bi {{ priorite_icon }}"></i>
+    </span>
+    <span class="wp-operator-priority-body">
+      <span class="wp-operator-status">{{ priorite_badge }}</span>
+      <strong>{{ priorite_titre }}</strong>
+      <small>{{ priorite_texte }}</small>
+      {% if a_corriger and priorite.correction_motif %}
+      <em>Message chef : {{ priorite.correction_motif | truncate(110) }}</em>
+      {% endif %}
+    </span>
+    <span class="wp-operator-go">
+      <i class="bi bi-arrow-right"></i>
+    </span>
+  </a>
+
+  <div class="wp-operator-grid">
+    <a href="{{ nouvelle_url }}" class="wp-operator-tile">
+      <span class="wp-operator-tile-icon wp-operator-tile-success">
+        <i class="bi bi-plus-circle"></i>
+      </span>
+      <span>
+        <strong>Nouvelle fiche</strong>
+        <small>{{ 'Après-midi' if shift_suggere == 'Apres-midi' else shift_suggere }}</small>
+      </span>
+    </a>
+
+    {% if a_corriger %}
+    <a href="{{ url_for('saisie.modifier_equipe', equipe_id=a_corriger[0].id) }}{% if a_corriger[0].correction_cible %}#{{ a_corriger[0].correction_cible }}{% endif %}" class="wp-operator-tile">
+    {% else %}
+    <a href="{{ url_for('saisie.historique') }}" class="wp-operator-tile">
+    {% endif %}
+      <span class="wp-operator-tile-icon wp-operator-tile-warning">
+        <i class="bi bi-arrow-counterclockwise"></i>
+      </span>
+      <span>
+        <strong>À corriger</strong>
+        <small>{{ a_corriger | length }} fiche{{ 's' if a_corriger | length > 1 }}</small>
+      </span>
+    </a>
+
+    {% if brouillons %}
+    <a href="{{ url_for('saisie.modifier_equipe', equipe_id=brouillons[0].id) }}" class="wp-operator-tile">
+    {% else %}
+    <a href="{{ nouvelle_url }}" class="wp-operator-tile">
+    {% endif %}
+      <span class="wp-operator-tile-icon wp-operator-tile-neutral">
+        <i class="bi bi-pencil-square"></i>
+      </span>
+      <span>
+        <strong>Brouillons</strong>
+        <small>{{ brouillons | length }} en cours</small>
+      </span>
+    </a>
+
+    {% if a_verifier %}
+    <a href="{{ url_for('saisie.detail_poste', poste_id=a_verifier[0].id) }}" class="wp-operator-tile">
+    {% else %}
+    <a href="{{ url_for('saisie.historique') }}" class="wp-operator-tile">
+    {% endif %}
+      <span class="wp-operator-tile-icon wp-operator-tile-info">
+        <i class="bi bi-hourglass-split"></i>
+      </span>
+      <span>
+        <strong>Chez le chef</strong>
+        <small>{{ a_verifier | length }} envoyée{{ 's' if a_verifier | length > 1 }}</small>
+      </span>
+    </a>
+
+    <a href="{{ feuille_url }}" target="_blank" class="wp-operator-tile">
+      <span class="wp-operator-tile-icon wp-operator-tile-info">
+        <i class="bi bi-printer"></i>
+      </span>
+      <span>
+        <strong>Fiche papier</strong>
+        <small>Imprimer / PDF</small>
+      </span>
+    </a>
+
+    <a href="{{ url_for('saisie.historique') }}" class="wp-operator-tile">
+      <span class="wp-operator-tile-icon wp-operator-tile-neutral">
+        <i class="bi bi-clock-history"></i>
+      </span>
+      <span>
+        <strong>Mes fiches</strong>
+        <small>Voir l'historique</small>
+      </span>
+    </a>
+  </div>
+
+  <div class="wp-card wp-operator-panel">
+    <div class="wp-operator-panel-head">
+      <span><i class="bi bi-list-check"></i> Dernières fiches</span>
+      <a href="{{ url_for('saisie.historique') }}">Tout voir</a>
+    </div>
+
+    {% if fiches_recentes %}
+    <div class="wp-operator-list">
+      {% for fiche in fiches_recentes %}
+        {% if fiche.statut in ('brouillon', 'a_corriger') and fiche.user_id == current_user.id %}
+          {% set fiche_url = url_for('saisie.modifier_equipe', equipe_id=fiche.id) ~ ('#' ~ fiche.correction_cible if fiche.statut == 'a_corriger' and fiche.correction_cible else '') %}
+        {% else %}
+          {% set fiche_url = url_for('saisie.detail_poste', poste_id=fiche.id) %}
+        {% endif %}
+
+        <a href="{{ fiche_url }}" class="wp-operator-row">
+          <span class="wp-operator-row-main">
+            <strong>{{ fiche.date.strftime('%d/%m/%Y') }} · {{ fiche.numero_equipe }}</strong>
+            <small>
+              {% if fiche.productions %}
+                {{ fiche.productions[:3] | map(attribute='essence') | join(', ') }}
+              {% else %}
+                Production à compléter
+              {% endif %}
+            </small>
+            {% if fiche.statut == 'a_corriger' and fiche.correction_motif %}
+            <em>Message chef : {{ fiche.correction_motif | truncate(95) }}</em>
+            {% endif %}
+          </span>
+          <span class="wp-operator-row-side">
+            {% if fiche.statut == 'brouillon' %}
+            <span class="wp-pill wp-pill-warning">Brouillon</span>
+            {% elif fiche.statut == 'a_corriger' %}
+            <span class="wp-pill wp-pill-warning">À corriger</span>
+            {% elif fiche.statut == 'a_verifier' %}
+            <span class="wp-pill wp-pill-info">Chez le chef</span>
+            {% elif fiche.statut == 'valide_chef' or fiche.statut == 'soumis' %}
+            <span class="wp-pill wp-pill-success">Validée</span>
+            {% elif fiche.statut == 'verrouille' %}
+            <span class="wp-pill wp-pill-neutral">Verrouillée</span>
+            {% else %}
+            <span class="wp-pill wp-pill-neutral">{{ fiche.statut }}</span>
+            {% endif %}
+            <i class="bi bi-chevron-right"></i>
+          </span>
+        </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <a href="{{ nouvelle_url }}" class="wp-operator-empty">
+      <i class="bi bi-inbox"></i>
+      <span>Aucune fiche enregistrée. Créer la première fiche.</span>
+    </a>
+    {% endif %}
+  </div>
+</div>
+
+{% endblock %}

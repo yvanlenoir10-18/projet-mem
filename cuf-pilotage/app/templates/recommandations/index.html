@@ -168,7 +168,10 @@ function analyserIA(code, contexte) {
 
   fetch('/recommandations/ai/' + code + force, {
     method: 'POST',
-    headers: {'Content-Type': 'application/json'},
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': document.querySelector('meta[name="csrf-token"]')?.content || ''
+    },
     body: JSON.stringify(contexte)
   })
   .then(r => r.json())

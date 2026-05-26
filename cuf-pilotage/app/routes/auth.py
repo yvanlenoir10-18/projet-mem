@@ -49,4 +49,4 @@ def _redirect_par_role(role):
     if role == 'admin':
         return redirect(url_for('dashboard.vue_chef'))
     # operateur
-    return redirect(url_for('saisie.historique'))
+    return redirect(url_for('saisie.accueil_operateur'))

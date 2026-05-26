@@ -1,5 +1,5 @@
 """
-Utilitaires transversaux — Wood_Pilot_Ebolowa.
+Utilitaires transversaux — wood_pilot.
 
 Décorateur RBAC : roles_required(*roles)
   Usage : @roles_required('chef', 'admin')
@@ -14,7 +14,7 @@ ROLES_VALIDES = ('operateur', 'chef', 'pdg', 'admin')
 
 # Accueil par défaut selon le rôle
 _ACCUEIL_ROLE = {
-    'operateur': 'saisie.historique',
+    'operateur': 'saisie.accueil_operateur',
     'chef':      'dashboard.vue_chef',
     'pdg':       'dashboard.vue_pdg',
     'admin':     'dashboard.vue_chef',

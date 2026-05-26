@@ -12,7 +12,7 @@ from openpyxl.utils import get_column_letter
 from app.models import Parametre
 from app.services.trs import (
     pareto_arrets, calcule_pertes_equipe, _prix_production,
-    manque_a_gagner_agrege,
+    manque_a_gagner_agrege, calcule_manque_gagner,
 )
 
 VERT_FONCE  = "1B5E20"
@@ -72,8 +72,9 @@ def _ligne_total(ws, row, vals_par_col, label='TOTAL', col_label=1):
 
 def _prix_manquants(equipes):
     for e in equipes:
-        if e.volume_sorti > 0 and calcule_pertes_equipe(e)['total'] == 0:
-            return True
+        for p in e.productions:
+            if (p.volume_conforme + p.volume_declass) > 0 and _prix_production(p) == 0:
+                return True
     return False
 
 
@@ -119,7 +120,7 @@ def _feuille_resume(wb, equipes, mois, annee, nb_brouillons=0):
     duree_totale_arrets = sum(e.duree_totale_arrets for e in equipes)
 
     pertes_list = [calcule_pertes_equipe(e) for e in equipes]
-    total_pertes = sum(p['total'] for p in pertes_list)
+    total_attribution = sum(p['total_attribution'] for p in pertes_list)
     total_d = sum(p['perte_d'] for p in pertes_list)
     total_p = sum(p['perte_p'] for p in pertes_list)
     total_q = sum(p['perte_q'] for p in pertes_list)
@@ -139,7 +140,7 @@ def _feuille_resume(wb, equipes, mois, annee, nb_brouillons=0):
     row += 1
 
     kpis = [
-        ("Équipes analysées (soumis + verrouillés)", len(equipes), None),
+        ("Équipes analysées (validées chef + verrouillées)", len(equipes), None),
         ("TRS moyen", f"{trs_moyen}%", _bg_trs(trs_moyen)),
         ("Benchmark international (cible TRS)", "≥ 60%", None),
         ("Production réelle", f"{production_reelle} m³", None),
@@ -150,7 +151,7 @@ def _feuille_resume(wb, equipes, mois, annee, nb_brouillons=0):
         ("Date de génération", date.today().strftime("%d/%m/%Y"), None),
     ]
     if nb_brouillons > 0:
-        kpis.insert(1, (f"Brouillons non soumis ({nb_brouillons})",
+        kpis.insert(1, (f"Fiches non validées ({nb_brouillons})",
                         "Non inclus dans ce rapport", ORANGE_PALE))
 
     for label, valeur, force_bg in kpis:
@@ -212,7 +213,7 @@ def _feuille_resume(wb, equipes, mois, annee, nb_brouillons=0):
     ]:
         _style_cellule(ws.cell(row=row, column=1, value=label), couleur_bg=bg, align='left')
         _style_cellule(ws.cell(row=row, column=2, value=int(val)), couleur_bg=bg)
-        _style_cellule(ws.cell(row=row, column=3, value=pct(val, total_pertes)), couleur_bg=bg)
+        _style_cellule(ws.cell(row=row, column=3, value=pct(val, total_attribution)), couleur_bg=bg)
         ws.row_dimensions[row].height = 20
         row += 1
 
@@ -278,7 +279,7 @@ def _feuille_production(wb, equipes):
         'Rendement %', 'Arrêts (min)',
         'TRS (%)', 'Dispo (%)', 'Perf (%)', 'Qualité (%)',
         'Perte D (FCFA)', 'Perte P (FCFA)', 'Perte Q décl', 'Perte Q déch',
-        'Perte Q tot', 'Perte totale (FCFA)',
+        'Perte Q tot', 'Attribution D/P/Q (FCFA)',
         'Soumis le', 'Modifié par', 'Notes',
     ]
     largeurs = [14, 12, 14, 20, 10, 12, 12, 11, 11, 12, 12,
@@ -290,7 +291,14 @@ def _feuille_production(wb, equipes):
     ws.row_dimensions[1].height = 30
     ws.auto_filter.ref = f"A1:{get_column_letter(len(entetes))}1"
 
-    BG_STATUT = {'verrouille': VERT_CLAIR, 'soumis': JAUNE_PALE, 'brouillon': ORANGE_PALE}
+    BG_STATUT = {
+        'verrouille': VERT_CLAIR,
+        'valide_chef': VERT_CLAIR,
+        'soumis': JAUNE_PALE,
+        'a_verifier': BLEU_PALE,
+        'a_corriger': ORANGE_PALE,
+        'brouillon': ORANGE_PALE,
+    }
 
     for i, e in enumerate(equipes, start=2):
         pertes = calcule_pertes_equipe(e)
@@ -348,7 +356,7 @@ def _feuille_trs(wb, equipes):
     # Tableau A — synthèse créneaux
     entetes_a = ['Créneau', 'Nb postes', 'TRS moy (%)', 'Dispo moy (%)',
                  'Perf moy (%)', 'Qualité moy (%)', 'Prod totale (m³)',
-                 'Arrêts tot (min)', 'Pertes tot (FCFA)']
+                 'Arrêts tot (min)', 'Manque à gagner (FCFA)']
     largeurs_a = [18, 12, 14, 14, 14, 14, 16, 16, 18]
 
     ws.merge_cells('A1:I1')
@@ -379,7 +387,7 @@ def _feuille_trs(wb, equipes):
         qual_v  = [e.trs_qualite       for e in groupe if e.trs_qualite is not None]
         prod_t  = round(sum(e.volume_sorti for e in groupe), 1)
         arr_t   = sum(e.duree_totale_arrets for e in groupe)
-        per_t   = int(sum(calcule_pertes_equipe(e)['total'] for e in groupe))
+        per_t   = int(sum(calcule_manque_gagner(e)['manque_a_gagner_estime'] for e in groupe))
         trs_m   = moy(trs_v)
         vals = [creneau, len(groupe), trs_m, moy(dispo_v),
                 moy(perf_v), moy(qual_v), prod_t, arr_t, per_t]
@@ -398,7 +406,7 @@ def _feuille_trs(wb, equipes):
     ws.row_dimensions[row_b_title].height = 22
 
     entetes_b = ['Date', 'Équipe', 'TRS (%)', 'Dispo (%)', 'Perf (%)',
-                 'Qualité (%)', 'Prod (m³)', 'Arrêts (min)', 'Pertes (FCFA)']
+                 'Qualité (%)', 'Prod (m³)', 'Arrêts (min)', 'Manque à gagner (FCFA)']
     row_b_hdr = row_b_title + 1
     for j, h in enumerate(entetes_b, start=1):
         _style_entete(ws.cell(row=row_b_hdr, column=j, value=h))
@@ -409,7 +417,7 @@ def _feuille_trs(wb, equipes):
 
     for i, e in enumerate(sorted(equipes, key=lambda x: x.date)):
         row = row_b_hdr + 1 + i
-        per_tot = int(calcule_pertes_equipe(e)['total'])
+        per_tot = int(calcule_manque_gagner(e)['manque_a_gagner_estime'])
         vals = [
             e.date.strftime('%d/%m/%Y') if e.date else '',
             e.numero_equipe, e.trs_global, e.trs_disponibilite,
@@ -452,7 +460,7 @@ def _feuille_essence(wb, equipes):
         'Movingui': BLEU_PALE,
     }
 
-    taux_revente = float(Parametre.get('taux_revente_rebut', 0.30))
+    taux_revente = float(Parametre.get('taux_revente_rebut', 0.70))
     data = defaultdict(lambda: {
         'vol_entree': 0.0, 'vol_sorti': 0.0,
         'vol_declass': 0.0, 'vol_dechets': 0.0,

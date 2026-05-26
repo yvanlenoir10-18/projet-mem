@@ -7,14 +7,14 @@ Routes du moteur de recommandations — P14.
 from flask import Blueprint, render_template, jsonify, request, abort
 from flask_login import login_required, current_user
 from datetime import date, timedelta
-from ..models import Equipe
+from ..models import Equipe, STATUTS_ANALYSES
 from ..services.recommandations import analyse_recommandations, top_n_recommandations, _REGLES
 from ..services.reco_ai import ai_enrichissement, cache_invalidate
 from ..utils import roles_required
 
 recos_bp = Blueprint('recommandations', __name__, url_prefix='/recommandations')
 
-_STATUTS = ('soumis', 'verrouille')
+_STATUTS = STATUTS_ANALYSES
 
 
 def _equipes_periode(jours=30):

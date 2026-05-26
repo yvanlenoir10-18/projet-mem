@@ -4,21 +4,219 @@ Service de calcul du TRS et des pertes financières — Scierie CUF, Chaîne 4.
 TRS = Disponibilité × Performance × Qualité
 Référence : Jonsson & Lesshammar (1999), fondateurs de l'OEE/TRS.
 
-Pertes FCFA décomposées en 3 composantes :
-  Perte D = arrêts non planifiés × capacité_h × prix_moyen_pondéré
-  Perte P = (capacité_temps_utile − volume_sorti) × prix_moyen_pondéré
-  Perte Q = Σ(volume_declass × prix × (1−taux_revente)) + Σ(volume_dechets × prix)
+Attribution D/P/Q indicative :
+  Cause D = arrêts impactants × capacité_h × prix_moyen_pondéré
+  Cause P = (capacité_temps_utile − volume_sorti) × prix_moyen_pondéré
+  Cause Q = pertes de valeur sur déclassé + déchets sans valeur en V1
 
 Volumes :
   volume_sorti   = conforme + declass (base Performance et Qualité TRS)
   volume_conforme = planches satisfaisant les contrats (base Qualité TRS)
-  volume_declass  = planches déclassées vendues localement à prix réduit
-  volume_dechets  = sciure/dosses/chutes — perte sèche 100%
+  volume_declass  = planches déclassées vendues localement à 70% par défaut
+  volume_dechets  = sciure/dosses/chutes — valeur résiduelle 0 FCFA en V1
 """
+from collections import defaultdict
+
 from ..models import Parametre, normalise_essence
 
 
 # ── TRS ──────────────────────────────────────────────────────────────────────
+
+def _minutes(hhmm):
+    try:
+        h, m = map(int, hhmm.split(':'))
+        return h * 60 + m
+    except (AttributeError, ValueError):
+        return None
+
+
+def _param_float(cle, defaut=0.0):
+    try:
+        return float(Parametre.get(cle, defaut))
+    except (TypeError, ValueError):
+        return float(defaut)
+
+
+def _capacite_h_essence(essence):
+    """Capacité théorique m³/h d'une essence, avec fallback global."""
+    capacite_defaut = _param_float('capacite_equipe_h', 1.5625)
+    cle = f'capacite_{normalise_essence(essence)}_h'
+    return _param_float(cle, capacite_defaut)
+
+
+def _duree_minutes(debut, fin):
+    d = _minutes(debut)
+    f = _minutes(fin)
+    if d is None or f is None:
+        return 0
+    return max(0, f - d)
+
+
+def _chevauchement_minutes(debut_a, fin_a, debut_b, fin_b):
+    da = _minutes(debut_a)
+    fa = _minutes(fin_a)
+    db = _minutes(debut_b)
+    fb = _minutes(fin_b)
+    if None in (da, fa, db, fb):
+        return 0
+    return max(0, min(fa, fb) - max(da, db))
+
+
+def _intervalle_impact_arret(arret):
+    """
+    Retourne l'intervalle horaire qui impacte réellement le TRS.
+    Pour une maintenance planifiée, seul le dépassement est imputé, en fin
+    d'arrêt : prévu 30 min, réel 50 min => impact des 20 dernières minutes.
+    """
+    debut = _minutes(arret.heure_debut)
+    fin = _minutes(arret.heure_fin)
+    if debut is None or fin is None or fin <= debut:
+        return None
+
+    impact = arret.duree_impact_min
+    if impact <= 0:
+        return None
+
+    if arret.categorie == 'Maintenance planifiée':
+        return (max(debut, fin - impact), fin)
+    return (debut, fin)
+
+
+def _arrets_sur_creneau(equipe, heure_debut, heure_fin):
+    debut = _minutes(heure_debut)
+    fin = _minutes(heure_fin)
+    if debut is None or fin is None:
+        return 0
+
+    total = 0
+    for arret in equipe.arrets:
+        intervalle = _intervalle_impact_arret(arret)
+        if not intervalle:
+            continue
+        a_debut, a_fin = intervalle
+        total += max(0, min(fin, a_fin) - max(debut, a_debut))
+    return total
+
+
+def calcule_trs_production(production):
+    """
+    Calcule le TRS d'une essence sur sa propre fenêtre horaire.
+    Les arrêts retenus sont uniquement ceux qui chevauchent cette fenêtre.
+    """
+    duree = production.duree_traitement_min
+    if duree <= 0:
+        return None
+
+    capacite_h = _capacite_h_essence(production.essence)
+    arrets_min = _arrets_sur_creneau(
+        production.equipe,
+        production.heure_debut,
+        production.heure_fin,
+    )
+    temps_utile = max(0, duree - arrets_min)
+
+    disponibilite = temps_utile / duree if duree > 0 else 0
+    volume_theorique = capacite_h * (temps_utile / 60)
+    volume_sorti = production.volume_conforme + production.volume_declass
+    performance = min(1.0, volume_sorti / volume_theorique) if volume_theorique > 0 else 0
+    qualite = production.volume_conforme / volume_sorti if volume_sorti > 0 else 0
+    trs_global = disponibilite * performance * qualite * 100
+
+    return {
+        'essence': production.essence,
+        'duree_planifiee': duree,
+        'duree_arrets': arrets_min,
+        'temps_utile': temps_utile,
+        'volume_theorique': round(volume_theorique, 2),
+        'disponibilite': round(disponibilite * 100, 1),
+        'performance': round(performance * 100, 1),
+        'qualite': round(qualite * 100, 1),
+        'trs_global': round(trs_global, 1),
+    }
+
+
+def calcule_trs_par_essence(equipes):
+    """
+    Agrège le TRS par essence à partir des fenêtres horaires de Production.
+    Fallback : si une essence n'a aucune fenêtre renseignée, on garde l'ancien
+    indicateur basé sur les TRS globaux des postes qui contiennent cette essence.
+    """
+    data = defaultdict(lambda: {
+        'volume_total': 0.0,
+        'volume_temps': 0.0,
+        'volume_conforme_temps': 0.0,
+        'volume_theorique': 0.0,
+        'temps_planifie': 0,
+        'arrets': 0,
+        'trs_fallback': [],
+        'nb_lignes': 0,
+        'nb_lignes_temporalisees': 0,
+    })
+
+    for equipe in equipes:
+        for prod in equipe.productions:
+            essence = prod.essence
+            volume_sorti = prod.volume_conforme + prod.volume_declass
+            d = data[essence]
+            d['volume_total'] += volume_sorti
+            d['nb_lignes'] += 1
+
+            duree = prod.duree_traitement_min
+            if duree > 0:
+                arrets = _arrets_sur_creneau(equipe, prod.heure_debut, prod.heure_fin)
+                temps_utile = max(0, duree - arrets)
+                d['temps_planifie'] += duree
+                d['arrets'] += arrets
+                d['volume_temps'] += volume_sorti
+                d['volume_conforme_temps'] += prod.volume_conforme
+                d['volume_theorique'] += _capacite_h_essence(essence) * (temps_utile / 60)
+                d['nb_lignes_temporalisees'] += 1
+            elif equipe.trs_global is not None:
+                d['trs_fallback'].append(equipe.trs_global)
+
+    resultats = []
+    for essence, d in data.items():
+        if d['temps_planifie'] > 0:
+            temps_utile = max(0, d['temps_planifie'] - d['arrets'])
+            disponibilite = temps_utile / d['temps_planifie'] if d['temps_planifie'] else 0
+            volume_theorique = d['volume_theorique']
+            performance = (
+                min(1.0, d['volume_temps'] / volume_theorique)
+                if volume_theorique > 0 else 0
+            )
+            qualite = (
+                d['volume_conforme_temps'] / d['volume_temps']
+                if d['volume_temps'] > 0 else 0
+            )
+            trs = disponibilite * performance * qualite * 100
+            resultats.append({
+                'essence': essence,
+                'volume_total': round(d['volume_total'], 2),
+                'trs_moyen': round(trs, 1),
+                'disponibilite': round(disponibilite * 100, 1),
+                'performance': round(performance * 100, 1),
+                'qualite': round(qualite * 100, 1),
+                'temps_planifie': d['temps_planifie'],
+                'duree_arrets': d['arrets'],
+                'mode': 'temporalise',
+                'couverture': round(d['nb_lignes_temporalisees'] / d['nb_lignes'] * 100, 0),
+            })
+        else:
+            trs_vals = d['trs_fallback']
+            resultats.append({
+                'essence': essence,
+                'volume_total': round(d['volume_total'], 2),
+                'trs_moyen': round(sum(trs_vals) / len(trs_vals), 1) if trs_vals else 0,
+                'disponibilite': None,
+                'performance': None,
+                'qualite': None,
+                'temps_planifie': 0,
+                'duree_arrets': 0,
+                'mode': 'poste',
+                'couverture': 0,
+            })
+
+    return sorted(resultats, key=lambda x: x['volume_total'], reverse=True)
 
 def calcule_trs(equipe):
     """
@@ -27,11 +225,11 @@ def calcule_trs(equipe):
     Performance   : volume sorti / volume théorique sur temps utile.
     Qualité       : volume conforme / volume sorti (planches).
     """
-    duree_poste = float(Parametre.get('duree_poste', 480))
-    capacite_h  = float(Parametre.get('capacite_equipe_h', 1.5625))
+    duree_poste = _param_float('duree_poste', 480)
+    capacite_h  = _param_float('capacite_equipe_h', 1.5625)
 
     # Disponibilité
-    duree_arrets = equipe.duree_totale_arrets
+    duree_arrets = equipe.duree_arrets_impact
     temps_utile  = max(0, duree_poste - duree_arrets)
     disponibilite = temps_utile / duree_poste if duree_poste > 0 else 0
 
@@ -76,9 +274,9 @@ def decompose_dpq(equipe):
                 equipe.trs_performance / 100,
                 equipe.trs_qualite / 100)
 
-    duree_poste  = float(Parametre.get('duree_poste', 480))
-    capacite_h   = float(Parametre.get('capacite_equipe_h', 1.5625))
-    duree_arrets = equipe.duree_totale_arrets
+    duree_poste  = _param_float('duree_poste', 480)
+    capacite_h   = _param_float('capacite_equipe_h', 1.5625)
+    duree_arrets = equipe.duree_arrets_impact
     temps_utile  = max(0, duree_poste - duree_arrets)
     d = temps_utile / duree_poste if duree_poste > 0 else 0
     vol_theo  = capacite_h * (temps_utile / 60)
@@ -100,25 +298,23 @@ def _prix_production(prod):
 
 def calcule_pertes_equipe(equipe):
     """
-    Décompose les pertes financières d'une équipe en FCFA (D + P + Q).
+    Décompose les causes probables en FCFA indicatifs (D/P/Q).
 
-    Perte D : valeur non produite pendant les arrêts non planifiés.
+    Perte D : valeur non produite pendant les arrêts impactants.
     Perte P : sous-performance vs capacité théorique sur le temps utile.
-    Perte Q : perte déclassé (revente à 30%) + perte déchets (perte sèche 100%).
+    Perte Q : perte déclassé (70% récupéré par défaut) + déchets sans valeur V1.
 
     Returns:
-        dict {'perte_d', 'perte_p', 'perte_q', 'perte_q_declass', 'perte_q_dechets', 'total'}
+        dict {'perte_d', 'perte_p', 'perte_q', 'perte_q_declass', 'perte_q_dechets',
+              'total_attribution', 'total'}
     """
-    duree_poste   = float(Parametre.get('duree_poste', 480))
-    capacite_h    = float(Parametre.get('capacite_equipe_h', 1.5625))
-    taux_revente  = float(Parametre.get('taux_revente_rebut', 0.30))
+    duree_poste      = _param_float('duree_poste', 480)
+    capacite_h       = _param_float('capacite_equipe_h', 1.5625)
+    taux_revente     = _param_float('taux_revente_rebut', 0.70)
+    valeur_dechets_m3 = _param_float('valeur_dechets_m3', 0)
 
-    duree_arrets_non_planifies = sum(
-        a.duree_min for a in equipe.arrets
-        if a.duree_min and a.categorie != 'Maintenance planifiée'
-    )
-    duree_arrets_total = equipe.duree_totale_arrets
-    temps_utile_h = max(0, duree_poste - duree_arrets_total) / 60
+    duree_arrets_impactants = sum(a.duree_impact_min for a in equipe.arrets)
+    temps_utile_h = max(0, duree_poste - duree_arrets_impactants) / 60
 
     # Prix moyen pondéré par volume sorti (D et P sont machine-level)
     total_vol = equipe.volume_sorti
@@ -130,8 +326,8 @@ def calcule_pertes_equipe(equipe):
     else:
         prix_moyen = 0.0
 
-    # Perte D : production perdue pendant les arrêts non planifiés
-    perte_d = (duree_arrets_non_planifies / 60) * capacite_h * prix_moyen
+    # Perte D : production perdue pendant les arrêts qui impactent réellement le poste
+    perte_d = (duree_arrets_impactants / 60) * capacite_h * prix_moyen
 
     # Perte P : sous-performance sur le temps utile
     volume_theorique = temps_utile_h * capacite_h
@@ -143,13 +339,14 @@ def calcule_pertes_equipe(equipe):
         for p in equipe.productions
     )
 
-    # Perte Q déchets : perte sèche sur sciure/dosses/chutes (zéro valeur marchande)
+    # Perte Q déchets : potentiel non valorisé, avec valeur résiduelle paramétrable (0 en V1)
     perte_q_dechets = sum(
-        p.volume_dechets * _prix_production(p)
+        p.volume_dechets * max(0, _prix_production(p) - valeur_dechets_m3)
         for p in equipe.productions
     )
 
     perte_q = perte_q_declass + perte_q_dechets
+    total_attribution = perte_d + perte_p + perte_q
 
     return {
         'perte_d':          round(perte_d, 0),
@@ -157,13 +354,14 @@ def calcule_pertes_equipe(equipe):
         'perte_q':          round(perte_q, 0),
         'perte_q_declass':  round(perte_q_declass, 0),
         'perte_q_dechets':  round(perte_q_dechets, 0),
-        'total':            round(perte_d + perte_p + perte_q, 0),
+        'total_attribution': round(total_attribution, 0),
+        'total':            round(total_attribution, 0),
     }
 
 
 def calcule_pertes_fcfa(equipe):
-    """Raccourci — retourne uniquement le montant total des pertes."""
-    return calcule_pertes_equipe(equipe)['total']
+    """Raccourci officiel — retourne la perte financière nette CA potentiel − CA réel."""
+    return calcule_manque_gagner(equipe)['manque_a_gagner_estime']
 
 
 # ── Manque à gagner estimé (P11) ─────────────────────────────────────────────
@@ -176,10 +374,12 @@ def calcule_manque_gagner(equipe):
     décomposition D/P/Q de calcule_pertes_equipe(). Évite le double comptage
     car chaque m³ est compté dans UNE seule catégorie (conforme ou déclassé).
 
-    - valeur_potentielle = objectif_m3 × prix moyen pondéré des essences traitées
+    - valeur_potentielle = capacité par essence × créneau × prix, si les créneaux existent
+      fallback : objectif_m3 × prix moyen pondéré des essences traitées
     - valeur_conforme    = Σ (vol_conforme_essence_i × prix_snapshot_essence_i)
     - valeur_declass     = Σ (vol_declass_essence_i × prix_snapshot_essence_i × taux_revente)
-    - valeur_reelle      = valeur_conforme + valeur_declass
+    - valeur_dechets     = Σ (vol_dechets × valeur_dechets_m3), 0 FCFA/m³ en V1
+    - valeur_reelle      = valeur_conforme + valeur_declass + valeur_dechets
     - manque_a_gagner    = max(0, valeur_potentielle − valeur_reelle)
 
     D/P/Q restent disponibles via calcule_pertes_equipe() pour l'attribution
@@ -188,8 +388,17 @@ def calcule_manque_gagner(equipe):
     Référence : Jonsson & Lesshammar (1999) — distinction "loss measurement"
     (chiffrage direct) vs "loss attribution" (diagnostic D × P × Q).
     """
-    objectif_m3  = float(Parametre.get('objectif_m3', 25.0))
-    taux_revente = float(Parametre.get('taux_revente_rebut', 0.30))
+    objectif_m3       = _param_float('objectif_m3', 12.5)
+    taux_revente      = _param_float('taux_revente_rebut', 0.70)
+    valeur_dechets_m3 = _param_float('valeur_dechets_m3', 0)
+
+    volume_cible = 0.0
+    valeur_potentielle_creneaux = 0.0
+    for p in equipe.productions:
+        if p.duree_traitement_min > 0:
+            cible_p = _capacite_h_essence(p.essence) * (p.duree_traitement_min / 60)
+            volume_cible += cible_p
+            valeur_potentielle_creneaux += cible_p * _prix_production(p)
 
     vol_total = equipe.volume_sorti
     if vol_total > 0 and equipe.productions:
@@ -200,7 +409,14 @@ def calcule_manque_gagner(equipe):
     else:
         prix_ref = 0.0
 
-    valeur_potentielle = objectif_m3 * prix_ref
+    if volume_cible > 0:
+        valeur_potentielle = valeur_potentielle_creneaux
+        prix_ref = valeur_potentielle / volume_cible if volume_cible > 0 else 0.0
+        mode_potentiel = 'capacite_par_essence'
+    else:
+        volume_cible = objectif_m3
+        valeur_potentielle = objectif_m3 * prix_ref
+        mode_potentiel = 'objectif_poste'
 
     valeur_conforme = sum(
         p.volume_conforme * _prix_production(p)
@@ -210,7 +426,11 @@ def calcule_manque_gagner(equipe):
         p.volume_declass * _prix_production(p) * taux_revente
         for p in equipe.productions
     )
-    valeur_reelle = valeur_conforme + valeur_declass
+    valeur_dechets = sum(
+        p.volume_dechets * valeur_dechets_m3
+        for p in equipe.productions
+    )
+    valeur_reelle = valeur_conforme + valeur_declass + valeur_dechets
     manque = max(0.0, valeur_potentielle - valeur_reelle)
 
     detail = [
@@ -220,16 +440,22 @@ def calcule_manque_gagner(equipe):
             'volume_declass':  round(p.volume_declass, 2),
             'valeur_conforme': round(p.volume_conforme * _prix_production(p), 0),
             'valeur_declass':  round(p.volume_declass * _prix_production(p) * taux_revente, 0),
+            'valeur_dechets':  round(p.volume_dechets * valeur_dechets_m3, 0),
         }
         for p in equipe.productions
     ]
 
     return {
         'objectif_m3':             objectif_m3,
+        'volume_cible_m3':         round(volume_cible, 2),
+        'mode_potentiel':          mode_potentiel,
+        'taux_revente_declass':    taux_revente,
+        'valeur_dechets_m3':       valeur_dechets_m3,
         'prix_reference':          round(prix_ref, 0),
         'valeur_potentielle':      round(valeur_potentielle, 0),
         'valeur_conforme':         round(valeur_conforme, 0),
         'valeur_declass':          round(valeur_declass, 0),
+        'valeur_dechets':          round(valeur_dechets, 0),
         'valeur_reelle_valorisee': round(valeur_reelle, 0),
         'manque_a_gagner_estime':  round(manque, 0),
         'detail_par_essence':      detail,

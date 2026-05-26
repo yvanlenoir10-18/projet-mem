@@ -8,6 +8,7 @@
 {% if couleur_trs == 'success' %}{% set trs_color = 'var(--wp-leaf)' %}{% set trs_pill = 'success' %}
 {% elif couleur_trs == 'warning' %}{% set trs_color = 'var(--wp-ochre)' %}{% set trs_pill = 'warning' %}
 {% else %}{% set trs_color = 'var(--wp-terracotta)' %}{% set trs_pill = 'danger' %}{% endif %}
+{% set vc = validation_chef|default({}) %}
 
 {# ── Header ── #}
 <div class="d-flex justify-content-between align-items-start mb-4 gap-3 flex-wrap">
@@ -80,6 +81,12 @@
     </form>
     {% endif %}
     {% if peut_valider_chef %}
+    {% if vc.nb_bloquantes|default(0) > 0 or vc.nb_avertissements|default(0) > 0 %}
+    <a href="#bloc-validation-chef"
+       class="btn btn-success d-flex align-items-center gap-1">
+      <i class="bi bi-shield-check"></i> Contrôler avant validation
+    </a>
+    {% else %}
     <form method="POST"
           action="{{ url_for('saisie.valider_chef_equipe', equipe_id=poste.id) }}"
           onsubmit="return confirm('Valider cette fiche et l’intégrer aux tableaux de bord ?')">
@@ -88,6 +95,7 @@
         <i class="bi bi-check2-circle"></i> Valider chef
       </button>
     </form>
+    {% endif %}
     {% endif %}
     <a href="{{ url_for('saisie.fiche_poste', poste_id=poste.id) }}"
        target="_blank"
@@ -146,6 +154,125 @@
         <i class="bi bi-arrow-down-circle"></i>
         Ouvrir la zone à corriger
       </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if vc.visible|default(false) %}
+<div id="bloc-validation-chef"
+     class="wp-card mb-4"
+     style="border-left:4px solid {% if vc.nb_bloquantes|default(0) > 0 %}var(--wp-terracotta){% elif vc.nb_avertissements|default(0) > 0 %}var(--wp-ochre){% else %}var(--wp-leaf){% endif %};">
+  <div class="wp-card-header">
+    <i class="bi bi-shield-check"
+       style="color:{% if vc.nb_bloquantes|default(0) > 0 %}var(--wp-terracotta){% elif vc.nb_avertissements|default(0) > 0 %}var(--wp-ochre){% else %}var(--wp-leaf){% endif %};"></i>
+    Validation chef
+    <span class="ms-auto d-flex gap-2 flex-wrap">
+      {% if vc.nb_bloquantes|default(0) > 0 %}
+      <span class="wp-pill wp-pill-danger">{{ vc.nb_bloquantes }} bloquant{{ 's' if vc.nb_bloquantes > 1 }}</span>
+      {% endif %}
+      {% if vc.nb_avertissements|default(0) > 0 %}
+      <span class="wp-pill wp-pill-warning">{{ vc.nb_avertissements }} avertissement{{ 's' if vc.nb_avertissements > 1 }}</span>
+      {% endif %}
+      {% if vc.nb_bloquantes|default(0) == 0 and vc.nb_avertissements|default(0) == 0 %}
+      <span class="wp-pill wp-pill-success">Prête à valider</span>
+      {% endif %}
+    </span>
+  </div>
+  <div style="padding:1rem 1.25rem;">
+    <div class="row g-2 mb-3">
+      {% for point in vc.points|default([]) %}
+      <div class="col-12 col-md">
+        <div style="border:1px solid {% if point.etat == 'danger' %}rgba(216,113,73,.35){% elif point.etat == 'warning' %}rgba(197,151,58,.35){% else %}rgba(63,138,92,.25){% endif %};
+                    border-radius:8px;padding:.75rem;background:#fff;">
+          <div style="display:flex;align-items:center;gap:.45rem;font-weight:850;color:var(--wp-ink);font-size:.82rem;">
+            {% if point.etat == 'danger' %}
+            <i class="bi bi-x-octagon" style="color:var(--wp-terracotta);"></i>
+            {% elif point.etat == 'warning' %}
+            <i class="bi bi-exclamation-triangle" style="color:var(--wp-ochre);"></i>
+            {% else %}
+            <i class="bi bi-check-circle" style="color:var(--wp-leaf);"></i>
+            {% endif %}
+            {{ point.label }}
+          </div>
+          <div style="font-size:.74rem;color:var(--wp-muted);margin-top:.35rem;line-height:1.35;">
+            {{ point.texte }}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if vc.bloquantes|default([]) %}
+    <div style="background:#fdecea;border:1px solid rgba(216,113,73,.25);border-radius:8px;padding:.85rem;margin-bottom:.75rem;">
+      <div style="font-weight:900;color:var(--wp-terracotta);font-size:.86rem;margin-bottom:.55rem;">
+        <i class="bi bi-x-octagon"></i> Validation impossible avant correction
+      </div>
+      {% for a in vc.bloquantes %}
+      <div style="font-size:.82rem;color:var(--wp-ink);line-height:1.4;{% if not loop.last %}margin-bottom:.55rem;{% endif %}">
+        <strong>{{ a.code }} · {{ a.titre }}</strong><br>
+        <span style="color:var(--wp-muted);">{{ a.suggestion }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if vc.avertissements|default([]) %}
+    <div style="background:#fffaf0;border:1px solid rgba(197,151,58,.28);border-radius:8px;padding:.85rem;margin-bottom:.75rem;">
+      <div style="font-weight:900;color:var(--wp-ochre);font-size:.86rem;margin-bottom:.55rem;">
+        <i class="bi bi-exclamation-triangle"></i> Points à accepter consciemment
+      </div>
+      {% for a in vc.avertissements %}
+      <div style="font-size:.82rem;color:var(--wp-ink);line-height:1.4;{% if not loop.last %}margin-bottom:.55rem;{% endif %}">
+        <strong>{{ a.code }} · {{ a.titre }}</strong><br>
+        <span style="color:var(--wp-muted);">{{ a.suggestion }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if peut_valider_chef %}
+    <form method="POST"
+          action="{{ url_for('saisie.valider_chef_equipe', equipe_id=poste.id) }}"
+          onsubmit="return confirm('Confirmer la validation chef de cette fiche ?')">
+      {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+      {% if vc.nb_avertissements|default(0) > 0 and vc.nb_bloquantes|default(0) == 0 %}
+      <div class="mb-3">
+        <label class="d-flex align-items-start gap-2" style="font-size:.84rem;color:var(--wp-ink);font-weight:700;">
+          <input type="checkbox" name="confirmer_avertissements" value="1" required style="margin-top:.2rem;">
+          Je confirme avoir lu les avertissements et je valide volontairement cette fiche.
+        </label>
+      </div>
+      <div class="mb-3">
+        <label for="motif_validation_avertissements" style="font-weight:800;color:var(--wp-ink);font-size:.84rem;">
+          Motif de validation malgré avertissement
+        </label>
+        <textarea id="motif_validation_avertissements"
+                  name="motif_validation_avertissements"
+                  class="form-control mt-2"
+                  minlength="10"
+                  rows="2"
+                  required
+                  placeholder="Exemple : arrêt connu et déjà traité par la maintenance."></textarea>
+      </div>
+      {% endif %}
+      <div class="d-flex justify-content-end gap-2 flex-wrap">
+        {% if vc.validation_bloquee|default(false) %}
+        <button type="button" class="btn btn-outline-secondary" disabled>
+          <i class="bi bi-lock"></i> Validation bloquée
+        </button>
+        {% else %}
+        <button type="submit" class="btn btn-success d-flex align-items-center gap-2">
+          <i class="bi bi-check2-circle"></i>
+          {% if vc.nb_avertissements|default(0) > 0 %}Valider avec motif{% else %}Valider chef{% endif %}
+        </button>
+        {% endif %}
+      </div>
+    </form>
+    {% elif poste.statut == 'valide_chef' or poste.statut == 'verrouille' %}
+    <div style="font-size:.84rem;color:var(--wp-leaf);font-weight:800;">
+      <i class="bi bi-check-circle"></i> Cette fiche est déjà intégrée aux analyses validées.
     </div>
     {% endif %}
   </div>
@@ -346,7 +473,7 @@
 {% endif %}
 
 {# ── P12 · Contrôles qualité de saisie (alertes non-bloquantes) ── #}
-{% if anomalies %}
+{% if anomalies and not vc.visible|default(false) %}
 <div class="wp-card mb-4"
      style="border-left:4px solid var(--wp-ochre);background:#fffaf0;">
   <div class="wp-card-header" style="color:var(--wp-ochre);">
@@ -623,7 +750,7 @@
       {% elif a.categorie == 'Approvisionnement' %}{% set pill = 'info' %}
       {% elif a.categorie == 'Maintenance planifiée' %}{% set pill = 'success' %}
       {% else %}{% set pill = 'neutral' %}{% endif %}
-      <tr>
+      <tr style="{% if a.duree_min and a.duree_min >= 45 %}background:#fffaf0;{% endif %}">
         <td style="font-weight:600;">{{ a.machine }}</td>
         <td style="color:var(--wp-muted);font-size:.84rem;">
           {{ a.heure_debut }} → {{ a.heure_fin }}
@@ -643,6 +770,9 @@
         </td>
         <td style="font-size:.865rem;">
           {{ a.cause }}
+          {% if a.duree_min and a.duree_min >= 45 %}
+          <span class="wp-pill wp-pill-warning" style="font-size:.66rem;margin-left:5px;">à regarder</span>
+          {% endif %}
           {% if a.notes %}
           <div style="font-size:.74rem;color:var(--wp-muted);margin-top:3px;line-height:1.35;">
             {{ a.notes }}

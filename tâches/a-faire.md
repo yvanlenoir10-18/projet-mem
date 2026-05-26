@@ -629,3 +629,16 @@ Objectif : donner au chef scierie une première vue courte, actionnable et orien
 - [x] Ajouter 5 KPI du jour : objectif, fiches à traiter, arrêts, rendement matière, déclassement.
 - [x] Afficher les postes du jour Matin / Après-midi avec statut et accès direct.
 - [x] Vérifier le rendu `/dashboard/chef` et le lancement Flask avant clôture.
+
+---
+
+## ⏳ P3.2 — Profil Chef Scierie : validation fiche assistée
+
+Objectif : aider le chef à valider vite, sans laisser passer les incohérences fortes.
+
+- [x] Ajouter une synthèse `Validation chef` sur la page détail fiche.
+- [x] Distinguer les anomalies bloquantes et les avertissements métier.
+- [x] Bloquer côté serveur la validation si une anomalie rouge est présente.
+- [x] Demander une confirmation et un motif si le chef valide malgré avertissements orange.
+- [x] Mettre en évidence les arrêts longs dans la table des arrêts.
+- [x] Vérifier le rendu détail fiche et les parcours validation bloquée / validation avec avertissement.

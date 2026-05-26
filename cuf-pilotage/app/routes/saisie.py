@@ -333,6 +333,61 @@ def _peut_demander_correction(equipe):
     return True
 
 
+def _validation_chef_resume(equipe, anomalies):
+    """Prépare une synthèse actionnable pour la page de validation chef."""
+    bloquantes = [a for a in anomalies if a.get('niveau') == 'danger']
+    avertissements = [a for a in anomalies if a.get('niveau') == 'warning']
+    informations = [a for a in anomalies if a.get('niveau') not in ('danger', 'warning')]
+
+    points = [
+        {
+            'label': 'En-tête',
+            'etat': 'ok' if equipe.date and equipe.numero_equipe and equipe.operateur_nom and equipe.effectif else 'warning',
+            'texte': f"{equipe.numero_equipe} · {equipe.effectif or 0} personne(s) · {equipe.operateur_nom or 'responsable manquant'}",
+        },
+        {
+            'label': 'Production',
+            'etat': 'ok' if equipe.productions and equipe.volume_sorti > 0 else 'danger',
+            'texte': f"{len(equipe.productions)} essence(s) · {equipe.volume_conforme} m³ conformes",
+        },
+        {
+            'label': 'Arrêts',
+            'etat': 'ok' if equipe.arrets or equipe.aucun_arret_confirme else 'warning',
+            'texte': (
+                f"{len(equipe.arrets)} arrêt(s) · {equipe.duree_totale_arrets} min"
+                if equipe.arrets else
+                ("Aucun arrêt confirmé" if equipe.aucun_arret_confirme else "Aucun arrêt non confirmé")
+            ),
+        },
+        {
+            'label': 'Papier',
+            'etat': 'ok' if equipe.mode_saisie != 'papier' or (equipe.fiche_papier_signee and equipe.fiche_papier_fichier) else 'danger',
+            'texte': (
+                "Saisie directe"
+                if equipe.mode_saisie != 'papier' else
+                ("Fiche papier jointe" if equipe.fiche_papier_fichier else "Fiche papier manquante")
+            ),
+        },
+        {
+            'label': 'Commentaires',
+            'etat': 'ok' if (equipe.notes or any(a.notes for a in equipe.arrets)) else 'warning',
+            'texte': "Commentaires présents" if (equipe.notes or any(a.notes for a in equipe.arrets)) else "Aucun commentaire terrain",
+        },
+    ]
+
+    return {
+        'visible': current_user.role in ('chef', 'admin'),
+        'bloquantes': bloquantes,
+        'avertissements': avertissements,
+        'informations': informations,
+        'nb_bloquantes': len(bloquantes),
+        'nb_avertissements': len(avertissements),
+        'peut_valider': _peut_valider_chef(equipe) and not bloquantes,
+        'validation_bloquee': bool(bloquantes),
+        'points': points,
+    }
+
+
 def _snapshot_equipe(equipe):
     """Photographie lisible des champs métier suivis dans l'audit."""
     return {
@@ -1075,16 +1130,40 @@ def valider_chef_equipe(equipe_id):
         flash(erreur, 'danger')
         return redirect(url_for('saisie.detail_poste', poste_id=equipe_id))
 
+    anomalies = detecte_anomalies(equipe)
+    bloquantes = [a for a in anomalies if a.get('niveau') == 'danger']
+    if bloquantes:
+        titres = ', '.join(a.get('titre', a.get('code', 'anomalie')) for a in bloquantes[:3])
+        flash(f"Validation impossible : {len(bloquantes)} anomalie(s) bloquante(s) à corriger. {titres}", 'danger')
+        return redirect(url_for('saisie.detail_poste', poste_id=equipe_id))
+
+    avertissements = [a for a in anomalies if a.get('niveau') == 'warning']
+    motif_avertissements = request.form.get('motif_validation_avertissements', '').strip()
+    if avertissements:
+        if request.form.get('confirmer_avertissements') != '1':
+            flash("Cette fiche contient des avertissements. Confirmez la validation consciente avant de continuer.", 'warning')
+            return redirect(url_for('saisie.detail_poste', poste_id=equipe_id))
+        if len(motif_avertissements) < 10:
+            flash("Expliquez brièvement pourquoi vous validez malgré les avertissements.", 'danger')
+            return redirect(url_for('saisie.detail_poste', poste_id=equipe_id))
+
     equipe.statut = STATUT_VALIDE_CHEF
     equipe.modifie_le = datetime.utcnow()
     equipe.modifie_par = current_user.nom
     _recalculer_trs(equipe)
+    action_audit = 'validation_avec_avertissement' if avertissements else 'validation_chef'
+    resume_audit = (
+        f"Fiche validée malgré {len(avertissements)} avertissement(s) : {motif_avertissements}"
+        if avertissements else
+        "Fiche validée par le chef et intégrée aux tableaux de bord."
+    )
     _audit_correction(
         equipe,
-        action='validation_chef',
+        action=action_audit,
         ancien_statut=ancien_statut,
         nouveau_statut=equipe.statut,
-        resume="Fiche validée par le chef et intégrée aux tableaux de bord.",
+        motif=motif_avertissements or None,
+        resume=resume_audit,
         avant=avant,
         apres=_snapshot_equipe(equipe),
     )
@@ -1300,6 +1379,7 @@ def detail_poste(poste_id):
                            afficher_indicateurs=current_user.role in ('chef', 'pdg', 'admin'),
                            couleur_trs=couleur,
                            anomalies=anomalies,
+                           validation_chef=_validation_chef_resume(equipe, anomalies),
                            correction_cibles=CORRECTION_CIBLES,
                            peut_soumettre=_peut_soumettre(equipe),
                            peut_valider_chef=_peut_valider_chef(equipe),

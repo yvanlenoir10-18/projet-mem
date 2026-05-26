@@ -617,3 +617,15 @@ Recette finale opérateur :
 - [x] Workflow correction OK : le chef choisit une zone simple, l'opérateur revient directement au bon bloc.
 - [x] CSRF OK : login, création, vérification et envoi fonctionnent avec jeton CSRF actif.
 - [x] Rendu serveur OK : formulaire, historique, détail, vérification et accueil opérateur.
+
+---
+
+## ⏳ P3.1 — Profil Chef Scierie : accueil Aujourd'hui
+
+Objectif : donner au chef scierie une première vue courte, actionnable et orientée décision immédiate.
+
+- [x] Créer une zone `Aujourd'hui` en haut du dashboard Chef.
+- [x] Afficher les actions immédiates : fiches à contrôler, corrections en attente, postes non saisis, brouillons anciens.
+- [x] Ajouter 5 KPI du jour : objectif, fiches à traiter, arrêts, rendement matière, déclassement.
+- [x] Afficher les postes du jour Matin / Après-midi avec statut et accès direct.
+- [x] Vérifier le rendu `/dashboard/chef` et le lancement Flask avant clôture.

@@ -863,7 +863,11 @@ def soumettre_equipe(equipe_id):
     )
     db.session.commit()
 
-    flash("Fiche envoyée au chef pour vérification. Elle n'est pas encore comptée dans les tableaux de bord.", 'success')
+    flash(
+        "Fiche envoyée au chef pour vérification. Elle est visible dans son suivi du jour, "
+        "mais pas encore intégrée aux analyses validées.",
+        'success'
+    )
     return redirect(url_for('saisie.detail_poste', poste_id=equipe_id))
 
 

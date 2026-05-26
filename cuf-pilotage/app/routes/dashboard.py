@@ -345,9 +345,9 @@ def vue_chef():
             elif eq.statut == STATUT_BROUILLON:
                 cellules[shift] = {'state': 'brouillon', 'display': '⏳', 'couleur': 'warning'}
             elif eq.statut == STATUT_A_VERIFIER:
-                cellules[shift] = {'state': 'a_verifier', 'display': 'À vérif.', 'couleur': 'info'}
+                cellules[shift] = {'state': 'a_verifier', 'display': 'Chez chef', 'couleur': 'info'}
             elif eq.statut == STATUT_A_CORRIGER:
-                cellules[shift] = {'state': 'a_corriger', 'display': 'Corr.', 'couleur': 'warning'}
+                cellules[shift] = {'state': 'a_corriger', 'display': 'À corriger', 'couleur': 'warning'}
             else:
                 trs = eq.trs_global or 0
                 if trs >= 70:

@@ -136,7 +136,7 @@
           <option value="a_corriger" {% if filtres and filtres.statut == 'a_corriger' %}selected{% endif %}>À corriger</option>
           <option value="a_verifier" {% if filtres and filtres.statut == 'a_verifier' %}selected{% endif %}>Chez le chef</option>
           <option value="valide_chef" {% if filtres and filtres.statut == 'valide_chef' %}selected{% endif %}>Validée chef</option>
-          <option value="verrouille" {% if filtres and filtres.statut == 'verrouille' %}selected{% endif %}>Verrouillée</option>
+          <option value="verrouille" {% if filtres and filtres.statut == 'verrouille' %}selected{% endif %}>Clôturée</option>
         </select>
       </div>
 
@@ -209,8 +209,7 @@
         {{ postes | selectattr('statut','equalto','a_verifier') | list | length }}
         {% else %}
         {{ (postes | selectattr('statut','equalto','valide_chef') | list | length)
-           + (postes | selectattr('statut','equalto','verrouille') | list | length)
-           + (postes | selectattr('statut','equalto','soumis') | list | length) }}
+           + (postes | selectattr('statut','equalto','verrouille') | list | length) }}
         {% endif %}
       </div>
     </div>
@@ -265,14 +264,20 @@
     {% set action_url = url_for('saisie.detail_poste', poste_id=p.id) %}
     {% set action_label = 'Voir' %}
     {% set action_icon = 'bi-eye' %}
-  {% elif p.statut == 'valide_chef' or p.statut == 'soumis' %}
+  {% elif p.statut == 'valide_chef' %}
     {% set statut_label = 'Validée' %}
     {% set statut_class = 'success' %}
     {% set action_url = url_for('saisie.detail_poste', poste_id=p.id) %}
     {% set action_label = 'Voir' %}
     {% set action_icon = 'bi-eye' %}
+  {% elif p.statut == 'soumis' %}
+    {% set statut_label = 'Ancienne fiche' %}
+    {% set statut_class = 'neutral' %}
+    {% set action_url = url_for('saisie.detail_poste', poste_id=p.id) %}
+    {% set action_label = 'Voir' %}
+    {% set action_icon = 'bi-eye' %}
   {% elif p.statut == 'verrouille' or p.est_verrouille %}
-    {% set statut_label = 'Verrouillée' %}
+    {% set statut_label = 'Clôturée' %}
     {% set statut_class = 'neutral' %}
     {% set action_url = url_for('saisie.detail_poste', poste_id=p.id) %}
     {% set action_label = 'Voir' %}
@@ -435,7 +440,7 @@
           <td>
             {% if p.statut == 'verrouille' or p.est_verrouille %}
             <span class="wp-pill wp-pill-neutral">
-              <i class="bi bi-lock"></i> Verrouillé
+              <i class="bi bi-lock"></i> Clôturée
             </span>
             {% elif p.statut == 'a_corriger' %}
             <span class="wp-pill wp-pill-warning">
@@ -451,9 +456,13 @@
             <span class="wp-pill wp-pill-info">
               <i class="bi bi-hourglass-split"></i> Chez le chef
             </span>
-            {% elif p.statut == 'valide_chef' or p.statut == 'soumis' %}
+            {% elif p.statut == 'valide_chef' %}
             <span class="wp-pill wp-pill-success">
               <i class="bi bi-check2-circle"></i> Validée chef
+            </span>
+            {% elif p.statut == 'soumis' %}
+            <span class="wp-pill wp-pill-neutral">
+              <i class="bi bi-archive"></i> Ancienne fiche
             </span>
             {% else %}
             <span class="wp-pill wp-pill-warning">
@@ -464,7 +473,7 @@
           <td class="text-nowrap">
             {% set peut_modifier_ligne = (
               (p.statut in ('brouillon', 'a_corriger') and p.user_id == current_user.id)
-              or (current_user.role in ('chef', 'admin') and p.statut in ('a_verifier', 'valide_chef', 'soumis'))
+              or (current_user.role in ('chef', 'admin') and p.statut in ('a_verifier', 'valide_chef'))
             ) %}
             <a href="{{ url_for('saisie.detail_poste', poste_id=p.id) }}"
                class="wp-icon-btn" title="Voir le détail"

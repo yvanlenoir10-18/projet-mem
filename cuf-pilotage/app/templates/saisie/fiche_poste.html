@@ -206,9 +206,10 @@
       <p>Document de terrain généré depuis wood_pilot, sans informations économiques.</p>
       <span class="statut">
         {% if poste.statut == 'a_verifier' %}Chez le chef
-        {% elif poste.statut == 'valide_chef' or poste.statut == 'soumis' %}Validée chef
+        {% elif poste.statut == 'valide_chef' %}Validée chef
         {% elif poste.statut == 'a_corriger' %}À corriger
-        {% elif poste.statut == 'verrouille' %}Verrouillée
+        {% elif poste.statut == 'verrouille' %}Clôturée
+        {% elif poste.statut == 'soumis' %}Ancienne fiche
         {% else %}Brouillon{% endif %}
       </span>
     </div>

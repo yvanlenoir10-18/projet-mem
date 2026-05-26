@@ -171,10 +171,12 @@
             <span class="wp-pill wp-pill-warning">À corriger</span>
             {% elif fiche.statut == 'a_verifier' %}
             <span class="wp-pill wp-pill-info">Chez le chef</span>
-            {% elif fiche.statut == 'valide_chef' or fiche.statut == 'soumis' %}
+            {% elif fiche.statut == 'valide_chef' %}
             <span class="wp-pill wp-pill-success">Validée</span>
+            {% elif fiche.statut == 'soumis' %}
+            <span class="wp-pill wp-pill-neutral">Ancienne fiche</span>
             {% elif fiche.statut == 'verrouille' %}
-            <span class="wp-pill wp-pill-neutral">Verrouillée</span>
+            <span class="wp-pill wp-pill-neutral">Clôturée</span>
             {% else %}
             <span class="wp-pill wp-pill-neutral">{{ fiche.statut }}</span>
             {% endif %}

@@ -4,7 +4,7 @@ Routes d'analyse — Page Pareto dédiée.
 from flask import Blueprint, render_template, request
 from flask_login import login_required
 from datetime import date, timedelta
-from ..models import Equipe
+from ..models import Equipe, STATUTS_ANALYSES
 from ..services.trs import pareto_arrets
 from ..utils import roles_required
 from config import Config
@@ -22,9 +22,14 @@ def arrets():
 
     if jours > 0:
         depuis = date.today() - timedelta(days=jours)
-        equipes = Equipe.query.filter(Equipe.date >= depuis).all()
+        equipes = Equipe.query.filter(
+            Equipe.date >= depuis,
+            Equipe.statut.in_(STATUTS_ANALYSES),
+        ).all()
     else:
-        equipes = Equipe.query.all()
+        equipes = Equipe.query.filter(
+            Equipe.statut.in_(STATUTS_ANALYSES),
+        ).all()
 
     arrets_filtres = []
     for e in equipes:

@@ -22,13 +22,15 @@
       </h1>
       <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap;">
         {% if poste.statut == 'verrouille' or poste.est_verrouille %}
-        <span class="wp-pill wp-pill-neutral"><i class="bi bi-lock"></i> Verrouillée</span>
+        <span class="wp-pill wp-pill-neutral"><i class="bi bi-lock"></i> Clôturée</span>
         {% elif poste.statut == 'a_corriger' %}
         <span class="wp-pill wp-pill-warning"><i class="bi bi-arrow-counterclockwise"></i> À corriger</span>
         {% elif poste.statut == 'a_verifier' %}
         <span class="wp-pill wp-pill-info"><i class="bi bi-hourglass-split"></i> Chez le chef</span>
-        {% elif poste.statut == 'valide_chef' or poste.statut == 'soumis' %}
+        {% elif poste.statut == 'valide_chef' %}
         <span class="wp-pill wp-pill-success"><i class="bi bi-check2-circle"></i> Validée chef</span>
+        {% elif poste.statut == 'soumis' %}
+        <span class="wp-pill wp-pill-neutral"><i class="bi bi-archive"></i> Ancienne fiche</span>
         {% else %}
         <span class="wp-pill wp-pill-warning"><i class="bi bi-pencil"></i> Brouillon</span>
         {% endif %}
@@ -102,20 +104,20 @@
     {% if peut_verrouiller %}
     <form method="POST"
           action="{{ url_for('saisie.verrouiller_equipe', equipe_id=poste.id) }}"
-          onsubmit="return confirm('Verrouiller définitivement cette équipe ?')">
+          onsubmit="return confirm('Clôturer définitivement cette fiche ?')">
       {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
       <button class="btn btn-outline-secondary d-flex align-items-center gap-1">
-        <i class="bi bi-lock"></i> Verrouiller
+        <i class="bi bi-lock"></i> Clôturer
       </button>
     </form>
     {% endif %}
     {% if peut_deverrouiller %}
     <form method="POST"
           action="{{ url_for('saisie.deverrouiller_equipe', equipe_id=poste.id) }}"
-          onsubmit="return confirm('Déverrouiller cette équipe ? (Admin uniquement)')">
+          onsubmit="return confirm('Rouvrir cette fiche clôturée ? (Admin uniquement)')">
       {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
       <button class="btn btn-warning d-flex align-items-center gap-1">
-        <i class="bi bi-unlock"></i> Déverrouiller
+        <i class="bi bi-unlock"></i> Rouvrir
       </button>
     </form>
     {% endif %}

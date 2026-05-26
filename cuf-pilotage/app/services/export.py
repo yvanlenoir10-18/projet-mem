@@ -140,7 +140,7 @@ def _feuille_resume(wb, equipes, mois, annee, nb_brouillons=0):
     row += 1
 
     kpis = [
-        ("Équipes analysées (validées chef + verrouillées)", len(equipes), None),
+        ("Équipes analysées (validées chef + clôturées)", len(equipes), None),
         ("TRS moyen", f"{trs_moyen}%", _bg_trs(trs_moyen)),
         ("Benchmark international (cible TRS)", "≥ 60%", None),
         ("Production réelle", f"{production_reelle} m³", None),

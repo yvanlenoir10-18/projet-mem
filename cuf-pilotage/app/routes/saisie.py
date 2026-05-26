@@ -4,11 +4,11 @@ L'agent administratif entre ici les données d'une équipe (poste 8h).
 Une équipe peut contenir plusieurs lignes de production (essences différentes).
 
 Workflow statut :
-  brouillon → a_verifier → valide_chef → verrouillé
+  brouillon → a_verifier → valide_chef → verrouille
   a_verifier → a_corriger → a_verifier
   Seul l'auteur peut envoyer son brouillon ou une fiche renvoyée.
   Chef/admin valident avant intégration aux tableaux de bord.
-  Admin uniquement peut déverrouiller.
+  Admin uniquement peut rouvrir une fiche clôturée.
 """
 import json
 import math
@@ -23,7 +23,7 @@ from datetime import datetime, date
 from werkzeug.utils import secure_filename
 from ..models import (
     db, User, Equipe, Production, Arret, AuditCorrection, Parametre, normalise_essence,
-    STATUT_A_CORRIGER, STATUT_A_VERIFIER, STATUT_BROUILLON, STATUT_SOUMIS_LEGACY,
+    STATUT_A_CORRIGER, STATUT_A_VERIFIER, STATUT_BROUILLON,
     STATUT_VALIDE_CHEF, STATUT_VERROUILLE,
 )
 from ..utils import roles_required
@@ -306,7 +306,7 @@ def _peut_modifier(equipe):
     """Retourne True si l'utilisateur courant peut modifier cette équipe."""
     if equipe.statut in (STATUT_BROUILLON, STATUT_A_CORRIGER):
         return equipe.user_id == current_user.id
-    if equipe.statut in (STATUT_A_VERIFIER, STATUT_VALIDE_CHEF, STATUT_SOUMIS_LEGACY) and not equipe.est_verrouille:
+    if equipe.statut in (STATUT_A_VERIFIER, STATUT_VALIDE_CHEF) and not equipe.est_verrouille:
         return current_user.role in ('chef', 'admin')
     return False
 
@@ -318,7 +318,7 @@ def _peut_soumettre(equipe):
 def _peut_valider_chef(equipe):
     return (
         current_user.role in ('chef', 'admin')
-        and equipe.statut in (STATUT_A_VERIFIER, STATUT_SOUMIS_LEGACY)
+        and equipe.statut == STATUT_A_VERIFIER
         and not equipe.est_verrouille
     )
 
@@ -326,7 +326,7 @@ def _peut_valider_chef(equipe):
 def _peut_demander_correction(equipe):
     if current_user.role not in ('chef', 'admin'):
         return False
-    if equipe.statut not in (STATUT_A_VERIFIER, STATUT_VALIDE_CHEF, STATUT_SOUMIS_LEGACY, STATUT_VERROUILLE):
+    if equipe.statut not in (STATUT_A_VERIFIER, STATUT_VALIDE_CHEF, STATUT_VERROUILLE):
         return False
     if equipe.est_verrouille and current_user.role != 'admin':
         return False
@@ -976,7 +976,7 @@ def modifier_equipe(equipe_id):
             # Trace de modification sur les équipes déjà entrées dans le circuit de validation
             if equipe.statut in (
                 STATUT_A_VERIFIER, STATUT_A_CORRIGER,
-                STATUT_VALIDE_CHEF, STATUT_SOUMIS_LEGACY,
+                STATUT_VALIDE_CHEF,
             ):
                 equipe.modifie_le  = datetime.utcnow()
                 equipe.modifie_par = current_user.nom
@@ -1052,7 +1052,7 @@ def dupliquer_poste(poste_id):
     return redirect(url_for('saisie.modifier_equipe', equipe_id=nouveau.id, reprise='1'))
 
 
-# ── Validation Chef / Verrouillage / Déverrouillage ──────────────────────────
+# ── Validation Chef / Clôture / Réouverture ─────────────────────────────────
 
 @saisie_bp.route('/equipe/<int:equipe_id>/valider-chef', methods=['POST'])
 @login_required
@@ -1093,14 +1093,14 @@ def valider_chef_equipe(equipe_id):
 @login_required
 @roles_required('chef', 'admin')
 def verrouiller_equipe(equipe_id):
-    """Transition valide_chef → verrouillé (chef ou admin)."""
+    """Transition valide_chef → verrouille (chef ou admin)."""
     equipe = Equipe.query.get_or_404(equipe_id)
-    if equipe.statut not in (STATUT_VALIDE_CHEF, STATUT_SOUMIS_LEGACY):
-        flash("Seule une fiche validée par le chef peut être verrouillée.", 'warning')
+    if equipe.statut != STATUT_VALIDE_CHEF:
+        flash("Seule une fiche validée par le chef peut être clôturée.", 'warning')
         return redirect(url_for('saisie.detail_poste', poste_id=equipe_id))
     equipe.statut = STATUT_VERROUILLE
     db.session.commit()
-    flash("Fiche verrouillée — données définitives.", 'secondary')
+    flash("Fiche clôturée — données définitives.", 'secondary')
     return redirect(url_for('saisie.detail_poste', poste_id=equipe_id))
 
 
@@ -1108,14 +1108,14 @@ def verrouiller_equipe(equipe_id):
 @login_required
 @roles_required('admin')
 def deverrouiller_equipe(equipe_id):
-    """Transition verrouillé → valide_chef (admin uniquement)."""
+    """Transition verrouille → valide_chef (admin uniquement)."""
     equipe = Equipe.query.get_or_404(equipe_id)
     if not equipe.est_verrouille:
-        flash("Cette équipe n'est pas verrouillée.", 'warning')
+        flash("Cette fiche n'est pas clôturée.", 'warning')
         return redirect(url_for('saisie.detail_poste', poste_id=equipe_id))
     equipe.statut = STATUT_VALIDE_CHEF
     db.session.commit()
-    flash("Fiche déverrouillée. Elle reste validée chef et peut être corrigée.", 'info')
+    flash("Fiche rouverte. Elle reste validée chef et peut être corrigée.", 'info')
     return redirect(url_for('saisie.detail_poste', poste_id=equipe_id))
 
 
@@ -1123,7 +1123,7 @@ def deverrouiller_equipe(equipe_id):
 @login_required
 @roles_required('chef', 'admin')
 def demander_correction(equipe_id):
-    """Transition a_verifier/valide_chef/verrouillé → a_corriger avec motif lisible."""
+    """Transition a_verifier/valide_chef/verrouille → a_corriger avec motif lisible."""
     equipe = Equipe.query.get_or_404(equipe_id)
     ancien_statut = equipe.statut
     avant = _snapshot_equipe(equipe)
@@ -1230,11 +1230,11 @@ def historique():
 
     if filtres['statut'] == 'valide':
         query = query.filter(Equipe.statut.in_((
-            STATUT_VALIDE_CHEF, STATUT_VERROUILLE, STATUT_SOUMIS_LEGACY,
+            STATUT_VALIDE_CHEF, STATUT_VERROUILLE,
         )))
     elif filtres['statut'] in (
         STATUT_BROUILLON, STATUT_A_VERIFIER, STATUT_A_CORRIGER,
-        STATUT_VALIDE_CHEF, STATUT_VERROUILLE, STATUT_SOUMIS_LEGACY,
+        STATUT_VALIDE_CHEF, STATUT_VERROUILLE,
     ):
         query = query.filter(Equipe.statut == filtres['statut'])
 
@@ -1301,7 +1301,7 @@ def detail_poste(poste_id):
                            peut_valider_chef=_peut_valider_chef(equipe),
                            peut_modifier=_peut_modifier(equipe),
                            peut_verrouiller=(
-                               equipe.statut in (STATUT_VALIDE_CHEF, STATUT_SOUMIS_LEGACY)
+                               equipe.statut == STATUT_VALIDE_CHEF
                                and not equipe.est_verrouille
                                and current_user.role in ('chef', 'admin')
                            ),

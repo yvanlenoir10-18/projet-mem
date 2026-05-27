@@ -667,3 +667,18 @@ Objectif : donner au chef une vue de diagnostic pour comprendre quelles machines
 - [x] Afficher les arrêts longs et les récurrences simples.
 - [x] Relier le dashboard Chef et la navigation à cette page.
 - [x] Vérifier le rendu, les filtres et le lancement Flask avant commit.
+
+---
+
+## ⏳ P3.5 — Profil Chef Scierie : Résolution guidée Ishikawa + 5 Pourquoi
+
+Objectif : transformer les symptômes terrain en causes racines défendables pour le pilotage et le mémoire OS4/H2.
+
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Ajouter les modèles `Probleme`, `IshikawaCause`, `PourquoiNiveau`.
+- [x] Créer le blueprint `/problemes` avec workflow : liste, nouveau, Ishikawa, 5 Pourquoi, cause racine, rapport A3.
+- [x] Créer les templates de résolution guidée et le CSS associé.
+- [x] Ajouter la navigation `Résolution`.
+- [x] Intégrer les liens depuis Machines & Arrêts, Pareto, Recommandations, détail fiche et dashboard chef.
+- [x] Vérifier les accès rôles, le workflow complet, l'anti-doublon, le CSRF AJAX et l'impression A3.
+- [ ] Commit et push GitHub.

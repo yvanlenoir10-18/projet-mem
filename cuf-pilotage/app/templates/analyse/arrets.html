@@ -199,6 +199,7 @@
           <th class="text-end">Durée</th>
           <th>Cause</th>
           <th>Catégorie</th>
+          <th class="text-end">Action</th>
         </tr>
       </thead>
       <tbody>
@@ -225,6 +226,20 @@
           </td>
           <td style="font-size:.865rem;">{{ a.cause }}</td>
           <td><span class="wp-pill wp-pill-{{ pill }}">{{ a.categorie }}</span></td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-primary"
+               href="{{ url_for('problemes.nouveau',
+                                origine_type='pareto',
+                                origine_label=a.machine ~ ' - ' ~ a.cause,
+                                contexte_ou=a.machine,
+                                contexte_quand=a.date.strftime('%d/%m/%Y') ~ ' · ' ~ a.numero_poste,
+                                contexte_combien=a.duree_min ~ ' min',
+                                pareto_cause=a.cause,
+                                equipe_id=a.poste_id,
+                                origine_url=url_for('analyse.arrets', jours=jours, machine=machine, categorie=categorie)) }}">
+              Analyser
+            </a>
+          </td>
         </tr>
         {% endfor %}
       </tbody>

@@ -123,6 +123,21 @@
       {% endfor %}
     </div>
 
+    {% if current_user.role in ('chef', 'admin') and reco.code in ['TRS_CRITIQUE', 'ARRETS_NON_DOCUMENTES', 'DECLASS_EXCESSIF'] %}
+    <div class="mb-3">
+      <a class="btn btn-sm btn-primary"
+         href="{{ url_for('problemes.nouveau',
+                          origine_type='recommandation',
+                          origine_label=reco.titre,
+                          reco_code=reco.code,
+                          contexte_quoi=reco.titre,
+                          contexte_combien='Analyse sur ' ~ contexte_global.nb_postes ~ ' postes',
+                          origine_url=url_for('recommandations.index', jours=jours)) }}">
+        <i class="bi bi-diagram-3"></i> Lancer une analyse
+      </a>
+    </div>
+    {% endif %}
+
     {# ── Couche 2 : enrichissement IA ── #}
     <div class="wp-reco-ai-zone mt-3">
       <div class="d-flex gap-2 align-items-center flex-wrap mb-2">

@@ -759,3 +759,88 @@ body {
 }
 .wp-kpi-mini-label { font-size: .65rem; color: var(--wp-muted); font-weight: 600; text-transform: uppercase; }
 .wp-kpi-mini-val   { font-size: 1rem; font-weight: 800; color: var(--wp-ink); }
+
+/* P3.5 — Résolution guidée Ishikawa / 5 Pourquoi */
+.wp-6m-branch .wp-card-header {
+  background: #fbfaf6;
+}
+.wp-cause-chip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .75rem;
+  border: 1px solid #e5e0d6;
+  border-radius: 8px;
+  padding: .7rem .8rem;
+  background: #fff;
+}
+.wp-pourquoi-card.wp-locked {
+  opacity: .62;
+  background: #f8f6f0;
+}
+.wp-root-option {
+  display: flex;
+  align-items: center;
+  gap: .85rem;
+  border: 1px solid #e5e0d6;
+  border-radius: 8px;
+  padding: .85rem;
+  background: #fff;
+  cursor: pointer;
+}
+.wp-root-option:hover {
+  border-color: rgba(31, 92, 61, .35);
+  background: #fbfdf9;
+}
+.wp-root-option input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+.wp-6m-stat {
+  border: 1px solid #e5e0d6;
+  border-radius: 8px;
+  padding: .85rem;
+  background: #fff;
+  min-height: 110px;
+}
+.wp-6m-stat-label {
+  font-size: .74rem;
+  color: var(--wp-muted);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+.wp-6m-stat-value {
+  font-size: 1.65rem;
+  color: var(--wp-ink);
+  font-weight: 900;
+  line-height: 1.1;
+  margin-top: .25rem;
+}
+.wp-6m-stat-sub {
+  font-size: .72rem;
+  color: var(--wp-muted);
+  margin-top: .35rem;
+}
+.wp-a3-rapport {
+  max-width: 1080px;
+  margin: 0 auto;
+}
+.wp-a3-section p {
+  margin-bottom: .55rem;
+  color: var(--wp-ink);
+}
+.wp-a3-why {
+  border-left: 3px solid var(--wp-emerald);
+  padding: .45rem .75rem;
+  margin-bottom: .6rem;
+  background: #fbfdf9;
+}
+.wp-h2-box {
+  border: 1px solid rgba(31, 92, 61, .22);
+  border-radius: 8px;
+  background: #f2f8ef;
+  color: var(--wp-ink);
+  padding: .85rem;
+  margin-top: .85rem;
+}

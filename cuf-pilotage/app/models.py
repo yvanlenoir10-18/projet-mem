@@ -314,3 +314,96 @@ class Arret(db.Model):
 
     def __repr__(self):
         return f'<Arret {self.machine} {self.heure_debut}-{self.heure_fin} ({self.duree_min}min)>'
+
+
+class Probleme(db.Model):
+    """
+    Analyse causale guidée : symptôme terrain → Ishikawa 6M → 5 Pourquoi → cause racine.
+    Le champ cause_racine_selectionnee_id reste un entier simple pour éviter une FK circulaire
+    fragile sous SQLite entre Probleme et IshikawaCause.
+    """
+    __tablename__ = 'probleme'
+
+    id = db.Column(db.Integer, primary_key=True)
+    titre = db.Column(db.String(200), nullable=False)
+    statut = db.Column(db.String(20), nullable=False, default='ouvert')
+    description = db.Column(db.Text)
+
+    contexte_quoi = db.Column(db.Text)
+    contexte_quand = db.Column(db.Text)
+    contexte_ou = db.Column(db.Text)
+    contexte_combien = db.Column(db.Text)
+
+    origine_type = db.Column(db.String(30), nullable=False, default='manuel')
+    origine_label = db.Column(db.String(200))
+    origine_url = db.Column(db.String(300))
+    equipe_id = db.Column(db.Integer, db.ForeignKey('equipe.id'))
+    pareto_cause = db.Column(db.String(200))
+    reco_code = db.Column(db.String(50))
+
+    cause_racine_selectionnee_id = db.Column(db.Integer)
+    actions_correctives = db.Column(db.Text)
+    responsable_action = db.Column(db.String(120))
+    delai_action = db.Column(db.Date)
+    statut_action = db.Column(db.String(30), nullable=False, default='a_faire')
+    classe_sans_action_motif = db.Column(db.Text)
+
+    cree_par_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    cree_le = db.Column(db.DateTime, default=datetime.utcnow)
+    modifie_le = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    cree_par = db.relationship('User', lazy=True)
+    equipe = db.relationship('Equipe', lazy=True)
+    causes = db.relationship('IshikawaCause', backref='probleme', lazy=True,
+                             cascade='all, delete-orphan')
+
+    @property
+    def cause_racine(self):
+        if not self.cause_racine_selectionnee_id:
+            return None
+        return next((c for c in self.causes if c.id == self.cause_racine_selectionnee_id), None)
+
+    @property
+    def est_ouvert(self):
+        return self.statut in ('ouvert', 'en_analyse', 'cause_identifiee')
+
+    def __repr__(self):
+        return f'<Probleme {self.id} {self.statut} {self.titre}>'
+
+
+class IshikawaCause(db.Model):
+    """Cause possible placée sur une branche 6M."""
+    __tablename__ = 'ishikawa_cause'
+
+    id = db.Column(db.Integer, primary_key=True)
+    probleme_id = db.Column(db.Integer, db.ForeignKey('probleme.id'), nullable=False)
+    categorie_6m = db.Column(db.String(30), nullable=False)
+    description = db.Column(db.String(500), nullable=False)
+    est_racine = db.Column(db.Boolean, default=False)
+    cree_le = db.Column(db.DateTime, default=datetime.utcnow)
+
+    pourquois = db.relationship('PourquoiNiveau', backref='cause', lazy=True,
+                                cascade='all, delete-orphan',
+                                order_by='PourquoiNiveau.niveau')
+
+    def __repr__(self):
+        return f'<IshikawaCause {self.categorie_6m} {self.description[:30]}>'
+
+
+class PourquoiNiveau(db.Model):
+    """Un niveau de la chaîne 5 Pourquoi."""
+    __tablename__ = 'pourquoi_niveau'
+
+    id = db.Column(db.Integer, primary_key=True)
+    cause_id = db.Column(db.Integer, db.ForeignKey('ishikawa_cause.id'), nullable=False)
+    niveau = db.Column(db.Integer, nullable=False)
+    question = db.Column(db.String(600), nullable=False)
+    reponse = db.Column(db.Text)
+    cree_le = db.Column(db.DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint('cause_id', 'niveau', name='uq_pourquoi_cause_niveau'),
+    )
+
+    def __repr__(self):
+        return f'<PourquoiNiveau cause={self.cause_id} n={self.niveau}>'

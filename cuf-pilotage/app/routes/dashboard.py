@@ -13,7 +13,7 @@ import io
 from ..models import (
     db, User, Equipe, Parametre, STATUT_A_CORRIGER, STATUT_A_VERIFIER,
     STATUT_BROUILLON, STATUT_VALIDE_CHEF, STATUT_VERROUILLE,
-    STATUTS_ANALYSES, STATUTS_NON_ANALYSES,
+    STATUTS_ANALYSES, STATUTS_NON_ANALYSES, Probleme,
 )
 from ..services.trs import (
     pareto_arrets, couleur_trs,
@@ -755,6 +755,9 @@ def vue_chef():
     kpi_jour = _kpi_aujourdhui(aujourd_hui)
     postes_du_jour = _postes_du_jour(aujourd_hui)
     actions_immediates = _actions_immediates(aujourd_hui, alertes)
+    nb_problemes_ouverts = Probleme.query.filter(
+        Probleme.statut.in_(('ouvert', 'en_analyse'))
+    ).count()
 
     try:
         mois_sel  = int(request.args.get('mois',  0))
@@ -789,7 +792,8 @@ def vue_chef():
                                kpi_jour=kpi_jour,
                                postes_du_jour=postes_du_jour,
                                actions_immediates=actions_immediates,
-                               alertes=alertes)
+                               alertes=alertes,
+                               nb_problemes_ouverts=nb_problemes_ouverts)
 
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen    = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
@@ -1026,7 +1030,8 @@ def vue_chef():
                            kpi_jour=kpi_jour,
                            postes_du_jour=postes_du_jour,
                            actions_immediates=actions_immediates,
-                           alertes=alertes)
+                           alertes=alertes,
+                           nb_problemes_ouverts=nb_problemes_ouverts)
 
 
 @dashboard_bp.route('/chef/fiches')

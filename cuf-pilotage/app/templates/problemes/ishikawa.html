@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+{% block title %}Ishikawa · wood_pilot{% endblock %}
+{% block page_title %}Ishikawa 6M{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <div class="wp-section-title mb-1">
+      <i class="bi bi-diagram-3"></i> {{ probleme.titre }}
+    </div>
+    <div style="font-size:.84rem;color:var(--wp-muted);">
+      Étape 2 / 4 : ajoute les causes possibles sur les branches 6M.
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('problemes.nouveau') }}" class="btn btn-sm btn-outline-secondary">Étape 1</a>
+    <a id="btn-etape4" href="{{ url_for('problemes.selectionner_racine', probleme_id=probleme.id) }}"
+       class="btn btn-sm btn-primary {% if not probleme.causes %}disabled{% endif %}">
+      Cause racine <i class="bi bi-arrow-right"></i>
+    </a>
+  </div>
+</div>
+
+<div id="solidite-box" class="wp-card mb-4 p-3">
+  <span class="badge bg-{{ solidite.couleur }}">{{ solidite.label }}</span>
+  <span style="font-size:.84rem;color:var(--wp-muted);margin-left:.5rem;">{{ solidite.detail }}</span>
+</div>
+
+<div class="row g-3">
+  {% for cat in categories %}
+  <div class="col-lg-6">
+    <div class="wp-card wp-6m-branch" data-category="{{ cat }}">
+      <div class="wp-card-header">
+        <i class="bi bi-chevron-down"></i>
+        {{ cat }}
+        <span class="ms-auto wp-pill wp-pill-neutral cause-count">{{ grouped_causes[cat]|length }} cause{{ 's' if grouped_causes[cat]|length > 1 }}</span>
+      </div>
+      <div class="p-3">
+        <div class="cause-list d-grid gap-2">
+          {% for cause in grouped_causes[cat] %}
+          <div class="wp-cause-chip" data-cause-id="{{ cause.id }}">
+            <div>
+              <strong>{{ cause.description }}</strong>
+              <div style="font-size:.72rem;color:var(--wp-muted);">
+                {{ cause.pourquois|length }} pourquoi renseigné{{ 's' if cause.pourquois|length > 1 }}
+              </div>
+            </div>
+            <div class="d-flex gap-1">
+              <a class="btn btn-sm btn-outline-primary"
+                 href="{{ url_for('problemes.pourquoi', probleme_id=probleme.id, cause_id=cause.id) }}">
+                <i class="bi bi-arrow-up-right"></i>
+              </a>
+              <button type="button" class="btn btn-sm btn-outline-danger btn-delete-cause"
+                      data-url="{{ url_for('problemes.supprimer_cause', probleme_id=probleme.id, cause_id=cause.id) }}">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        <form class="form-cause mt-3">
+          <input type="hidden" name="categorie_6m" value="{{ cat }}">
+          <div class="input-group">
+            <input name="description" class="form-control" maxlength="500"
+                   placeholder="Ajouter une cause {{ cat|lower }}">
+            <button class="btn btn-outline-primary">Ajouter</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const tokenResolution = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+function majSolidite(solidite) {
+  if (!solidite) return;
+  const box = document.getElementById('solidite-box');
+  box.innerHTML = '<span class="badge bg-' + solidite.couleur + '">' + escHtml(solidite.label) + '</span>'
+    + '<span style="font-size:.84rem;color:var(--wp-muted);margin-left:.5rem;">' + escHtml(solidite.detail) + '</span>';
+}
+
+function refreshCount(branch) {
+  const count = branch.querySelectorAll('.wp-cause-chip').length;
+  branch.querySelector('.cause-count').textContent = count + ' cause' + (count > 1 ? 's' : '');
+  if (document.querySelectorAll('.wp-cause-chip').length > 0) {
+    document.getElementById('btn-etape4').classList.remove('disabled');
+  }
+}
+
+document.querySelectorAll('.form-cause').forEach(form => {
+  form.addEventListener('submit', event => {
+    event.preventDefault();
+    const input = form.querySelector('input[name="description"]');
+    const categorie = form.querySelector('input[name="categorie_6m"]').value;
+    const description = input.value.trim();
+    if (!description) return;
+
+    fetch('{{ url_for("problemes.ajouter_cause", probleme_id=probleme.id) }}', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': tokenResolution},
+      body: JSON.stringify({categorie_6m: categorie, description: description})
+    })
+    .then(r => r.json().then(data => ({ok: r.ok, data: data})))
+    .then(({ok, data}) => {
+      if (!ok) throw new Error(data.erreur || 'Erreur');
+      const branch = form.closest('.wp-6m-branch');
+      const list = branch.querySelector('.cause-list');
+      const item = document.createElement('div');
+      item.className = 'wp-cause-chip';
+      item.dataset.causeId = data.id;
+      item.innerHTML = '<div><strong>' + escHtml(data.description) + '</strong>'
+        + '<div style="font-size:.72rem;color:var(--wp-muted);">0 pourquoi renseigné</div></div>'
+        + '<div class="d-flex gap-1">'
+        + '<a class="btn btn-sm btn-outline-primary" href="' + data.url_pourquoi + '"><i class="bi bi-arrow-up-right"></i></a>'
+        + '<button type="button" class="btn btn-sm btn-outline-danger btn-delete-cause" data-url="/problemes/{{ probleme.id }}/cause/' + data.id + '"><i class="bi bi-x-lg"></i></button>'
+        + '</div>';
+      list.appendChild(item);
+      input.value = '';
+      refreshCount(branch);
+      majSolidite(data.solidite);
+    })
+    .catch(err => alert(err.message));
+  });
+});
+
+document.addEventListener('click', event => {
+  const btn = event.target.closest('.btn-delete-cause');
+  if (!btn) return;
+  if (!confirm('Supprimer cette cause et ses pourquoi ?')) return;
+  fetch(btn.dataset.url, {method: 'DELETE', headers: {'X-CSRFToken': tokenResolution}})
+    .then(r => r.json().then(data => ({ok: r.ok, data: data})))
+    .then(({ok, data}) => {
+      if (!ok) throw new Error(data.erreur || 'Erreur');
+      const branch = btn.closest('.wp-6m-branch');
+      btn.closest('.wp-cause-chip').remove();
+      refreshCount(branch);
+      majSolidite(data.solidite);
+    })
+    .catch(err => alert(err.message));
+});
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+</script>
+{% endblock %}

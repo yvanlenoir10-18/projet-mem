@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+{% block title %}Nouveau problème · wood_pilot{% endblock %}
+{% block page_title %}Nouveau problème{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <div class="wp-section-title mb-1">
+      <i class="bi bi-pencil-square"></i> Décrire le problème
+    </div>
+    <div style="font-size:.84rem;color:var(--wp-muted);">
+      Étape 1 / 4 : cadrer le symptôme avant de chercher les causes.
+    </div>
+  </div>
+  <a href="{{ url_for('problemes.liste') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Liste
+  </a>
+</div>
+
+{% if doublon %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-ochre);background:#fffaf0;">
+  <div class="p-3">
+    <div style="font-weight:900;color:var(--wp-ochre);">
+      <i class="bi bi-exclamation-triangle"></i> Problème similaire déjà ouvert
+    </div>
+    <div style="font-size:.84rem;color:var(--wp-muted);margin:.35rem 0 .7rem;">
+      {{ doublon.titre }} · statut {{ doublon.statut }}
+    </div>
+    <a href="{{ url_for('problemes.detail', probleme_id=doublon.id) }}" class="btn btn-sm btn-outline-primary">
+      Ouvrir l'existant
+    </a>
+  </div>
+</div>
+{% endif %}
+
+<form method="POST" class="wp-card">
+  {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+  {% if doublon %}<input type="hidden" name="ignorer_doublon" value="1">{% endif %}
+  <div class="p-4">
+    <div class="row g-3">
+      <div class="col-12">
+        <label class="form-label">Titre du problème</label>
+        <input name="titre" class="form-control" maxlength="200" required
+               value="{{ data.titre }}" placeholder="Ex. Blocage répété des grumes sur Bicoupe">
+      </div>
+      <div class="col-12">
+        <label class="form-label">Description libre</label>
+        <textarea name="description" class="form-control" rows="3"
+                  placeholder="Décris le signal observé sans conclure trop vite.">{{ data.description }}</textarea>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label">Quoi ?</label>
+        <textarea name="contexte_quoi" class="form-control" rows="2"
+                  placeholder="Quel phénomène est observé ?">{{ data.contexte_quoi }}</textarea>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Quand ?</label>
+        <textarea name="contexte_quand" class="form-control" rows="2"
+                  placeholder="Depuis quand, quelle fréquence, quel poste ?">{{ data.contexte_quand }}</textarea>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Où ?</label>
+        <textarea name="contexte_ou" class="form-control" rows="2"
+                  placeholder="Machine, essence, équipe, zone atelier.">{{ data.contexte_ou }}</textarea>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label">Combien ?</label>
+        <textarea name="contexte_combien" class="form-control" rows="2"
+                  placeholder="Minutes perdues, m³ concernés, fréquence, impact.">{{ data.contexte_combien }}</textarea>
+      </div>
+
+      <div class="col-md-4">
+        <label class="form-label">Origine</label>
+        <select name="origine_type" class="form-select">
+          {% for code, label in origines.items() %}
+          <option value="{{ code }}" {% if data.origine_type == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-8">
+        <label class="form-label">Source lisible</label>
+        <input name="origine_label" class="form-control" maxlength="200"
+               value="{{ data.origine_label }}" placeholder="Ex. Bicoupe - Blocage grumes">
+      </div>
+
+      <input type="hidden" name="origine_url" value="{{ data.origine_url }}">
+      <input type="hidden" name="equipe_id" value="{{ data.equipe_id or '' }}">
+      <input type="hidden" name="pareto_cause" value="{{ data.pareto_cause }}">
+      <input type="hidden" name="reco_code" value="{{ data.reco_code }}">
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mt-4">
+      <a href="{{ url_for('problemes.liste') }}" class="btn btn-outline-secondary">Annuler</a>
+      <button class="btn btn-primary">
+        Continuer vers Ishikawa <i class="bi bi-arrow-right"></i>
+      </button>
+    </div>
+  </div>
+</form>
+
+{% endblock %}

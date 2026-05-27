@@ -49,6 +49,10 @@
          href="{{ url_for('analyse.arrets') }}">
         <span class="wp-nav-ic"><i class="bi bi-exclamation-triangle"></i></span>Causes d'arrêts
       </a>
+      <a class="wp-nav-link {% if request.endpoint and request.endpoint.startswith('problemes.') %}active{% endif %}"
+         href="{{ url_for('problemes.liste') }}">
+        <span class="wp-nav-ic"><i class="bi bi-diagram-3"></i></span>Résolution
+      </a>
       {% endif %}
 
       {% if current_user.role == 'pdg' %}
@@ -140,6 +144,8 @@
           <span class="wp-nav-ic"><i class="bi bi-cash-stack"></i></span>Pertes financières</a>
         <a class="wp-nav-link" href="{{ url_for('analyse.arrets') }}">
           <span class="wp-nav-ic"><i class="bi bi-exclamation-triangle"></i></span>Causes d'arrêts</a>
+        <a class="wp-nav-link" href="{{ url_for('problemes.liste') }}">
+          <span class="wp-nav-ic"><i class="bi bi-diagram-3"></i></span>Résolution</a>
         {% endif %}
         {% if current_user.role == 'pdg' %}
         <span class="wp-nav-section">Direction</span>

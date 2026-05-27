@@ -279,6 +279,33 @@
 </div>
 {% endif %}
 
+{% if anomalies and current_user.role in ('chef', 'admin') %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-emerald);">
+  <div class="p-3 d-flex justify-content-between align-items-center gap-3 flex-wrap">
+    <div>
+      <div style="font-weight:900;color:var(--wp-ink);">
+        <i class="bi bi-diagram-3" style="color:var(--wp-emerald);"></i>
+        Transformer ces alertes en analyse causale
+      </div>
+      <div style="font-size:.82rem;color:var(--wp-muted);">
+        Utile si le problème revient ou si tu veux documenter une cause racine pour le mémoire.
+      </div>
+    </div>
+    <a class="btn btn-sm btn-primary"
+       href="{{ url_for('problemes.nouveau',
+                        origine_type='fiche',
+                        origine_label='Fiche #' ~ poste.id ~ ' - ' ~ poste.date.strftime('%d/%m/%Y') ~ ' ' ~ poste.numero_equipe,
+                        equipe_id=poste.id,
+                        contexte_quoi=anomalies[0].titre,
+                        contexte_quand=poste.date.strftime('%d/%m/%Y') ~ ' · ' ~ poste.numero_equipe,
+                        contexte_ou=poste.essences_label,
+                        origine_url=url_for('saisie.detail_poste', poste_id=poste.id)) }}">
+      Ouvrir une analyse
+    </a>
+  </div>
+</div>
+{% endif %}
+
 <div class="wp-card mb-4">
   <div class="wp-card-header">
     <i class="bi bi-clipboard-check" style="color:var(--wp-sky);"></i>

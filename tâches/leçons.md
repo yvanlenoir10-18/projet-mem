@@ -102,6 +102,10 @@
 **Contexte :** Le détail d'une fiche affichait `Journal d'audit des corrections` avec `soumission_initiale`, auteur, statuts et valeurs tracées. C'est utile pour la traçabilité interne, mais incompréhensible et inutile dans le flux normal du chef.
 **Règle :** Garder les traces en base, mais ne les afficher que dans un espace admin/audit dédié si nécessaire. Les écrans chef/opérateur doivent montrer les décisions et actions utiles, pas les logs techniques.
 
+### R23 — Les helpers de formulaire doivent séparer valeur par défaut et limite
+**Contexte :** Dans P3.5, le helper de lecture du formulaire `get()` utilisait le deuxième argument comme valeur par défaut alors que l'appelant l'utilisait comme limite de longueur. Résultat : `GET /problemes/nouveau` envoyait un entier à `.strip()` et provoquait une erreur 500.
+**Règle :** Les helpers de formulaire doivent avoir des paramètres explicites (`default`, `limite`) et être couverts par un test de rendu GET avant de tester le POST. Ne jamais mélanger valeur métier et contrainte de nettoyage dans un même argument ambigu.
+
 ---
 
 ## 📅 HISTORIQUE DES CORRECTIONS
@@ -128,3 +132,4 @@
 | 2026-05-23 | Crash potentiel templates CSRF sans redémarrage Python | R20 |
 | 2026-05-24 | `Zone à corriger` fonctionnelle mais ambiguë côté chef | R21 |
 | 2026-05-24 | Journal d'audit trop technique dans le détail fiche | R22 |
+| 2026-05-27 | Helper formulaire P3.5 ambigu `default/limite` | R23 |

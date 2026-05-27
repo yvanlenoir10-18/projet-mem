@@ -158,10 +158,24 @@
           </td>
           <td><span class="badge bg-{{ m.couleur }}">{{ m.statut }}</span></td>
           <td class="text-end">
-            <a class="btn btn-sm btn-outline-primary"
-               href="{{ url_for('dashboard.machines_chef', jours=jours, mode=mode, machine=m.machine) }}">
-              Détail
-            </a>
+            <div class="btn-group btn-group-sm">
+              <a class="btn btn-outline-primary"
+                 href="{{ url_for('dashboard.machines_chef', jours=jours, mode=mode, machine=m.machine) }}">
+                Détail
+              </a>
+              {% if m.cause_principale %}
+              <a class="btn btn-primary"
+                 href="{{ url_for('problemes.nouveau',
+                                  origine_type='machine',
+                                  origine_label=m.machine ~ ' - ' ~ m.cause_principale.nom,
+                                  contexte_ou=m.machine,
+                                  contexte_combien=m.duree_fmt ~ ' sur ' ~ label_periode,
+                                  pareto_cause=m.cause_principale.nom,
+                                  origine_url=url_for('dashboard.machines_chef', jours=jours, mode=mode, machine=m.machine)) }}">
+                Analyser
+              </a>
+              {% endif %}
+            </div>
           </td>
         </tr>
         {% endfor %}

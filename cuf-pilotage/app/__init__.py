@@ -29,6 +29,7 @@ def create_app():
     from .routes.admin import admin_bp
     from .routes.analyse import analyse_bp
     from .routes.recommandations import recos_bp
+    from .routes.problemes import problemes_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(saisie_bp)
@@ -36,6 +37,7 @@ def create_app():
     app.register_blueprint(admin_bp)
     app.register_blueprint(analyse_bp)
     app.register_blueprint(recos_bp)
+    app.register_blueprint(problemes_bp)
 
     with app.app_context():
         db.create_all()
@@ -50,7 +52,9 @@ def create_app():
     @app.errorhandler(CSRFError)
     def erreur_csrf(e):
         message = "Session expirée ou formulaire invalide. Rechargez la page puis réessayez."
-        if request.path.startswith('/recommandations/ai/'):
+        if request.path.startswith('/recommandations/ai/') or (
+            request.path.startswith('/problemes/') and (request.is_json or request.method == 'DELETE')
+        ):
             return jsonify({'erreur': message}), 400
         flash(message, 'danger')
         return redirect(request.referrer or url_for('auth.login'))

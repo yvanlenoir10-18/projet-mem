@@ -106,6 +106,10 @@
 **Contexte :** Dans P3.5, le helper de lecture du formulaire `get()` utilisait le deuxième argument comme valeur par défaut alors que l'appelant l'utilisait comme limite de longueur. Résultat : `GET /problemes/nouveau` envoyait un entier à `.strip()` et provoquait une erreur 500.
 **Règle :** Les helpers de formulaire doivent avoir des paramètres explicites (`default`, `limite`) et être couverts par un test de rendu GET avant de tester le POST. Ne jamais mélanger valeur métier et contrainte de nettoyage dans un même argument ambigu.
 
+### R24 — Un seul serveur Flask doit écouter sur le port 5000
+**Contexte :** Plusieurs `python run.py` lancés en parallèle ont servi des versions différentes du code. Résultat : `BuildError` sur `dashboard.production_chef` et `UndefinedError` sur `stats_operateur`, alors que le code local était déjà corrigé.
+**Règle :** Avant de diagnostiquer une route Flask, vérifier les processus qui écoutent sur `5000`. Utiliser `scripts/redemarrer_wood_pilot.ps1` pour tuer les anciennes instances, libérer le port et relancer l'application avec le `venv`. Tester ensuite les pages critiques avec `test_client`.
+
 ---
 
 ## 📅 HISTORIQUE DES CORRECTIONS
@@ -133,3 +137,4 @@
 | 2026-05-24 | `Zone à corriger` fonctionnelle mais ambiguë côté chef | R21 |
 | 2026-05-24 | Journal d'audit trop technique dans le détail fiche | R22 |
 | 2026-05-27 | Helper formulaire P3.5 ambigu `default/limite` | R23 |
+| 2026-05-27 | Serveurs Flask multiples sur le port 5000 | R24 |

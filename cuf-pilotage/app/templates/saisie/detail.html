@@ -154,6 +154,36 @@
   </div>
 </div>
 
+{# ── Encouragement opérateur — Bug 5 ── #}
+{% if current_user.role == 'operateur' and poste.statut in ('soumis', 'verrouille') %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-leaf);">
+  <div style="padding:16px 20px;display:flex;align-items:center;gap:14px;">
+    <div style="font-size:1.6rem;flex-shrink:0;">
+      {% if poste.trs_global and poste.trs_global >= 65 %}🏆
+      {% elif poste.trs_global and poste.trs_global >= 50 %}📊
+      {% else %}💪{% endif %}
+    </div>
+    <div>
+      <div style="font-weight:800;color:var(--wp-emerald);font-size:.97rem;">
+        {% if poste.trs_global and poste.trs_global >= 65 %}
+          Excellent poste — TRS au-dessus de la moyenne de la chaîne !
+        {% elif poste.trs_global and poste.trs_global >= 50 %}
+          Poste dans la norme — données bien enregistrées, merci.
+        {% elif poste.trs_global %}
+          TRS bas ce poste — chaque arrêt documenté aide à cibler les vraies causes.
+        {% else %}
+          Merci pour cette saisie complète.
+        {% endif %}
+      </div>
+      <div style="font-size:.8rem;color:var(--wp-muted);margin-top:3px;">
+        Ces données alimentent le tableau de bord du chef de production
+        et contribuent directement à l'analyse de performance de la chaîne 4.
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {# ── Productions + Pertes ── #}
 <div class="row g-3 mb-3">
 

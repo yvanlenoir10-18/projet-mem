@@ -127,6 +127,7 @@
 {% block scripts %}
 <script>
 const essencesOptions = `
+    <option value="" disabled selected>— Choisir l'essence —</option>
     {% for e in essences %}
     <option value="{{ e }}">{{ e }}</option>
     {% endfor %}
@@ -136,56 +137,58 @@ const templateProduction = (index) => `
 <div class="row g-2 mb-3 align-items-end p-2 rounded"
      id="prod-${index}"
      style="border:1px solid var(--wp-line);background:var(--wp-cream);">
-    <div class="col-md-2">
+    <div class="col-12 col-md-2">
         <label class="form-label">Essence <span style="color:var(--wp-terracotta);">*</span></label>
         <select name="prod_essence[]" class="form-select form-select-sm" required>
             ${essencesOptions}
         </select>
     </div>
-    <div class="col-md-2">
+    <div class="col-6 col-md-2">
         <label class="form-label small">Grumes entrée (m³) <span style="color:var(--wp-terracotta);">*</span></label>
-        <input type="number" name="prod_volume_entree[]"
+        <input type="text" inputmode="decimal" name="prod_volume_entree[]"
                class="form-control form-control-sm vol-entree-${index}"
-               step="0.1" min="0" placeholder="ex: 35.5" required
+               placeholder="ex: 35.5" required
                oninput="majDechets(${index})">
     </div>
-    <div class="col-md-2">
+    <div class="col-6 col-md-2">
         <label class="form-label small">Conformes (m³) <span style="color:var(--wp-terracotta);">*</span></label>
-        <input type="number" name="prod_volume_conforme[]"
+        <input type="text" inputmode="decimal" name="prod_volume_conforme[]"
                class="form-control form-control-sm vol-conforme-${index}"
-               step="0.001" min="0" placeholder="ex: 12.5" required
+               placeholder="ex: 12.5" required
                oninput="majDechets(${index})">
     </div>
-    <div class="col-md-2">
+    <div class="col-6 col-md-2">
         <label class="form-label small">Déclassé (m³)</label>
-        <input type="number" name="prod_volume_declass[]"
+        <input type="text" inputmode="decimal" name="prod_volume_declass[]"
                class="form-control form-control-sm vol-declass-${index}"
-               step="0.001" min="0" placeholder="ex: 2.1" value="0"
+               placeholder="ex: 2.1" value="0"
                oninput="majDechets(${index})">
     </div>
-    <div class="col-md-2">
+    <div class="col-6 col-md-2">
         <label class="form-label small" style="color:var(--wp-muted);">Déchets estimés</label>
         <input type="text" class="form-control form-control-sm"
                id="dechets-${index}" placeholder="calculé auto"
                style="color:var(--wp-muted);" readonly>
     </div>
-    <div class="col-md-1">
+    <div class="col-12 col-md-1 d-flex align-items-end">
         ${index > 0
             ? `<button type="button"
-                       class="btn btn-sm w-100 mt-4"
-                       style="color:var(--wp-terracotta);border:1.5px solid var(--wp-terracotta);border-radius:8px;"
+                       class="btn btn-sm w-100"
+                       style="color:var(--wp-terracotta);border:1.5px solid var(--wp-terracotta);border-radius:8px;min-height:38px;"
                        onclick="supprimerProduction(${index})">
                  <i class="bi bi-trash"></i>
                </button>`
-            : '<div class="mt-4">&nbsp;</div>'}
+            : '<div style="min-height:38px;">&nbsp;</div>'}
     </div>
+    <div class="col-12" id="err-prod-${index}"
+         style="display:none;color:var(--wp-terracotta);font-size:.82rem;padding:2px 4px;"></div>
 </div>`;
 
 const templateArret = (index) => `
 <div class="row g-2 mb-3 align-items-end p-2 rounded"
      id="arret-${index}"
      style="border:1px solid var(--wp-line);background:var(--wp-cream);">
-    <div class="col-md-2">
+    <div class="col-12 col-md-2">
         <label class="form-label small">Machine</label>
         <select name="arret_machine[]" class="form-select form-select-sm" required>
             {% for m in machines %}
@@ -193,20 +196,24 @@ const templateArret = (index) => `
             {% endfor %}
         </select>
     </div>
-    <div class="col-md-2">
+    <div class="col-6 col-md-2">
         <label class="form-label small">Heure début</label>
-        <input type="time" name="arret_debut[]" class="form-control form-control-sm" required>
+        <input type="time" name="arret_debut[]" id="arret_debut_${index}"
+               class="form-control form-control-sm" required
+               onchange="validerArret(${index})">
     </div>
-    <div class="col-md-2">
+    <div class="col-6 col-md-2">
         <label class="form-label small">Heure fin</label>
-        <input type="time" name="arret_fin[]" class="form-control form-control-sm" required>
+        <input type="time" name="arret_fin[]" id="arret_fin_${index}"
+               class="form-control form-control-sm" required
+               onchange="validerArret(${index})">
     </div>
-    <div class="col-md-3">
+    <div class="col-12 col-md-3">
         <label class="form-label small">Cause de l'arrêt</label>
         <input type="text" name="arret_cause[]" class="form-control form-control-sm"
                placeholder="Décrivez la cause..." required>
     </div>
-    <div class="col-md-2">
+    <div class="col-10 col-md-2">
         <label class="form-label small">Catégorie</label>
         <select name="arret_categorie[]" class="form-select form-select-sm">
             {% for c in categories %}
@@ -214,26 +221,64 @@ const templateArret = (index) => `
             {% endfor %}
         </select>
     </div>
-    <div class="col-md-1">
+    <div class="col-2 col-md-1 d-flex align-items-end">
         <button type="button"
                 class="btn btn-sm w-100"
-                style="color:var(--wp-terracotta);border:1.5px solid var(--wp-terracotta);border-radius:8px;"
+                style="color:var(--wp-terracotta);border:1.5px solid var(--wp-terracotta);border-radius:8px;min-height:38px;"
                 onclick="supprimerArret(${index})">
             <i class="bi bi-trash"></i>
         </button>
     </div>
+    <div class="col-12" id="err-arret-${index}"
+         style="display:none;color:var(--wp-terracotta);font-size:.82rem;padding:2px 4px;"></div>
 </div>`;
 
 let compteurProd  = 0;
 let compteurArret = 0;
 
+function _pf(val) {
+    return parseFloat((val || '').replace(',', '.')) || 0;
+}
+
 function majDechets(index) {
-    const entree   = parseFloat(document.querySelector(`.vol-entree-${index}`)?.value)   || 0;
-    const conforme = parseFloat(document.querySelector(`.vol-conforme-${index}`)?.value) || 0;
-    const declass  = parseFloat(document.querySelector(`.vol-declass-${index}`)?.value)  || 0;
+    const entree   = _pf(document.querySelector(`.vol-entree-${index}`)?.value);
+    const conforme = _pf(document.querySelector(`.vol-conforme-${index}`)?.value);
+    const declass  = _pf(document.querySelector(`.vol-declass-${index}`)?.value);
     const dechets  = Math.max(0, entree - conforme - declass);
     const champ    = document.getElementById(`dechets-${index}`);
     if (champ) champ.value = dechets > 0 ? dechets.toFixed(3) + ' m³' : '—';
+    validerProd(index);
+}
+
+function validerProd(index) {
+    const entree   = _pf(document.querySelector(`.vol-entree-${index}`)?.value);
+    const conforme = _pf(document.querySelector(`.vol-conforme-${index}`)?.value);
+    const declass  = _pf(document.querySelector(`.vol-declass-${index}`)?.value);
+    const err = document.getElementById(`err-prod-${index}`);
+    if (!err) return true;
+    if (entree > 0 && (conforme + declass) > entree + 0.01) {
+        err.textContent = `⚠ Conformes + Déclassé (${(conforme + declass).toFixed(2)} m³) dépasse le volume entré (${entree.toFixed(2)} m³)`;
+        err.style.display = 'block';
+        return false;
+    }
+    err.textContent = '';
+    err.style.display = 'none';
+    return true;
+}
+
+function validerArret(index) {
+    const debut = document.getElementById(`arret_debut_${index}`)?.value;
+    const fin   = document.getElementById(`arret_fin_${index}`)?.value;
+    const err   = document.getElementById(`err-arret-${index}`);
+    if (!err || !debut || !fin) return true;
+    if (fin <= debut) {
+        err.textContent = `⚠ L'heure de fin (${fin}) doit être après l'heure de début (${debut})`;
+        err.style.display = 'block';
+        return false;
+    }
+    err.textContent = '';
+    err.style.display = 'none';
+    return true;
 }
 
 function ajouterProduction() {
@@ -297,5 +342,22 @@ if (productionsDonnees.length > 0) {
 }
 
 arretsDonnees.forEach(a => ajouterArretAvecDonnees(a));
+
+// Bug 4 — Blocage côté client si des erreurs de cohérence sont détectées
+document.getElementById('formEquipe').addEventListener('submit', function(e) {
+    let valide = true;
+    document.querySelectorAll('[id^="prod-"]').forEach(row => {
+        const idx = row.id.replace('prod-', '');
+        if (!validerProd(idx)) valide = false;
+    });
+    document.querySelectorAll('[id^="arret-"]').forEach(row => {
+        const idx = row.id.replace('arret-', '');
+        if (!validerArret(idx)) valide = false;
+    });
+    if (!valide) {
+        e.preventDefault();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+});
 </script>
 {% endblock %}

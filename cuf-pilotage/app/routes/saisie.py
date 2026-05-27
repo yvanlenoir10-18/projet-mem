@@ -23,6 +23,43 @@ saisie_bp = Blueprint('saisie', __name__, url_prefix='/saisie')
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+def _parse_float(val):
+    """Accepte la virgule française ('12,5') et le point ('12.5') comme séparateur."""
+    if not val:
+        return 0.0
+    return float(str(val).replace(',', '.').strip())
+
+
+def _form_data_brut():
+    """Extrait les données brutes du POST pour re-affichage après erreur (Bug 3)."""
+    essences      = request.form.getlist('prod_essence[]')
+    vol_entrees   = request.form.getlist('prod_volume_entree[]')
+    vol_conformes = request.form.getlist('prod_volume_conforme[]')
+    vol_declass   = request.form.getlist('prod_volume_declass[]')
+    machines      = request.form.getlist('arret_machine[]')
+    heures_debut  = request.form.getlist('arret_debut[]')
+    heures_fin    = request.form.getlist('arret_fin[]')
+    causes        = request.form.getlist('arret_cause[]')
+    categories    = request.form.getlist('arret_categorie[]')
+
+    prods = [
+        {'essence':         essences[i]      if i < len(essences)      else '',
+         'volume_entree':   vol_entrees[i]   if i < len(vol_entrees)   else '',
+         'volume_conforme': vol_conformes[i] if i < len(vol_conformes) else '',
+         'volume_declass':  vol_declass[i]   if i < len(vol_declass)   else '0'}
+        for i in range(len(essences))
+    ]
+    arrs = [
+        {'machine':     machines[i]     if i < len(machines)     else '',
+         'heure_debut': heures_debut[i] if i < len(heures_debut) else '',
+         'heure_fin':   heures_fin[i]   if i < len(heures_fin)   else '',
+         'cause':       causes[i]       if i < len(causes)       else '',
+         'categorie':   categories[i]   if i < len(categories)   else ''}
+        for i in range(len(machines))
+    ]
+    return prods, arrs
+
+
 def _verifier_coherence(equipe):
     """P7-V1 — Vérifie la cohérence métier d'une équipe avant soumission.
 
@@ -82,11 +119,9 @@ def _extraire_productions_arrets(form):
             machines, heures_debut, heures_fin, causes, categories)
 
 
-def _render_form(equipe=None):
+def _render_form(equipe=None, productions_data=None, arrets_data=None):
     """Render le formulaire de saisie (création ou modification)."""
-    productions_data = []
-    arrets_data = []
-    if equipe:
+    if productions_data is None and equipe:
         productions_data = [
             {'essence': p.essence,
              'volume_entree': p.volume_entree,
@@ -94,6 +129,7 @@ def _render_form(equipe=None):
              'volume_declass': p.volume_declass}
             for p in equipe.productions
         ]
+    if arrets_data is None and equipe:
         arrets_data = [
             {'machine': a.machine,
              'heure_debut': a.heure_debut,
@@ -102,6 +138,8 @@ def _render_form(equipe=None):
              'categorie': a.categorie}
             for a in equipe.arrets
         ]
+    productions_data = productions_data or []
+    arrets_data      = arrets_data or []
 
     form_action = (
         url_for('saisie.modifier_equipe', equipe_id=equipe.id)
@@ -133,6 +171,7 @@ def _render_form(equipe=None):
 def nouveau_poste():
     """Formulaire de saisie d'une nouvelle équipe — sauvegardée en brouillon."""
     if request.method == 'POST':
+        prods_brut, arrs_brut = _form_data_brut()
         try:
             equipe = Equipe(
                 date=date.fromisoformat(request.form['date']),
@@ -152,23 +191,41 @@ def nouveau_poste():
             if not essences:
                 flash("Au moins une ligne de production est requise.", 'danger')
                 db.session.rollback()
-                return _render_form()
+                return _render_form(productions_data=prods_brut, arrets_data=arrs_brut)
 
             for i, essence in enumerate(essences):
+                # Bug 2 — essence obligatoire si des volumes sont saisis
+                ve = (vol_entrees[i] if i < len(vol_entrees) else '').strip().replace(',', '.')
+                try:
+                    has_volume = float(ve) > 0 if ve else False
+                except ValueError:
+                    has_volume = bool(ve)
+                if not essence and has_volume:
+                    flash("Ligne de production incomplète : sélectionnez une essence avant d'entrer les volumes.", 'danger')
+                    db.session.rollback()
+                    return _render_form(productions_data=prods_brut, arrets_data=arrs_brut)
                 if not essence:
                     continue
                 prod = Production(
                     equipe_id=equipe.id,
                     essence=essence,
-                    volume_entree=float(vol_entrees[i])   if i < len(vol_entrees)   and vol_entrees[i]   else 0,
-                    volume_conforme=float(vol_conformes[i]) if i < len(vol_conformes) and vol_conformes[i] else 0,
-                    volume_declass=float(vol_declass[i])   if i < len(vol_declass)   and vol_declass[i]   else 0,
-                    # prix_snapshot figé à la soumission, pas à la création
+                    volume_entree=_parse_float(vol_entrees[i]   if i < len(vol_entrees)   else ''),
+                    volume_conforme=_parse_float(vol_conformes[i] if i < len(vol_conformes) else ''),
+                    volume_declass=_parse_float(vol_declass[i]   if i < len(vol_declass)   else ''),
                 )
                 db.session.add(prod)
 
             for i in range(len(machines)):
                 if machines[i] and heures_debut[i] and heures_fin[i] and causes[i]:
+                    # Bug 1 — heure_fin doit être strictement après heure_debut
+                    if heures_fin[i] <= heures_debut[i]:
+                        flash(
+                            f"Arrêt {i+1} ({machines[i]}) : l'heure de fin ({heures_fin[i]}) "
+                            f"doit être après l'heure de début ({heures_debut[i]}).",
+                            'danger'
+                        )
+                        db.session.rollback()
+                        return _render_form(productions_data=prods_brut, arrets_data=arrs_brut)
                     arret = Arret(
                         equipe_id=equipe.id,
                         machine=machines[i],
@@ -181,7 +238,7 @@ def nouveau_poste():
                     db.session.add(arret)
 
             db.session.flush()
-            calcule_trs(equipe)   # prévisualisation TRS (non figé)
+            calcule_trs(equipe)
             db.session.commit()
 
             flash("Équipe sauvegardée en brouillon. Vérifiez et soumettez quand les données sont complètes.", 'info')
@@ -190,6 +247,7 @@ def nouveau_poste():
         except Exception as e:
             db.session.rollback()
             flash(f"Erreur lors de l'enregistrement : {type(e).__name__} — {str(e)}", 'danger')
+            return _render_form(productions_data=prods_brut, arrets_data=arrs_brut)
 
     return _render_form()
 
@@ -247,18 +305,16 @@ def modifier_equipe(equipe_id):
         return redirect(url_for('saisie.detail_poste', poste_id=equipe_id))
 
     if request.method == 'POST':
+        prods_brut, arrs_brut = _form_data_brut()
         try:
-            # Conserver les prix_snapshot existants avant suppression
             snapshots = {p.essence: p.prix_snapshot for p in equipe.productions}
 
-            # Supprimer anciennes productions et arrêts
             for p in list(equipe.productions):
                 db.session.delete(p)
             for a in list(equipe.arrets):
                 db.session.delete(a)
             db.session.flush()
 
-            # Mettre à jour les champs de l'équipe
             equipe.date           = date.fromisoformat(request.form['date'])
             equipe.numero_equipe  = request.form['numero_equipe']
             equipe.effectif       = int(request.form.get('effectif', 10))
@@ -271,23 +327,40 @@ def modifier_equipe(equipe_id):
             if not essences:
                 flash("Au moins une ligne de production est requise.", 'danger')
                 db.session.rollback()
-                return _render_form(equipe)
+                return _render_form(equipe, productions_data=prods_brut, arrets_data=arrs_brut)
 
             for i, essence in enumerate(essences):
+                ve = (vol_entrees[i] if i < len(vol_entrees) else '').strip().replace(',', '.')
+                try:
+                    has_volume = float(ve) > 0 if ve else False
+                except ValueError:
+                    has_volume = bool(ve)
+                if not essence and has_volume:
+                    flash("Ligne de production incomplète : sélectionnez une essence avant d'entrer les volumes.", 'danger')
+                    db.session.rollback()
+                    return _render_form(equipe, productions_data=prods_brut, arrets_data=arrs_brut)
                 if not essence:
                     continue
                 prod = Production(
                     equipe_id=equipe.id,
                     essence=essence,
-                    volume_entree=float(vol_entrees[i])   if i < len(vol_entrees)   and vol_entrees[i]   else 0,
-                    volume_conforme=float(vol_conformes[i]) if i < len(vol_conformes) and vol_conformes[i] else 0,
-                    volume_declass=float(vol_declass[i])   if i < len(vol_declass)   and vol_declass[i]   else 0,
-                    prix_snapshot=snapshots.get(essence),   # préservé depuis la soumission
+                    volume_entree=_parse_float(vol_entrees[i]   if i < len(vol_entrees)   else ''),
+                    volume_conforme=_parse_float(vol_conformes[i] if i < len(vol_conformes) else ''),
+                    volume_declass=_parse_float(vol_declass[i]   if i < len(vol_declass)   else ''),
+                    prix_snapshot=snapshots.get(essence),
                 )
                 db.session.add(prod)
 
             for i in range(len(machines)):
                 if machines[i] and heures_debut[i] and heures_fin[i] and causes[i]:
+                    if heures_fin[i] <= heures_debut[i]:
+                        flash(
+                            f"Arrêt {i+1} ({machines[i]}) : l'heure de fin ({heures_fin[i]}) "
+                            f"doit être après l'heure de début ({heures_debut[i]}).",
+                            'danger'
+                        )
+                        db.session.rollback()
+                        return _render_form(equipe, productions_data=prods_brut, arrets_data=arrs_brut)
                     arret = Arret(
                         equipe_id=equipe.id,
                         machine=machines[i],
@@ -302,7 +375,6 @@ def modifier_equipe(equipe_id):
             db.session.flush()
             calcule_trs(equipe)
 
-            # Trace de modification uniquement sur les équipes déjà soumises
             if equipe.statut == 'soumis':
                 equipe.modifie_le  = datetime.utcnow()
                 equipe.modifie_par = current_user.nom
@@ -314,6 +386,7 @@ def modifier_equipe(equipe_id):
         except Exception as e:
             db.session.rollback()
             flash(f"Erreur lors de la modification : {type(e).__name__} — {str(e)}", 'danger')
+            return _render_form(equipe, productions_data=prods_brut, arrets_data=arrs_brut)
 
     return _render_form(equipe)
 
@@ -355,12 +428,42 @@ def deverrouiller_equipe(equipe_id):
 @saisie_bp.route('/historique')
 @login_required
 def historique():
+    from datetime import timedelta
     equipes = Equipe.query.order_by(Equipe.date.desc(), Equipe.numero_equipe).all()
-    # P12 — pré-calcul des anomalies pour drapeau dans la liste
     anomalies_par_poste = {e.id: detecte_anomalies(e) for e in equipes}
+
+    # Bug 5 — Stats motivantes pour l'opérateur (aucune nouvelle table, filtre user_id)
+    stats_op = None
+    if current_user.role == 'operateur':
+        mes_equipes = [e for e in equipes if e.user_id == current_user.id]
+        soumises    = [e for e in mes_equipes
+                       if e.statut in ('soumis', 'verrouille') and e.trs_global]
+        nb = len(soumises)
+        trs_moy    = round(sum(e.trs_global for e in soumises) / nb, 1) if nb else None
+        meilleur   = max((e.trs_global for e in soumises), default=None)
+        aujourd_hui = date.today()
+        recentes   = [e for e in soumises
+                      if e.date >= aujourd_hui - timedelta(days=7)]
+        precedentes = [e for e in soumises
+                       if aujourd_hui - timedelta(days=14) <= e.date < aujourd_hui - timedelta(days=7)]
+        trs_rec  = round(sum(e.trs_global for e in recentes)   / len(recentes),   1) if recentes   else None
+        trs_prec = round(sum(e.trs_global for e in precedentes) / len(precedentes), 1) if precedentes else None
+        if trs_rec and trs_prec:
+            tendance = 'up' if trs_rec > trs_prec else ('down' if trs_rec < trs_prec else 'flat')
+        else:
+            tendance = 'flat'
+        stats_op = {
+            'nb_equipes':  nb,
+            'trs_moyen':   trs_moy,
+            'meilleur_trs': meilleur,
+            'trs_recent':  trs_rec,
+            'tendance':    tendance,
+        }
+
     return render_template('saisie/historique.html',
                            postes=equipes,
-                           anomalies_par_poste=anomalies_par_poste)
+                           anomalies_par_poste=anomalies_par_poste,
+                           stats_operateur=stats_op)
 
 
 @saisie_bp.route('/poste/<int:poste_id>')

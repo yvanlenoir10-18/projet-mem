@@ -159,6 +159,12 @@ def _init_donnees_defaut():
         if not Parametre.query.filter_by(cle=cle).first():
             db.session.add(Parametre(cle=cle, valeur=valeur, description=desc))
 
+    # F6 — Objectif hebdomadaire de régularité de saisie (nb de postes/semaine, pas le TRS)
+    if not Parametre.query.filter_by(cle='objectif_postes_semaine').first():
+        db.session.add(Parametre(
+            cle='objectif_postes_semaine', valeur='5',
+            description='Objectif de régularité : nombre de postes saisis par semaine'))
+
     db.session.commit()
 
 

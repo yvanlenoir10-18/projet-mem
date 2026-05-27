@@ -1336,12 +1336,40 @@ def _stats_operateur(user_id):
     else:
         tendance = 'flat'
 
+    # F6 — Objectif hebdomadaire de régularité (nb de postes saisis, jamais le TRS → pas de biais H3)
+    debut_semaine = ref - timedelta(days=ref.weekday())  # lundi de la semaine courante
+    postes_semaine = sum(
+        1 for e in Equipe.query.filter_by(user_id=user_id).all()
+        if e.statut in ('soumis', 'verrouille', 'valide_chef') and e.date >= debut_semaine
+    )
+    try:
+        objectif_hebdo = int(Parametre.get('objectif_postes_semaine', 5))
+    except (TypeError, ValueError):
+        objectif_hebdo = 5
+    objectif_pct = min(100, round(postes_semaine / objectif_hebdo * 100)) if objectif_hebdo else 0
+
+    # F6b — Record personnel : le dernier poste soumis établit-il un nouveau meilleur TRS ?
+    record_battu = False
+    record_trs = None
+    if nb >= 2:
+        derniere = max(soumises, key=lambda e: (e.date, e.cree_le or datetime.min))
+        autres = [e.trs_global for e in soumises if e is not derniere]
+        if autres and derniere.trs_global == meilleur and derniere.trs_global > max(autres):
+            record_battu = True
+            record_trs = derniere.trs_global
+
     return {
         'nb_equipes': nb,
         'trs_moyen': trs_moyen,
         'meilleur_trs': meilleur,
         'trs_recent': trs_rec,
         'tendance': tendance,
+        'postes_semaine': postes_semaine,
+        'objectif_hebdo': objectif_hebdo,
+        'objectif_pct': objectif_pct,
+        'objectif_atteint': postes_semaine >= objectif_hebdo,
+        'record_battu': record_battu,
+        'record_trs': record_trs,
     }
 
 

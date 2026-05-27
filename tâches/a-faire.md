@@ -681,7 +681,7 @@ Objectif : transformer les symptômes terrain en causes racines défendables pou
 - [x] Ajouter la navigation `Résolution`.
 - [x] Intégrer les liens depuis Machines & Arrêts, Pareto, Recommandations, détail fiche et dashboard chef.
 - [x] Vérifier les accès rôles, le workflow complet, l'anti-doublon, le CSRF AJAX et l'impression A3.
-- [ ] Commit et push GitHub.
+- [x] Commit et push GitHub.
 
 ---
 
@@ -695,7 +695,7 @@ Objectif : permettre au chef de voir si la scierie atteint l'objectif, où se si
 - [x] Créer l'écran chef avec filtres `officiel` / `temps réel`.
 - [x] Relier la navigation et le bloc `Aujourd'hui`.
 - [x] Vérifier le rendu, les filtres et les liens vers fiches/Résolution.
-- [ ] Commit et push GitHub.
+- [x] Commit et push GitHub.
 
 ---
 
@@ -709,4 +709,4 @@ Objectif : montrer où part la matière et identifier les essences/fiches qui cr
 - [x] Créer l'écran chef avec filtres `officiel` / `temps réel`.
 - [x] Relier la navigation, `Aujourd'hui`, les fiches et le module Résolution.
 - [x] Vérifier le rendu, les filtres et les accès rôles.
-- [ ] Commit et push GitHub.
+- [x] Commit et push GitHub.

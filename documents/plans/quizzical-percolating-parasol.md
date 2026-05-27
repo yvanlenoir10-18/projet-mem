@@ -1,309 +1,345 @@
-# Plan — Correction 6 bugs profil opérateur
+# Plan — Module Résolution Guidée (Ishikawa 6M + 5 Pourquoi)
 
-**Branche :** `claude/install-claude-excel-6MGzv`  
+**Branche :** `claude/install-claude-excel-6MGzv`
 **Date :** 2026-05-27
+**Inspiration :** ProBeya "Structured Problem Resolution" → transposé bois/scierie
 
 ---
 
 ## Context
 
-L'analyse du profil opérateur a révélé 6 problèmes bloquants ou dégradants pour la qualité des données collectées terrain. Certains (Bug 1) faussent directement le TRS calculé — ce qui compromet la validité scientifique de l'hypothèse H3 du mémoire (TRS < 60%). Les autres dégradent l'expérience de saisie ou la complétude des données. L'utilisateur a validé les 6 corrections.
+wood_pilot couvre déjà les piliers de mesure ProBeya (TRS D×P×Q, Pareto, criticité machine×catégorie, reco IA grounded). Ce qui manque pour la complétude du mémoire est **l'OS4** : "identifier et hiérarchiser les causes responsables de l'écart". L'Ishikawa 6M et les 5 Pourquoi sont les outils prescrit par le Dr Manga. Ce module les rend guidés, persistants et auditables — ni un tableau blanc mort, ni un PowerPoint. L'hypothèse H2 ("les pertes sont organisationnelles, pas techniques") sera vérifiable empiriquement via le champ `categorie_6m` des causes racines identifiées.
+
+**Périmètre hors scope (validé par l'utilisateur) :** multi-tenant, connecteurs machines (MES), MCP server, signatures réglementaires, PWA offline. Terrain = tablette + wifi, saisie responsive suffit.
 
 ---
 
-## Fichiers modifiés
+## Diagnostic — 16 capacités ProBeya vs wood_pilot
 
-| Fichier | Bugs |
-|---|---|
-| `app/models.py` | Bug 1 |
-| `app/routes/saisie.py` | Bug 1, 2, 3, 5 |
-| `app/templates/saisie/formulaire.html` | Bug 2, 4, 6 |
-| `app/templates/saisie/historique.html` | Bug 5 |
-| `app/templates/saisie/detail.html` | Bug 5 |
+| # | Capacité ProBeya | Statut |
+|---|---|---|
+| 1 | TRS / analyse arrêts | ✅ Présent — D×P×Q, Pareto, criticité machine×catégorie |
+| 2 | Dialogues performance (IA) | ✅ Présent — Claude/Groq grounded sur KPIs réels, cache 7j |
+| 3 | Fiche suiveuse (dossier lot) | 🟡 Partiel — `fiche_poste.html` + AuditCorrection JSON snapshots |
+| 4 | Contrôle qualité (SPC) | 🟡 Partiel — rendement matière, déclassé %, anomalies R3 |
+| 5 | GMAO corrective | 🟡 Partiel — arrêts consignés + catégorie "Maintenance planifiée" |
+| 6 | Passation de poste | 🟡 Partiel — workflow statuts + dupliquer poste |
+| 7 | **Résolution guidée (Ishikawa)** | **❌ Absent — 1er module à implémenter** |
+| 8 | SQCDL board quotidien | ❌ Absent — KPIs Q/C/D existent, S et L manquent |
+| 9 | Actions + escalade T1→T3 | ❌ Absent — nécessaire pour la pérennité |
+| 10 | Matrice compétences opérateurs | ❌ Absent |
+| 11 | Marche Gemba / Leader Standard Work | ❌ Absent |
+| 12 | SOPs versionnées + Kaizen photo | ❌ Absent |
+| 13 | EHS + Andon | ❌ Absent |
+| 14 | Flux matière / Kanban bois | ❌ Absent |
+| 15 | Formation / onboarding | ❌ Absent |
+| 16 | Portail audit / inspecteur | ❌ Absent (hors périmètre mémoire) |
+
+**Score actuel : 2 présents + 4 partiels → Niveau 2 (Structuré) sur l'axe mesure. Niveau 1 (Réactif) sur les axes management visuel et résolution de problèmes.**
 
 ---
 
-## Bug 1 — heure_fin ne peut jamais être ≤ heure_debut
+## Top 5 features à implémenter (roadmap priorisé)
 
-**Problème :** `Arret.calcule_duree()` (models.py:220-226) fait `max(0, résultat)`, convertissant silencieusement une heure inversée en 0 minute. Cela gonfle le TRS artificiellement.
+| Priorité | Module | Justification | Lien mémoire |
+|---|---|---|---|
+| **1** | **Ishikawa + 5 Pourquoi guidés** | Comble OS4 directement ; vérifie H2 empiriquement | OS4, H2 |
+| 2 | SQCDL board quotidien | Socle ProBeya ; KPIs Q/C/D déjà calculés (brancher S et L) | OS6 |
+| 3 | Actions + escalade T1→T2→T3 | Transversal à tous les modules ; "l'infrastructure survit aux consultants" | OS5, OS6 |
+| 4 | Matrice compétences opérateurs | Polyvalence, formation machine ; alimente H2 (causes organisationnelles) | OS4, H2 |
+| 5 | EHS + Andon | Pilier S du SQCDL ; presque-accidents, arrêt ligne en 1 tap | OS6 |
 
-**Fix :**
+---
 
-1. **`models.py` — `calcule_duree()`** : supprimer le `max(0, ...)` et lever une `ValueError` si le résultat est ≤ 0. La méthode doit retourner `True` si OK, `False` (ou lever) si invalide.
+## Module 1 — Ishikawa 6M + 5 Pourquoi (à implémenter)
 
+### Modèle de données — 3 nouvelles tables
+
+#### `Probleme`
+| Colonne | Type | Contrainte | Notes |
+|---|---|---|---|
+| id | Integer | PK | |
+| titre | String(200) | NOT NULL | |
+| statut | String(20) | NOT NULL, default='ouvert' | ouvert → en_analyse → cause_identifiee → clos |
+| description | Text | nullable | |
+| contexte_quoi | Text | nullable | "Quel phénomène ?" |
+| contexte_quand | Text | nullable | "Depuis quand / quelle fréquence ?" |
+| contexte_ou | Text | nullable | "Sur quelle machine / essence ?" |
+| contexte_combien | Text | nullable | "Quel impact quantifié ?" |
+| equipe_id | Integer | FK('equipe.id'), nullable | Poste déclencheur |
+| pareto_cause | String(200) | nullable | Cause Pareto texte verbatim |
+| reco_code | String(50) | nullable | Ex. 'TRS_CRITIQUE' |
+| cause_racine_selectionnee_id | Integer | nullable, **PAS de ForeignKey()** (évite FK circulaire SQLite) | Pointe vers IshikawaCause |
+| actions_correctives | Text | nullable | Plan d'action libre |
+| cree_par_id | Integer | FK('user.id') | |
+| cree_le | DateTime | default=utcnow | |
+| modifie_le | DateTime | onupdate=utcnow | |
+
+**Transitions de statut :**
+- `ouvert → en_analyse` : dès la 1re `IshikawaCause` ajoutée (dans `ajouter_cause()`)
+- `en_analyse → cause_identifiee` : quand `sauver_racine()` est appelé
+- `cause_identifiee → clos` : par le bouton Clôturer dans le rapport
+- `clos → ouvert` : réouverture chef/admin uniquement
+
+#### `IshikawaCause`
+| Colonne | Type | Contrainte | Notes |
+|---|---|---|---|
+| id | Integer | PK | |
+| probleme_id | Integer | FK('probleme.id'), NOT NULL | |
+| categorie_6m | String(30) | NOT NULL | Machine \| Main d'oeuvre \| Matière \| Méthode \| Milieu \| Mesure |
+| description | String(500) | NOT NULL | |
+| est_racine | Boolean | default=False | Un seul True par probleme_id (enforced app-level) |
+| cree_le | DateTime | default=utcnow | |
+
+#### `PourquoiNiveau`
+| Colonne | Type | Contrainte | Notes |
+|---|---|---|---|
+| id | Integer | PK | |
+| cause_id | Integer | FK('ishikawa_cause.id'), NOT NULL | |
+| niveau | Integer | NOT NULL | 1 à 5 |
+| question | String(600) | NOT NULL | Auto-généré : "Pourquoi [description N-1] ?" |
+| reponse | Text | nullable | Vide = non encore répondu |
+| cree_le | DateTime | default=utcnow | |
+
+**Règle de chaîne :** Pour ajouter le niveau N, `reponse` du niveau N-1 doit être non vide. La `question` du niveau N = `"Pourquoi " + reponse_N-1.strip() + " ?"`. Enforced dans `sauver_pourquoi()`.
+
+**Décision technique clé :** `cause_racine_selectionnee_id` est déclaré `db.Column(db.Integer, nullable=True)` **sans** `db.ForeignKey()` pour éviter la référence circulaire `Probleme → IshikawaCause → Probleme` qui cause une erreur sur SQLite avec SQLAlchemy. L'intégrité est enforced au niveau applicatif.
+
+---
+
+### Routes — nouveau blueprint `problemes_bp`
+
+**Fichier :** `app/routes/problemes.py` — `url_prefix='/problemes'`
+
+**Constantes dans le fichier :**
 ```python
-def calcule_duree(self):
-    try:
-        h_d, m_d = map(int, self.heure_debut.split(':'))
-        h_f, m_f = map(int, self.heure_fin.split(':'))
-        delta = (h_f * 60 + m_f) - (h_d * 60 + m_d)
-        if delta <= 0:
-            raise ValueError("fin <= debut")
-        self.duree_min = delta
-    except (ValueError, AttributeError):
-        self.duree_min = 0
-        raise  # re-raise pour que la route puisse bloquer
+CATEGORIES_6M = ['Machine', "Main d'oeuvre", 'Matière', 'Méthode', 'Milieu', 'Mesure']
+_LABELS_RECO = {'TRS_CRITIQUE': 'TRS critique', 'ARRETS_NON_DOCUMENTES': 'Arrêts non documentés', ...}
 ```
 
-Alternativement (plus simple et sans casser le contrat existant) : ne pas raise, mais retourner un booléen et laisser la route valider.
+| Route | Méthode | Fonction | Rôles | Description |
+|---|---|---|---|---|
+| `/` | GET | `liste()` | chef, admin | Liste tous les problèmes, filtrable par statut. Passe `stats={ouvert, en_analyse, cause_identifiee, clos}`. |
+| `/nouveau` | GET | `nouveau()` | chef, admin | Form étape 1. Pré-remplit depuis `?pareto_cause=`, `?reco_code=`, `?equipe_id=`. |
+| `/nouveau` | POST | `nouveau()` | chef, admin | Crée `Probleme`, redirige vers `ishikawa(probleme_id)`. |
+| `/<id>/etape/2` | GET | `ishikawa(id)` | chef, admin | Diagramme Ishikawa. Charge `grouped_causes` par 6M. |
+| `/<id>/etape/2/cause` | POST | `ajouter_cause(id)` | chef, admin | **AJAX JSON**. Lit `{categorie_6m, description}`. Crée `IshikawaCause`. Si 1re cause → statut `en_analyse`. Retourne `{id, categorie_6m, description}` ou `{erreur}`. |
+| `/<id>/cause/<cause_id>` | DELETE | `supprimer_cause(id, cause_id)` | chef, admin | **AJAX JSON**. Supprime cause + PourquoiNiveau cascade. Si cause était racine → clear `cause_racine_selectionnee_id`, statut `en_analyse`. |
+| `/<id>/etape/3/<cause_id>` | GET | `pourquoi(id, cause_id)` | chef, admin | Affiche chaîne 5 Pourquoi pour une cause. |
+| `/<id>/etape/3/<cause_id>/pourquoi` | POST | `sauver_pourquoi(id, cause_id)` | chef, admin | **AJAX JSON**. Lit `{niveau, reponse}`. Valide niveau N-1 répondu. Upsert `PourquoiNiveau`. Génère `question_suivante`. Retourne `{niveau, question, reponse, question_suivante}`. |
+| `/<id>/etape/4` | GET | `selectionner_racine(id)` | chef, admin | Liste toutes les causes avec profondeur 5 Pourquoi. Radio bouton. Textarea actions. |
+| `/<id>/etape/4` | POST | `sauver_racine(id)` | chef, admin | Lit `cause_racine_id` + `actions_correctives`. Set `est_racine=True` sur cause choisie (False sur les autres). Set `cause_racine_selectionnee_id` + statut `cause_identifiee`. Redirige vers rapport. |
+| `/<id>/rapport` | GET | `rapport(id)` | chef, admin | Rapport A3 imprimable. Eager-load causes + pourquois. |
+| `/<id>/clore` | POST | `clore(id)` | chef, admin | `cause_identifiee → clos`. |
+| `/<id>/rouvrir` | POST | `rouvrir(id)` | chef, admin | `clos → ouvert`. |
+| `/<id>` | GET | `detail(id)` | chef, admin | Smart redirect selon `statut` : ouvert/en_analyse → étape 2 ; cause_identifiee/clos → rapport. |
 
-**Approche retenue — validation dans la route** : `calcule_duree()` reste silencieuse (compatibilité) mais on ajoute une validation explicite dans `saisie.py` **avant** le `db.session.add`. Pour chaque arrêt parsé, vérifier que `heure_fin > heure_debut` (comparaison string HH:MM fonctionne si format correct, sinon convertir). Si invalide → `flash(..., 'danger')` et `return _render_form(...)` avec données préservées.
-
-**Localisation dans saisie.py :** après la boucle de parsing des arrêts dans `nouveau_poste()` (lignes 160-175 environ), avant `db.session.add`.
+**CSRF AJAX :** Même pattern que `recommandations/index.html` : `X-CSRFToken: document.querySelector('meta[name="csrf-token"]')?.content` dans les headers `fetch()`. Étendre le handler d'erreur CSRF dans `__init__.py` aux paths `/problemes/`.
 
 ---
 
-## Bug 2 — Essence obligatoire, aucune essence par défaut
+### Maquettes ASCII — 3 écrans clés (375px mobile)
 
-**Problème :** Le `<select>` essence peut avoir une valeur pré-sélectionnée par le navigateur, et `saisie.py:157` fait `if not essence: continue` — sautant silencieusement les lignes sans essence plutôt qu'alerter.
+#### Écran 1 — Étape 2 : Diagramme Ishikawa
 
-**Fix :**
-
-1. **`formulaire.html` — template production row** : s'assurer que la première `<option>` est `value=""` et que c'est la seule sélectionnée par défaut :
-```html
-<option value="" selected>-- Choisir l'essence --</option>
-<option value="Ayous">Ayous</option>
-...
 ```
-Retirer tout attribut `selected` sur les essences.
-
-2. **`saisie.py` — `nouveau_poste()` et `modifier_equipe()`** : remplacer le `continue` silencieux par une détection de lignes incomplètes :
-```python
-for i, essence in enumerate(essences):
-    vol_e = vol_entrees[i] if i < len(vol_entrees) else ''
-    vol_c = vol_conformes[i] if i < len(vol_conformes) else ''
-    vol_d = vol_declass[i] if i < len(vol_declass) else ''
-    # Si une ligne a des volumes mais pas d'essence → erreur bloquante
-    has_volumes = any(v.strip() for v in [vol_e, vol_c, vol_d])
-    if not essence and has_volumes:
-        flash("Veuillez sélectionner une essence pour chaque ligne de production.", 'danger')
-        return _render_form(...)  # avec données préservées
-    if not essence:
-        continue  # ligne vide, on ignore
+┌────────────────────────────────────────┐
+│ ← Analyse : Blocage grumes  [2 / 4]   │
+│ ─────────────────────────────────────  │
+│ DIAGRAMME ISHIKAWA (6M)                │
+│ Ajoutez les causes observées           │
+│ sur chaque branche.                    │
+│                                        │
+│ ▼ MACHINE  (2 causes)                  │
+│ ┌──────────────────────────────────┐   │
+│ │ • Courroie usée          [↗] [✕] │   │
+│ │ • Vibrations anormales   [↗] [✕] │   │
+│ └──────────────────────────────────┘   │
+│ [+ Ajouter une cause Machine       ]   │
+│                                        │
+│ ▼ MAIN D'OEUVRE  (0 causes)            │
+│ ┌──────────────────────────────────┐   │
+│ │  (aucune cause saisie)           │   │
+│ └──────────────────────────────────┘   │
+│ [+ Ajouter une cause Main d'oeuvre ]   │
+│                                        │
+│ ▼ MATIÈRE  (1 cause)                   │
+│ ┌──────────────────────────────────┐   │
+│ │ • Grumes trop humides    [↗] [✕] │   │
+│ └──────────────────────────────────┘   │
+│ [+ Ajouter une cause Matière       ]   │
+│                                        │
+│ [MÉTHODE +] [MILIEU +] [MESURE +]      │
+│                                        │
+│ ─── FORMULAIRE INLINE (collapse) ───   │
+│ Branche : [Machine               ▼]   │
+│ Description :                          │
+│ [__________________________________ ]  │
+│              [Annuler] [Ajouter →  ]   │
+│                                        │
+│ [← Étape 1]      [→ Étape 3 : 5 Pq]   │
+└────────────────────────────────────────┘
 ```
+`[↗]` = lien vers la page 5 Pourquoi de cette cause. Le bouton `[→ Étape 3]` est désactivé si 0 cause totale.
 
----
+#### Écran 2 — Étape 3 : Chaîne 5 Pourquoi
 
-## Bug 3 — Virgule comme séparateur décimal + préservation des données sur erreur
-
-**Problème :**
-- `float("12,5")` lève `ValueError` — les opérateurs francophones tapent des virgules
-- Sur exception, le formulaire est re-rendu vide (données perdues)
-
-**Fix :**
-
-1. **`saisie.py` — fonction helper `_parse_float()`** : remplacer dans `_extraire_productions_arrets()` :
-```python
-def _parse_float(val):
-    """Accepte virgule (12,5) et point (12.5) comme séparateur décimal."""
-    if not val:
-        return 0.0
-    return float(str(val).replace(',', '.').strip())
 ```
-Utiliser `_parse_float()` partout où `float(vol_entrees[i])` est appelé.
-
-2. **`saisie.py` — `nouveau_poste()` et `modifier_equipe()`** : sur `except Exception`, passer les données du formulaire à `_render_form()` :
-```python
-except Exception as e:
-    db.session.rollback()
-    flash(f"Erreur : {str(e)}", 'danger')
-    return _render_form(
-        productions_donnees=_extraire_donnees_brutes_form(),
-        arrets_donnees=_extraire_arrets_bruts_form(),
-    )
-```
-Cela suppose que `_render_form()` accepte ces paramètres et les passe au template, et que le template `formulaire.html` utilise déjà `ajouterProductionAvecDonnees(data)` et `ajouterArretAvecDonnees(data)` (confirmé : fonctions présentes).
-
----
-
-## Bug 4 — Validation client-side en temps réel
-
-**Problème :** La validation de cohérence (`_verifier_coherence`) ne tourne qu'au submit. L'opérateur ne sait pas qu'il fait une erreur pendant la saisie.
-
-**Fix dans `formulaire.html`** — JavaScript à ajouter dans `{% block scripts %}` :
-
-```javascript
-// Validation inline temps réel
-
-function validerLigneProduction(index) {
-  const entree = parseFloat(document.querySelector(`.vol-entree-${index}`)?.value?.replace(',','.')) || 0;
-  const conforme = parseFloat(document.querySelector(`.vol-conforme-${index}`)?.value?.replace(',','.')) || 0;
-  const declass = parseFloat(document.querySelector(`.vol-declass-${index}`)?.value?.replace(',','.')) || 0;
-  const errDiv = document.getElementById(`err-prod-${index}`);
-  if (!errDiv) return;
-  if (entree > 0 && (conforme + declass) > entree + 0.01) {
-    errDiv.textContent = "⚠ Conforme + Déclassé > Entrée";
-    errDiv.style.display = 'block';
-  } else {
-    errDiv.textContent = '';
-    errDiv.style.display = 'none';
-  }
-}
-
-function validerLigneArret(index) {
-  const debut = document.getElementById(`arret_debut_${index}`)?.value;
-  const fin = document.getElementById(`arret_fin_${index}`)?.value;
-  const errDiv = document.getElementById(`err-arret-${index}`);
-  if (!errDiv || !debut || !fin) return;
-  if (fin <= debut) {
-    errDiv.textContent = "⚠ Heure de fin doit être après l'heure de début";
-    errDiv.style.display = 'block';
-  } else {
-    errDiv.textContent = '';
-    errDiv.style.display = 'none';
-  }
-}
+┌────────────────────────────────────────┐
+│ ← Ishikawa     5 Pourquoi  [3 / 4]    │
+│ ─────────────────────────────────────  │
+│ Cause analysée :                       │
+│ ┌──────────────────────────────────┐   │
+│ │ 🔧 Machine / Courroie usée       │   │
+│ └──────────────────────────────────┘   │
+│                                        │
+│ NIVEAU 1  ✓                            │
+│ ┌──────────────────────────────────┐   │
+│ │ Q : Pourquoi la courroie est-    │   │
+│ │     elle usée ?                  │   │
+│ │ R : La maintenance préventive    │   │
+│ │     n'est pas planifiée.         │   │
+│ └──────────────────────────────────┘   │
+│                                        │
+│ NIVEAU 2  ← en cours                   │
+│ ┌──────────────────────────────────┐   │
+│ │ Q : Pourquoi la maintenance      │   │
+│ │     préventive n'est pas         │   │
+│ │     planifiée ?                  │   │
+│ │ R : [Saisir la réponse...    ]   │   │
+│ │              [ Enregistrer ↓ ]   │   │
+│ └──────────────────────────────────┘   │
+│                                        │
+│ NIVEAU 3 ░░░ (débloqué après N2)       │
+│ NIVEAUX 4, 5 ░░░                       │
+│                                        │
+│ [← Autres causes]  [→ Sél. racine]     │
+└────────────────────────────────────────┘
 ```
 
-- Ajouter `<div id="err-prod-{index}" class="text-danger small mt-1" style="display:none"></div>` sous chaque ligne production dans le template
-- Ajouter `<div id="err-arret-{index}" ...>` sous chaque ligne arrêt
-- Connecter `oninput="validerLigneProduction(${index})"` sur les champs de volume, `onchange="validerLigneArret(${index})"` sur les champs d'heure
-- Bloquer le submit via `form.addEventListener('submit', ...)` si des erreurs inline sont visibles
+#### Écran 3 — Rapport A3 (imprimable)
 
----
-
-## Bug 5 — Feedback motivant pour l'opérateur
-
-**Contrainte :** R7 — pas de nouvelle table DB. Calcul depuis `Equipe` filtré par `user_id`.
-
-**Fix dans `saisie.py` — `historique()`** : calculer des stats personnelles avant le render :
-
-```python
-# Stats personnelles opérateur (pas de nouvelle table, filtre user_id)
-from datetime import date, timedelta
-equipes_user = Equipe.query.filter_by(user_id=current_user.id).all()
-equipes_soumises = [e for e in equipes_user if e.statut in ('soumis', 'verrouille') and e.trs_global]
-nb_equipes = len(equipes_soumises)
-trs_moyen = round(sum(e.trs_global for e in equipes_soumises) / nb_equipes, 1) if nb_equipes else None
-meilleur_trs = max((e.trs_global for e in equipes_soumises), default=None)
-# Tendance : comparer 7 derniers jours vs 7 jours précédents
-aujourd_hui = date.today()
-recentes = [e for e in equipes_soumises if e.date >= aujourd_hui - timedelta(days=7)]
-precedentes = [e for e in equipes_soumises if aujourd_hui - timedelta(days=14) <= e.date < aujourd_hui - timedelta(days=7)]
-trs_recent = round(sum(e.trs_global for e in recentes)/len(recentes),1) if recentes else None
-trs_prec = round(sum(e.trs_global for e in precedentes)/len(precedentes),1) if precedentes else None
-tendance = 'up' if (trs_recent and trs_prec and trs_recent > trs_prec) else 'down' if (trs_recent and trs_prec and trs_recent < trs_prec) else 'flat'
 ```
-
-Passer à template : `stats_operateur={nb_equipes, trs_moyen, meilleur_trs, trs_recent, tendance}`.
-
-**Fix dans `historique.html`** — bloc motivant avant le tableau (uniquement si `current_user.role == 'operateur'`) :
-
-```html
-{% if current_user.role == 'operateur' and stats_operateur %}
-<div class="wp-card mb-4 p-4" style="border-left: 4px solid var(--wp-leaf);">
-  <div class="d-flex align-items-center gap-3">
-    <div style="font-size:2rem;">🌱</div>
-    <div>
-      <div style="font-weight:800; color:var(--wp-emerald);">
-        {% if stats_operateur.nb_equipes == 0 %}
-          Bienvenue ! Votre premier poste compte.
-        {% elif stats_operateur.trs_moyen >= 65 %}
-          Excellent travail, continuez comme ça !
-        {% elif stats_operateur.trs_moyen >= 50 %}
-          Bonne dynamique — chaque poste rapproche de l'objectif.
-        {% else %}
-          Chaque saisie aide à comprendre et améliorer la chaîne.
-        {% endif %}
-      </div>
-      <div class="d-flex gap-4 mt-2 flex-wrap">
-        <div><span class="wp-muted">Postes saisis :</span> <strong>{{ stats_operateur.nb_equipes }}</strong></div>
-        {% if stats_operateur.trs_moyen %}
-        <div><span class="wp-muted">TRS moyen :</span> <strong>{{ stats_operateur.trs_moyen }}%</strong></div>
-        {% endif %}
-        {% if stats_operateur.meilleur_trs %}
-        <div><span class="wp-muted">Meilleur TRS :</span> <strong style="color:var(--wp-leaf);">{{ stats_operateur.meilleur_trs }}%</strong></div>
-        {% endif %}
-        {% if stats_operateur.tendance == 'up' %}
-        <div class="wp-delta-up">↑ En progression cette semaine</div>
-        {% elif stats_operateur.tendance == 'down' %}
-        <div class="wp-delta-down">↓ Semaine plus difficile — continuez !</div>
-        {% endif %}
-      </div>
-    </div>
-  </div>
-</div>
-{% endif %}
-```
-
-**Fix dans `detail.html`** — après les KPI cards (ligne 155 environ), ajouter un bloc d'encouragement conditionnel :
-
-```html
-{% if current_user.role == 'operateur' and equipe.statut in ('soumis', 'verrouille') %}
-<div class="alert mt-3" style="background:var(--wp-cream-2); border-left:4px solid var(--wp-leaf); border-radius:12px;">
-  <strong>Merci pour cette saisie !</strong>
-  {% if equipe.trs_global >= 65 %}
-  Ce poste est au-dessus de la moyenne — excellent !
-  {% elif equipe.trs_global >= 50 %}
-  TRS dans la plage normale. Chaque donnée compte pour l'analyse.
-  {% else %}
-  TRS bas ce poste — les arrêts documentés aident à identifier les causes.
-  {% endif %}
-  <br><small class="text-muted">Ces données alimentent le tableau de bord du chef de production.</small>
-</div>
-{% endif %}
+┌────────────────────────────────────────┐
+│ [← Modifier]  RAPPORT A3  [🖨 Imprimer]│
+│ ─────────────────────────────────────  │
+│ ┌──────────────────────────────────┐   │
+│ │ ANALYSE : Blocage grumes         │   │
+│ │ CUF Chaîne 4 · Chef Scierie      │   │
+│ │ Créé le 27/05/2026               │   │
+│ │ Statut : ● CAUSE IDENTIFIÉE      │   │
+│ └──────────────────────────────────┘   │
+│                                        │
+│ 1. CONTEXTE DU PROBLÈME                │
+│ Quoi    : Blocage répété des grumes    │
+│ Quand   : 3 semaines, poste Matin      │
+│ Où      : Bicoupe                      │
+│ Combien : ~45 min perdues / poste      │
+│                                        │
+│ 2. CAUSES IDENTIFIÉES (6M)             │
+│ Machine (2) : Courroie usée,           │
+│               Vibrations anormales     │
+│ Matière (1) : Grumes trop humides      │
+│ Méthode, Milieu, Mesure : (vides)      │
+│                                        │
+│ 3. CAUSE RACINE                        │
+│ ★ Machine → Courroie usée              │
+│   N1 : Maintenance non planifiée       │
+│   N2 : Pas de planning hebdo           │
+│   N3 : Pas de responsable désigné      │
+│                                        │
+│ 4. ACTIONS CORRECTIVES                 │
+│ Désigner un référent maintenance.      │
+│ Créer un planning hebdo.               │
+│                                        │
+│ H2 : cause = Méthode/Organisationnelle │
+│ → confirme l'hypothèse H2 du mémoire  │
+│                                        │
+│            [Clôturer ce problème →]   │
+└────────────────────────────────────────┘
 ```
 
 ---
 
-## Bug 6 — Ergonomie mobile du formulaire
+### Points d'intégration avec l'existant
 
-**Problème :** Les lignes production/arrêt utilisent `col-md-2` — 6 colonnes côte à côte sur desktop, qui stackent une par une sur mobile (illisible).
-
-**Fix dans `formulaire.html`** — restructurer chaque ligne production en layout 2-colonnes sur mobile :
-
-**Avant (chaque champ) :**
-```html
-<div class="col-md-2">...</div>
-```
-
-**Après — productions :**
-```html
-<!-- Essence : pleine largeur sur mobile, 2/12 sur desktop -->
-<div class="col-12 col-md-2">Essence select</div>
-<!-- Entrée + Conformes : 2 colonnes sur mobile (col-6), 2/12 sur desktop -->
-<div class="col-6 col-md-2">Entrée grumes</div>
-<div class="col-6 col-md-2">Conformes</div>
-<!-- Déclassé + Déchets : 2 colonnes sur mobile -->
-<div class="col-6 col-md-2">Déclassé</div>
-<div class="col-6 col-md-2">Déchets (readonly)</div>
-<!-- Bouton supprimer : pleine largeur sur mobile -->
-<div class="col-12 col-md-1 d-flex align-items-end">Supprimer</div>
-```
-
-**Après — arrêts :**
-```html
-<div class="col-12 col-md-2">Machine select</div>
-<div class="col-6 col-md-2">Heure début</div>
-<div class="col-6 col-md-2">Heure fin</div>
-<div class="col-12 col-md-3">Cause</div>
-<div class="col-10 col-md-2">Catégorie</div>
-<div class="col-2 col-md-1">Supprimer</div>
-```
-
-Ajouter aussi `style="min-height:44px"` sur tous les boutons Ajouter/Supprimer pour ciblage tactile correct.
+| Fichier source | Modification | Changement |
+|---|---|---|
+| `templates/analyse/arrets.html` | Colonne "Actions" dans le tableau Pareto | Bouton `<a href="{{ url_for('problemes.nouveau', pareto_cause=p.cause) }}">Analyser</a>` par ligne |
+| `templates/recommandations/index.html` | Dans chaque carte reco | Bouton "Lancer une analyse" sur `TRS_CRITIQUE`, `ARRETS_NON_DOCUMENTES`, `DECLASS_EXCESSIF` |
+| `templates/saisie/detail.html` | Après le bloc anomalies | Bouton "Ouvrir une analyse" si `current_user.role in ('chef','admin')` et `anomalies` |
+| `templates/chef/dashboard.html` | KPI row | Widget "Problèmes ouverts" (compte `Probleme.statut in ['ouvert','en_analyse']`) |
+| `templates/base.html` | Sidebar nav (desktop + mobile) | Lien "Résolution" (route `problemes.liste`) dans section Pilotage |
+| `app/routes/dashboard.py` → `vue_chef()` | Query avant `render_template` | `nb_problemes_ouverts = Probleme.query.filter(Probleme.statut.in_(['ouvert','en_analyse'])).count()` |
+| `app/__init__.py` | Import + register_blueprint | `from .routes.problemes import problemes_bp` + `app.register_blueprint(problemes_bp)` |
 
 ---
 
-## Ordre d'implémentation
+### Valeur académique (OS4 + H2)
 
-1. `models.py` — Bug 1 (calcule_duree propre)
-2. `saisie.py` — Bugs 1+2+3 ensemble (validation arrêts, essence obligatoire, _parse_float, preserve data)
-3. `formulaire.html` — Bugs 2+4+6 (no default essence, JS inline validation, mobile layout)
-4. `saisie.py` — Bug 5 (stats_operateur dans historique())
-5. `historique.html` + `detail.html` — Bug 5 (blocs motivants)
+**OS4** : Le module livre l'Ishikawa + 5 Pourquoi comme outils guidés, persistants et auditables. Le `Probleme.cause_racine_selectionnee_id` est la "cause racine formellement identifiée" du mémoire. La `pareto_cause` field crée un lien explicite entre le Pareto existant (déjà livrable OS4) et l'Ishikawa (approfondissement OS4).
+
+**H2** : La distribution de `IshikawaCause.categorie_6m WHERE est_racine=True` sur tous les `Probleme` clos est le test empirique de H2. Une requête `GROUP BY categorie_6m` sur cette vue donne le tableau de résultats de H2. Si la majorité des causes racines sont dans "Méthode", "Main d'oeuvre" ou "Milieu" (plutôt que "Machine"), H2 est validée.
 
 ---
 
-## Vérification
+### Fichiers à créer / modifier
 
-1. Lancer l'appli : `cd cuf-pilotage && flask run`
-2. Se connecter en tant qu'opérateur
-3. **Bug 1** : Créer un arrêt avec heure_fin < heure_debut → message d'erreur rouge, formulaire conservé
-4. **Bug 2** : Entrer des volumes sans sélectionner d'essence → message d'erreur, formulaire conservé ; vérifier que le select commence vide
-5. **Bug 3** : Entrer "12,5" dans un champ volume → accepté ; provoquer une erreur → vérifier que le formulaire est re-rendu avec les données saisies
-6. **Bug 4** : Entrer conforme + déclassé > entrée → message rouge inline immédiat sans soumettre ; même test sur heures inversées
-7. **Bug 5** : Se connecter en opérateur, aller sur historique → bloc stats visible avec TRS moyen et badge tendance ; aller sur le détail d'un poste soumis → message d'encouragement
-8. **Bug 6** : Ouvrir formulaire sur mobile (ou DevTools resize < 576px) → champs en 2 colonnes, pas en 1 par ligne
+**Nouveaux fichiers :**
+```
+app/routes/problemes.py          — blueprint + toutes les routes
+app/templates/problemes/
+  liste.html                     — liste + filtres statut + stats pills
+  nouveau.html                   — étape 1 : contexte (QUOI/QUAND/OÙ/COMBIEN)
+  ishikawa.html                  — étape 2 : 6 branches accordion + AJAX
+  pourquoi.html                  — étape 3 : chaîne 5 niveaux + AJAX
+  selectionner_racine.html       — étape 4 : radio cause racine + actions
+  rapport.html                   — A3 imprimable (print CSS inline)
+```
 
-Commit : `fix(operateur): validation arrêts/essence/virgule + feedback motivant + mobile`
+**Fichiers modifiés :**
+```
+app/models.py                    — +3 classes : Probleme, IshikawaCause, PourquoiNiveau
+app/__init__.py                  — import + register problemes_bp ; CSRF handler étendu
+app/routes/dashboard.py          — nb_problemes_ouverts query dans vue_chef()
+app/static/css/style.css         — +.wp-pourquoi-card, .wp-6m-branch, .wp-cause-chip, .wp-a3-rapport
+templates/base.html              — nav link "Résolution" (chef + admin)
+templates/chef/dashboard.html    — KPI widget problèmes ouverts
+templates/analyse/arrets.html    — bouton "Analyser" par ligne Pareto
+templates/recommandations/index.html — bouton "Lancer une analyse" sur 3 codes
+templates/saisie/detail.html     — bouton "Ouvrir une analyse" après anomalies
+```
+
+**Non modifiés (aucun changement nécessaire) :**
+```
+app/routes/analyse.py, saisie.py, recommandations.py — les intégrations sont 100% template-side
+app/services/                    — aucun changement
+```
+
+---
+
+### Ordre d'implémentation (8 phases)
+
+1. **Models** — 3 classes dans `models.py`. `db.create_all()` crée les tables automatiquement (nouvelles tables, pas d'ALTER TABLE).
+2. **Blueprint skeleton** — `problemes.py` avec routes retournant des placeholders. Register dans `__init__.py`. Vérifier le lien nav.
+3. **Étape 1 — Nouveau** — Form contexte + pré-remplissage query params. Créer `nouveau.html`.
+4. **Étape 2 — Ishikawa AJAX** — `ajouter_cause()` + `supprimer_cause()`. Créer `ishikawa.html` avec accordion Bootstrap + fetch AJAX.
+5. **Étape 3 — Pourquoi AJAX** — `sauver_pourquoi()` avec logique de chaîne. Créer `pourquoi.html` avec cartes locked/unlocked.
+6. **Étapes 4 + Rapport** — `sauver_racine()` + `rapport()` + `clore()` + `rouvrir()`. Templates restants.
+7. **Intégrations** — Modifier les 5 templates existants + `dashboard.py`. Tester les boutons pré-remplissage.
+8. **CSS + Print** — Nouveaux composants CSS. Print CSS dans `rapport.html`. Test `window.print()`.
+
+---
+
+## Vérification end-to-end
+
+1. Se connecter en tant que `chef`
+2. Aller sur `/analyse/arrets` → cliquer "Analyser" sur la 1re ligne Pareto → vérifier que le formulaire Étape 1 est pré-rempli avec `titre` et `pareto_cause`
+3. Remplir le contexte (QUOI/QUAND/OÙ/COMBIEN) → soumettre → arriver sur l'Ishikawa (Étape 2)
+4. Ajouter 2 causes sur la branche Machine, 1 sur Matière → vérifier les cartes apparaissent sans rechargement de page
+5. Cliquer `[↗]` sur la 1re cause → Étape 3 → saisir 3 niveaux de Pourquoi → vérifier que le niveau 4 se déverrouille
+6. Aller sur Étape 4 → sélectionner la cause racine → saisir des actions → soumettre → rapport A3
+7. Vérifier le rapport : toutes les sections remplies, `@media print` masque la nav
+8. Cliquer Clôturer → vérifier statut `clos` dans la liste
+9. Aller sur `/dashboard/chef` → vérifier le widget "Problèmes ouverts" = 0 (clos)
+10. Vérifier la cohérence H2 : dans `problemes.liste`, le problème clos montre la catégorie 6M de la cause racine

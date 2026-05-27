@@ -45,6 +45,10 @@
          href="{{ url_for('dashboard.production_chef') }}">
         <span class="wp-nav-ic"><i class="bi bi-bar-chart-line"></i></span>Production & Objectifs
       </a>
+      <a class="wp-nav-link {% if request.endpoint == 'dashboard.qualite_chef' %}active{% endif %}"
+         href="{{ url_for('dashboard.qualite_chef') }}">
+        <span class="wp-nav-ic"><i class="bi bi-tree"></i></span>Qualité / Matière
+      </a>
       <a class="wp-nav-link {% if request.endpoint == 'dashboard.pertes' %}active{% endif %}"
          href="{{ url_for('dashboard.pertes') }}">
         <span class="wp-nav-ic"><i class="bi bi-cash-stack"></i></span>Pertes financières
@@ -146,6 +150,8 @@
           <span class="wp-nav-ic"><i class="bi bi-tools"></i></span>Machines & Arrêts</a>
         <a class="wp-nav-link" href="{{ url_for('dashboard.production_chef') }}">
           <span class="wp-nav-ic"><i class="bi bi-bar-chart-line"></i></span>Production & Objectifs</a>
+        <a class="wp-nav-link" href="{{ url_for('dashboard.qualite_chef') }}">
+          <span class="wp-nav-ic"><i class="bi bi-tree"></i></span>Qualité / Matière</a>
         <a class="wp-nav-link" href="{{ url_for('dashboard.pertes') }}">
           <span class="wp-nav-ic"><i class="bi bi-cash-stack"></i></span>Pertes financières</a>
         <a class="wp-nav-link" href="{{ url_for('analyse.arrets') }}">

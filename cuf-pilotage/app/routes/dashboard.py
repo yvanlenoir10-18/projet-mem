@@ -975,6 +975,181 @@ def _projection_production_active():
     }
 
 
+def _resume_qualite(equipes):
+    entree = sum(e.volume_entree for e in equipes)
+    conforme = sum(e.volume_conforme for e in equipes)
+    declass = sum(e.volume_declass for e in equipes)
+    dechets = sum(e.volume_dechets for e in equipes)
+    sortie = conforme + declass
+    rendement = _rendement_matiere(entree, sortie)
+    declass_pct = round((declass / sortie) * 100, 1) if sortie else 0
+    dechets_pct = round((dechets / entree) * 100, 1) if entree else 0
+    seuil_declass = _safe_float_param('seuil_declass_pct', 30)
+    seuil_rendement = _safe_float_param('seuil_rendement_min', 65)
+
+    if rendement < seuil_rendement * 0.85 or declass_pct > seuil_declass:
+        couleur = 'danger'
+    elif rendement < seuil_rendement or declass_pct >= seuil_declass * 0.8:
+        couleur = 'warning'
+    else:
+        couleur = 'success'
+
+    return {
+        'entree': round(entree, 2),
+        'conforme': round(conforme, 2),
+        'declass': round(declass, 2),
+        'dechets': round(dechets, 2),
+        'sortie': round(sortie, 2),
+        'rendement': rendement,
+        'declass_pct': declass_pct,
+        'dechets_pct': dechets_pct,
+        'seuil_declass': seuil_declass,
+        'seuil_rendement': seuil_rendement,
+        'couleur': couleur,
+        'nb_postes': len(equipes),
+    }
+
+
+def _qualite_par_essence(equipes):
+    seuil_declass = _safe_float_param('seuil_declass_pct', 30)
+    seuil_rendement = _safe_float_param('seuil_rendement_min', 65)
+    stats = defaultdict(lambda: {
+        'essence': '',
+        'entree': 0.0,
+        'conforme': 0.0,
+        'declass': 0.0,
+        'dechets': 0.0,
+        'postes': set(),
+    })
+
+    for equipe in equipes:
+        for prod in equipe.productions:
+            essence = prod.essence or 'Non renseignée'
+            s = stats[essence]
+            s['essence'] = essence
+            s['entree'] += prod.volume_entree or 0
+            s['conforme'] += prod.volume_conforme or 0
+            s['declass'] += prod.volume_declass or 0
+            s['dechets'] += prod.volume_dechets or 0
+            s['postes'].add(equipe.id)
+
+    lignes = []
+    for s in stats.values():
+        sortie = s['conforme'] + s['declass']
+        rendement = _rendement_matiere(s['entree'], sortie)
+        declass_pct = round((s['declass'] / sortie) * 100, 1) if sortie else 0
+        dechets_pct = round((s['dechets'] / s['entree']) * 100, 1) if s['entree'] else 0
+        if rendement < seuil_rendement * 0.85 or declass_pct > seuil_declass:
+            couleur = 'danger'
+        elif rendement < seuil_rendement or declass_pct >= seuil_declass * 0.8:
+            couleur = 'warning'
+        else:
+            couleur = 'success'
+        lignes.append({
+            'essence': s['essence'],
+            'entree': round(s['entree'], 2),
+            'conforme': round(s['conforme'], 2),
+            'declass': round(s['declass'], 2),
+            'dechets': round(s['dechets'], 2),
+            'sortie': round(sortie, 2),
+            'rendement': rendement,
+            'declass_pct': declass_pct,
+            'dechets_pct': dechets_pct,
+            'nb_postes': len(s['postes']),
+            'couleur': couleur,
+            'analyse_url': url_for(
+                'problemes.nouveau',
+                origine_type='manuel',
+                origine_label=f'Qualité matière - {s["essence"]}',
+                contexte_quoi=f'Rendement matière ou déclassement à surveiller sur {s["essence"]}',
+                contexte_ou=s['essence'],
+                contexte_combien=f'Rendement {rendement}% · déclassé {declass_pct}% · déchets {dechets_pct}%',
+                origine_url=url_for('dashboard.qualite_chef', jours=30),
+            ),
+        })
+    lignes.sort(key=lambda item: (item['couleur'] == 'success', item['rendement'], -item['declass_pct']))
+    return lignes
+
+
+def _qualite_par_shift(equipes):
+    groupes = []
+    for shift in _SHIFTS_JOUR:
+        items = [e for e in equipes if e.numero_equipe == shift]
+        entree = sum(e.volume_entree for e in items)
+        conforme = sum(e.volume_conforme for e in items)
+        declass = sum(e.volume_declass for e in items)
+        dechets = sum(e.volume_dechets for e in items)
+        sortie = conforme + declass
+        groupes.append({
+            'shift': shift,
+            'nb_postes': len(items),
+            'entree': round(entree, 2),
+            'conforme': round(conforme, 2),
+            'declass': round(declass, 2),
+            'dechets': round(dechets, 2),
+            'rendement': _rendement_matiere(entree, sortie),
+            'declass_pct': round((declass / sortie) * 100, 1) if sortie else 0,
+            'dechets_pct': round((dechets / entree) * 100, 1) if entree else 0,
+        })
+    return groupes
+
+
+def _fiches_qualite_a_surveiller(equipes):
+    seuil_declass = _safe_float_param('seuil_declass_pct', 30)
+    seuil_rendement = _safe_float_param('seuil_rendement_min', 65)
+    lignes = []
+    for equipe in equipes:
+        entree = equipe.volume_entree
+        sortie = equipe.volume_sorti
+        rendement = _rendement_matiere(entree, sortie)
+        declass_pct = round((equipe.volume_declass / sortie) * 100, 1) if sortie else 0
+        dechets_pct = round((equipe.volume_dechets / entree) * 100, 1) if entree else 0
+        score = 0
+        raisons = []
+        if rendement < seuil_rendement:
+            score += int(seuil_rendement - rendement) + 20
+            raisons.append(f'Rendement {rendement}%')
+        if declass_pct > seuil_declass:
+            score += int(declass_pct - seuil_declass) + 20
+            raisons.append(f'Déclassé {declass_pct}%')
+        if dechets_pct > 35:
+            score += int(dechets_pct - 35) + 10
+            raisons.append(f'Déchets {dechets_pct}%')
+        if score <= 0:
+            continue
+        lignes.append({
+            'id': equipe.id,
+            'date': equipe.date,
+            'date_fmt': equipe.date.strftime('%d/%m/%Y') if equipe.date else '—',
+            'shift': equipe.numero_equipe,
+            'operateur': equipe.operateur_nom or (equipe.saisie_par.nom if equipe.saisie_par else 'Non renseigné'),
+            'essences': equipe.essences_label or '—',
+            'entree': round(entree, 2),
+            'conforme': round(equipe.volume_conforme, 2),
+            'declass': round(equipe.volume_declass, 2),
+            'dechets': round(equipe.volume_dechets, 2),
+            'rendement': rendement,
+            'declass_pct': declass_pct,
+            'dechets_pct': dechets_pct,
+            'raisons': raisons,
+            'score': score,
+            'href': url_for('saisie.detail_poste', poste_id=equipe.id),
+            'analyse_url': url_for(
+                'problemes.nouveau',
+                origine_type='fiche',
+                origine_label=f'Qualité matière fiche #{equipe.id}',
+                equipe_id=equipe.id,
+                contexte_quoi='Rendement matière ou déclassement anormal',
+                contexte_quand=f'{equipe.date.strftime("%d/%m/%Y")} · {equipe.numero_equipe}' if equipe.date else equipe.numero_equipe,
+                contexte_ou=equipe.essences_label,
+                contexte_combien=' · '.join(raisons),
+                origine_url=url_for('saisie.detail_poste', poste_id=equipe.id),
+            ),
+        })
+    lignes.sort(key=lambda item: item['score'], reverse=True)
+    return lignes[:12]
+
+
 def _get_equipes_periode(jours=30):
     depuis = date.today() - timedelta(days=jours)
     return Equipe.query.filter(
@@ -1378,6 +1553,34 @@ def production_chef():
         essences=essences,
         extremes=extremes,
         projection=projection,
+    )
+
+
+@dashboard_bp.route('/chef/qualite')
+@login_required
+@roles_required('chef', 'admin')
+def qualite_chef():
+    """Qualité / Matière pour le chef scierie."""
+    jours = request.args.get('jours', 30)
+    mode = request.args.get('mode', 'officiel').strip()
+    if mode not in ('officiel', 'temps_reel'):
+        mode = 'officiel'
+
+    equipes, jours, label_periode = _equipes_production(jours, mode)
+    resume = _resume_qualite(equipes)
+    essences = _qualite_par_essence(equipes)
+    shifts = _qualite_par_shift(equipes)
+    fiches_a_surveiller = _fiches_qualite_a_surveiller(equipes)
+
+    return render_template(
+        'chef/qualite.html',
+        jours=jours,
+        mode=mode,
+        label_periode=label_periode,
+        resume=resume,
+        essences=essences,
+        shifts=shifts,
+        fiches_a_surveiller=fiches_a_surveiller,
     )
 
 

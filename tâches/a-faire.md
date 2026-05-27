@@ -696,3 +696,17 @@ Objectif : permettre au chef de voir si la scierie atteint l'objectif, où se si
 - [x] Relier la navigation et le bloc `Aujourd'hui`.
 - [x] Vérifier le rendu, les filtres et les liens vers fiches/Résolution.
 - [ ] Commit et push GitHub.
+
+---
+
+## ⏳ P3.7 — Profil Chef Scierie : Qualité / Matière
+
+Objectif : montrer où part la matière et identifier les essences/fiches qui créent le plus de déclassement ou de déchets.
+
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Ajouter la route `/dashboard/chef/qualite`.
+- [x] Calculer rendement matière, déclassé, déchets, répartition par essence et comparaison Matin/Après-midi.
+- [x] Créer l'écran chef avec filtres `officiel` / `temps réel`.
+- [x] Relier la navigation, `Aujourd'hui`, les fiches et le module Résolution.
+- [x] Vérifier le rendu, les filtres et les accès rôles.
+- [ ] Commit et push GitHub.

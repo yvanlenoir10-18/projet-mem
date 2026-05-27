@@ -946,3 +946,40 @@ body {
   padding: .85rem;
   margin-top: .85rem;
 }
+
+/* P3.7 — Qualité / Matière */
+.wp-quality-band {
+  border-radius: 8px;
+  padding: 1rem;
+  min-height: 118px;
+  border: 1px solid #e5e0d6;
+}
+.wp-quality-ok {
+  background: #f2f8ef;
+  border-color: rgba(63, 138, 92, .22);
+}
+.wp-quality-warn {
+  background: #fffaf0;
+  border-color: rgba(197, 151, 58, .24);
+}
+.wp-quality-danger {
+  background: #fff8f6;
+  border-color: rgba(216, 113, 73, .24);
+}
+.wp-quality-label {
+  font-size: .74rem;
+  color: var(--wp-muted);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+.wp-quality-value {
+  font-size: 1.35rem;
+  color: var(--wp-ink);
+  font-weight: 900;
+  margin-top: .3rem;
+}
+.wp-quality-sub {
+  font-size: .76rem;
+  color: var(--wp-muted);
+  margin-top: .25rem;
+}

@@ -131,7 +131,9 @@
   </div>
 
   <div class="col-12 col-md-6 col-xl">
-    <div class="wp-card h-100 p-3">
+    <a href="{{ url_for('dashboard.qualite_chef', jours=7, mode='temps_reel') }}"
+       class="wp-card h-100 p-3 d-block"
+       style="text-decoration:none;color:inherit;">
       <div class="wp-kpi-label">Rendement matière</div>
       <div style="font-size:1.55rem;font-weight:900;color:var(--wp-ink);">
         {{ rendement.valeur|default(0) }}%
@@ -143,11 +145,13 @@
       <div class="mt-2">
         <span class="badge bg-{{ rendement.couleur|default('secondary') }}">Matière</span>
       </div>
-    </div>
+    </a>
   </div>
 
   <div class="col-12 col-md-6 col-xl">
-    <div class="wp-card h-100 p-3">
+    <a href="{{ url_for('dashboard.qualite_chef', jours=7, mode='temps_reel') }}"
+       class="wp-card h-100 p-3 d-block"
+       style="text-decoration:none;color:inherit;">
       <div class="wp-kpi-label">Déclassement</div>
       <div style="font-size:1.55rem;font-weight:900;color:var(--wp-ink);">
         {{ declass.valeur|default(0) }}%
@@ -156,7 +160,7 @@
       <div class="mt-2">
         <span class="badge bg-{{ declass.couleur|default('secondary') }}">Qualité</span>
       </div>
-    </div>
+    </a>
   </div>
 </div>
 

@@ -12,6 +12,9 @@
     <div>
       <div class="wp-operator-kicker">{{ date_jour.strftime('%d/%m/%Y') }} · {{ current_user.nom }}</div>
       <h1>Poste de saisie</h1>
+      {% if fiches_aujourdhui %}
+      <div class="wp-operator-today"><i class="bi bi-check2-circle"></i> {{ fiches_aujourdhui }} fiche{{ 's' if fiches_aujourdhui > 1 }} enregistrée{{ 's' if fiches_aujourdhui > 1 }} aujourd'hui</div>
+      {% endif %}
     </div>
     <a href="{{ nouvelle_url }}" class="btn btn-primary btn-touch d-flex align-items-center gap-2">
       <i class="bi bi-plus-circle"></i>
@@ -61,6 +64,10 @@
     </span>
   </a>
 
+  {% if current_user.role == 'operateur' %}
+    {% include 'saisie/_progression.html' %}
+  {% endif %}
+
   <div class="wp-operator-grid">
     <a href="{{ nouvelle_url }}" class="wp-operator-tile">
       <span class="wp-operator-tile-icon wp-operator-tile-success">
@@ -73,16 +80,21 @@
     </a>
 
     {% if a_corriger %}
-    <a href="{{ url_for('saisie.modifier_equipe', equipe_id=a_corriger[0].id) }}{% if a_corriger[0].correction_cible %}#{{ a_corriger[0].correction_cible }}{% endif %}" class="wp-operator-tile">
+    <a href="{{ url_for('saisie.modifier_equipe', equipe_id=a_corriger[0].id) }}{% if a_corriger[0].correction_cible %}#{{ a_corriger[0].correction_cible }}{% endif %}" class="wp-operator-tile wp-operator-tile-has-alert">
     {% else %}
     <a href="{{ url_for('saisie.historique') }}" class="wp-operator-tile">
     {% endif %}
       <span class="wp-operator-tile-icon wp-operator-tile-warning">
         <i class="bi bi-arrow-counterclockwise"></i>
+        {% if a_corriger %}<span class="wp-tile-badge">{{ a_corriger | length }}</span>{% endif %}
       </span>
       <span>
         <strong>À corriger</strong>
-        <small>{{ a_corriger | length }} fiche{{ 's' if a_corriger | length > 1 }}</small>
+        {% if a_corriger %}
+        <small class="wp-tile-alert-text">{{ a_corriger | length }} fiche{{ 's' if a_corriger | length > 1 }} renvoyée{{ 's' if a_corriger | length > 1 }}</small>
+        {% else %}
+        <small class="wp-tile-ok-text"><i class="bi bi-check2"></i> Tout est à jour</small>
+        {% endif %}
       </span>
     </a>
 
@@ -93,10 +105,15 @@
     {% endif %}
       <span class="wp-operator-tile-icon wp-operator-tile-neutral">
         <i class="bi bi-pencil-square"></i>
+        {% if brouillons %}<span class="wp-tile-badge wp-tile-badge-neutral">{{ brouillons | length }}</span>{% endif %}
       </span>
       <span>
         <strong>Brouillons</strong>
+        {% if brouillons %}
         <small>{{ brouillons | length }} en cours</small>
+        {% else %}
+        <small class="wp-tile-ok-text">Aucun brouillon</small>
+        {% endif %}
       </span>
     </a>
 
@@ -107,10 +124,15 @@
     {% endif %}
       <span class="wp-operator-tile-icon wp-operator-tile-info">
         <i class="bi bi-hourglass-split"></i>
+        {% if a_verifier %}<span class="wp-tile-badge wp-tile-badge-info">{{ a_verifier | length }}</span>{% endif %}
       </span>
       <span>
         <strong>Chez le chef</strong>
+        {% if a_verifier %}
         <small>{{ a_verifier | length }} envoyée{{ 's' if a_verifier | length > 1 }}</small>
+        {% else %}
+        <small>Aucune en attente</small>
+        {% endif %}
       </span>
     </a>
 

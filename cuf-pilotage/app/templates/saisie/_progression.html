@@ -1,0 +1,64 @@
+{# Composant de progression opérateur — partagé entre l'accueil et l'historique (F1).
+   Attend une variable `stats_operateur` (dict) ou None. #}
+{% if stats_operateur is not none %}
+{% set s = stats_operateur %}
+{% set trs_class = 'is-good' if s.trs_moyen and s.trs_moyen >= 65 else ('is-mid' if s.trs_moyen and s.trs_moyen >= 50 else 'is-low') %}
+<div class="wp-progress">
+  <div class="wp-progress-head">
+    <span class="wp-progress-emoji" aria-hidden="true">
+      {%- if s.nb_equipes == 0 %}🌱
+      {%- elif s.trs_moyen and s.trs_moyen >= 65 %}🏆
+      {%- elif s.trs_moyen and s.trs_moyen >= 50 %}📈
+      {%- else %}💪{% endif -%}
+    </span>
+    <p class="wp-progress-message">
+      {% if s.nb_equipes == 0 %}
+        Bienvenue ! Votre première saisie construira le tableau de bord de la chaîne 4.
+      {% elif s.trs_moyen and s.trs_moyen >= 65 %}
+        Excellent travail — vous êtes au-dessus de la moyenne de la chaîne !
+      {% elif s.trs_moyen and s.trs_moyen >= 50 %}
+        Bonne dynamique — chaque poste bien documenté compte pour l'analyse.
+      {% else %}
+        Chaque saisie, même avec des arrêts, aide à identifier et réduire les pertes.
+      {% endif %}
+    </p>
+  </div>
+
+  {% if s.nb_equipes > 0 %}
+  <div class="wp-progress-metrics">
+    <div class="wp-progress-metric">
+      <span class="wp-progress-value">{{ s.nb_equipes }}</span>
+      <span class="wp-progress-label">Postes<br>saisis</span>
+    </div>
+    {% if s.trs_moyen %}
+    <div class="wp-progress-metric">
+      <span class="wp-progress-value {{ trs_class }}">{{ s.trs_moyen }}%</span>
+      <span class="wp-progress-label">TRS<br>moyen</span>
+    </div>
+    {% endif %}
+    {% if s.meilleur_trs %}
+    <div class="wp-progress-metric">
+      <span class="wp-progress-value is-good">{{ s.meilleur_trs }}%</span>
+      <span class="wp-progress-label">Meilleur<br>TRS</span>
+    </div>
+    {% endif %}
+    {% if s.trs_recent %}
+    <div class="wp-progress-metric">
+      <span class="wp-progress-value">{{ s.trs_recent }}%</span>
+      <span class="wp-progress-label">7 derniers<br>jours</span>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if s.tendance == 'up' %}
+  <span class="wp-progress-trend wp-progress-trend-up">
+    <i class="bi bi-arrow-up-right" aria-hidden="true"></i> En progression cette semaine
+  </span>
+  {% elif s.tendance == 'down' %}
+  <span class="wp-progress-trend wp-progress-trend-down">
+    <i class="bi bi-arrow-down-right" aria-hidden="true"></i> En baisse — la tendance peut s'inverser !
+  </span>
+  {% endif %}
+  {% endif %}
+</div>
+{% endif %}

@@ -19,7 +19,7 @@ from flask import (
 )
 from flask_login import login_required, current_user
 from sqlalchemy import and_, func, or_
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from werkzeug.utils import secure_filename
 from ..models import (
     db, User, Equipe, Production, Arret, AuditCorrection, Parametre, normalise_essence,
@@ -1280,6 +1280,41 @@ def demander_correction(equipe_id):
 
 # ── Consultation ──────────────────────────────────────────────────────────────
 
+def _stats_operateur(user_id):
+    """Stats de progression d'un opérateur, agrégées sur ses Equipe (aucune table dédiée).
+
+    Composant partagé par l'accueil et l'historique : même calcul, même rendu.
+    Ne compte que les postes effectivement soumis et porteurs d'un TRS, pour que
+    la progression reflète des données validées, pas des brouillons.
+    """
+    soumises = [
+        e for e in Equipe.query.filter_by(user_id=user_id).all()
+        if e.statut in ('soumis', 'verrouille', 'valide_chef') and e.trs_global
+    ]
+    nb = len(soumises)
+    trs_moyen = round(sum(e.trs_global for e in soumises) / nb, 1) if nb else None
+    meilleur = max((e.trs_global for e in soumises), default=None)
+
+    ref = date.today()
+    recentes = [e for e in soumises if e.date >= ref - timedelta(days=7)]
+    precedentes = [e for e in soumises
+                   if ref - timedelta(days=14) <= e.date < ref - timedelta(days=7)]
+    trs_rec = round(sum(e.trs_global for e in recentes) / len(recentes), 1) if recentes else None
+    trs_prec = round(sum(e.trs_global for e in precedentes) / len(precedentes), 1) if precedentes else None
+    if trs_rec and trs_prec:
+        tendance = 'up' if trs_rec > trs_prec else ('down' if trs_rec < trs_prec else 'flat')
+    else:
+        tendance = 'flat'
+
+    return {
+        'nb_equipes': nb,
+        'trs_moyen': trs_moyen,
+        'meilleur_trs': meilleur,
+        'trs_recent': trs_rec,
+        'tendance': tendance,
+    }
+
+
 @saisie_bp.route('/accueil')
 @login_required
 @roles_required('operateur', 'chef', 'admin')
@@ -1306,6 +1341,8 @@ def accueil_operateur():
     dernier_brouillon = brouillons[0] if brouillons else None
     fiche_prioritaire = a_corriger[0] if a_corriger else dernier_brouillon
 
+    stats_operateur = _stats_operateur(current_user.id) if current_user.role == 'operateur' else None
+
     return render_template(
         'saisie/accueil_operateur.html',
         brouillons=brouillons,
@@ -1317,6 +1354,7 @@ def accueil_operateur():
         fiches_aujourdhui=fiches_aujourdhui,
         date_jour=aujourd_hui,
         shift_suggere=shift_suggere,
+        stats_operateur=stats_operateur,
     )
 
 
@@ -1381,33 +1419,8 @@ def historique():
     # P12 — pré-calcul des anomalies pour drapeau dans la liste
     anomalies_par_poste = {e.id: detecte_anomalies(e) for e in equipes}
 
-    # Bug 5 — Stats motivantes pour l'opérateur (aucune nouvelle table, filtre user_id)
-    from datetime import timedelta
-    stats_op = None
-    if current_user.role == 'operateur':
-        toutes_mes = Equipe.query.filter_by(user_id=current_user.id).all()
-        soumises   = [e for e in toutes_mes
-                      if e.statut in ('soumis', 'verrouille', 'valide_chef') and e.trs_global]
-        nb = len(soumises)
-        trs_moy  = round(sum(e.trs_global for e in soumises) / nb, 1) if nb else None
-        meilleur = max((e.trs_global for e in soumises), default=None)
-        aujourd_hui = date.today()
-        recentes    = [e for e in soumises if e.date >= aujourd_hui - timedelta(days=7)]
-        precedentes = [e for e in soumises
-                       if aujourd_hui - timedelta(days=14) <= e.date < aujourd_hui - timedelta(days=7)]
-        trs_rec  = round(sum(e.trs_global for e in recentes)    / len(recentes),    1) if recentes    else None
-        trs_prec = round(sum(e.trs_global for e in precedentes) / len(precedentes), 1) if precedentes else None
-        if trs_rec and trs_prec:
-            tendance = 'up' if trs_rec > trs_prec else ('down' if trs_rec < trs_prec else 'flat')
-        else:
-            tendance = 'flat'
-        stats_op = {
-            'nb_equipes':   nb,
-            'trs_moyen':    trs_moy,
-            'meilleur_trs': meilleur,
-            'trs_recent':   trs_rec,
-            'tendance':     tendance,
-        }
+    # Bug 5 / F1 — Stats motivantes opérateur (composant partagé avec l'accueil)
+    stats_op = _stats_operateur(current_user.id) if current_user.role == 'operateur' else None
 
     return render_template('saisie/historique.html',
                            postes=equipes,

@@ -1,4 +1,69 @@
-# Plan — Module Résolution Guidée (Ishikawa 6M + 5 Pourquoi)
+# Plan ACTIF — Profil opérateur, Wave 1, F1 : Accueil action-first (Option B)
+
+**Branche :** `claude/install-claude-excel-6MGzv`
+**Date :** 2026-05-27
+**Approche :** discussion pros/cons avant chaque fonctionnalité, design soigné sur tout le profil opérateur (exigence explicite de l'utilisateur).
+
+---
+
+## Context
+
+L'accueil opérateur (`accueil_operateur.html`) répond déjà à « que dois-je faire ? » via la carte de priorité dynamique. Il manque la deuxième motivation : « est-ce que je progresse ? ». Le bloc stats motivant existe mais il est enterré dans `historique.html` (page peu visitée) et codé en styles inline non réutilisables. F1 Option B remonte la progression sur l'écran le plus consulté et, au passage, transforme ce bloc en composant propre partagé — pour éliminer la duplication et poser une base design réutilisable par tout le profil.
+
+But académique : renforce OS6 (outil de pilotage adapté) et la boucle de rétroaction opérateur (Kankkunen & Holopainen 2024 ; Mncwango & Mdunge 2025).
+
+---
+
+## Décisions de design
+
+1. **Pas de copier-coller des styles inline.** On extrait un composant réutilisable à 3 niveaux :
+   - Python : helper `_stats_operateur(user_id)` dans `saisie.py` → dict `{nb_equipes, trs_moyen, meilleur_trs, trs_recent, tendance}`.
+   - Template : partial `saisie/_progression.html` inclus par l'accueil ET l'historique.
+   - CSS : composant `.wp-progress*` dans `style.css` (remplace les styles inline de l'historique).
+2. **Mobile-first** : les métriques passent de 1 ligne (desktop) à grille 2 colonnes sous 480px. Cible terrain = tablette/téléphone wifi.
+3. **Cohérence Canopée** : réutilise les variables `--wp-leaf / --wp-ochre / --wp-terracotta / --wp-emerald / --wp-muted` et les seuils TRS existants (≥65 vert, ≥50 ochre, <50 terracotta).
+
+---
+
+## Étapes d'implémentation
+
+### 1. `app/routes/saisie.py`
+- Extraire la logique `stats_op` actuelle de `historique()` (lignes ~1384-1410) dans un helper module-level `_stats_operateur(user_id)` qui retourne le dict.
+- `historique()` : remplacer le bloc inline par `stats_op = _stats_operateur(current_user.id) if current_user.role == 'operateur' else None`.
+- `accueil_operateur()` (lignes 1283-1320) : ajouter `stats_operateur=...` au `render_template`. `fiches_aujourdhui` est déjà calculé et passé — il faut juste l'afficher.
+
+### 2. Nouveau partial `app/templates/saisie/_progression.html`
+- Reprend la logique emoji + message contextuel + 4 métriques + badge tendance, mais en classes `.wp-progress*` (zéro style inline).
+- Garde-fou : `{% if stats_operateur is not none %}`. Gère l'état `nb_equipes == 0` (message de bienvenue).
+
+### 3. `app/templates/saisie/accueil_operateur.html`
+- Header : sous `wp-operator-kicker`, ajouter une ligne « {{ fiches_aujourdhui }} fiche(s) aujourd'hui » (discrète).
+- Insérer `{% include 'saisie/_progression.html' %}` entre la carte priorité (ligne ~62) et `wp-operator-grid` (ligne 64), pour le rôle opérateur.
+
+### 4. `app/templates/saisie/historique.html`
+- Remplacer le bloc inline (lignes 194-269) par `{% include 'saisie/_progression.html' %}` → consistance visuelle, suppression de la duplication.
+
+### 5. `app/static/css/style.css`
+- Ajouter le composant `.wp-progress` (carte, bord gauche `--wp-leaf`), `.wp-progress-head` (emoji + message), `.wp-progress-metrics` (flex/grid responsive), `.wp-progress-metric` (valeur + label), `.wp-progress-trend` (badge ↑/↓). Réutilise `--wp-shadow-sm`, `--wp-line`, rayons 14px cohérents avec `.wp-operator-*`.
+
+---
+
+## Vérification end-to-end
+
+1. Lancer l'app Flask dans `cuf-pilotage/`.
+2. Se connecter en opérateur.
+3. Accueil : vérifier (a) le compteur « X fiches aujourd'hui » dans le header, (b) le bloc progression entre carte priorité et grille, (c) couleurs TRS + badge tendance corrects.
+4. Cas vide (opérateur sans poste soumis) : message de bienvenue 🌱, pas de crash.
+5. Historique : même bloc affiché à l'identique (composant partagé).
+6. Responsive 375px via Playwright : métriques lisibles en 2 colonnes, rien ne déborde.
+7. Aucune régression chef/pdg/admin (bloc réservé à `operateur`).
+
+---
+---
+
+# Plan PAUSED (phase chef) — Module Résolution Guidée (Ishikawa 6M + 5 Pourquoi)
+
+> Conservé pour reprise après complétion du profil opérateur.
 
 **Branche :** `claude/install-claude-excel-6MGzv`
 **Date :** 2026-05-27

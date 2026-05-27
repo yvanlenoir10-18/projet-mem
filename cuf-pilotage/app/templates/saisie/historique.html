@@ -191,80 +191,9 @@
 </form>
 {% endif %}
 
-{% if current_user.role == 'operateur' and stats_operateur is not none %}
-{# ── Bloc motivant opérateur — Bug 5 ── #}
-<div class="wp-card mb-4" style="border-left:4px solid var(--wp-leaf);overflow:hidden;">
-  <div style="padding:20px 24px;">
-    <div class="d-flex align-items-start gap-3">
-      <div style="font-size:2rem;line-height:1;flex-shrink:0;">
-        {% if stats_operateur.nb_equipes == 0 %}🌱
-        {% elif stats_operateur.trs_moyen and stats_operateur.trs_moyen >= 65 %}🏆
-        {% elif stats_operateur.trs_moyen and stats_operateur.trs_moyen >= 50 %}📈
-        {% else %}💪{% endif %}
-      </div>
-      <div style="flex:1;">
-        <div style="font-weight:800;font-size:1.05rem;color:var(--wp-emerald);margin-bottom:6px;">
-          {% if stats_operateur.nb_equipes == 0 %}
-            Bienvenue ! Votre première saisie construira le tableau de bord de la chaîne 4.
-          {% elif stats_operateur.trs_moyen and stats_operateur.trs_moyen >= 65 %}
-            Excellent travail — vous êtes au-dessus de la moyenne de la chaîne !
-          {% elif stats_operateur.trs_moyen and stats_operateur.trs_moyen >= 50 %}
-            Bonne dynamique — chaque poste bien documenté compte pour l'analyse.
-          {% else %}
-            Chaque saisie, même avec des arrêts, aide à identifier et réduire les pertes.
-          {% endif %}
-        </div>
-        <div class="d-flex flex-wrap gap-4 mt-1 align-items-center">
-          <div class="text-center">
-            <div style="font-size:1.7rem;font-weight:800;color:var(--wp-emerald);line-height:1.1;">
-              {{ stats_operateur.nb_equipes }}
-            </div>
-            <div style="font-size:.7rem;color:var(--wp-muted);text-transform:uppercase;letter-spacing:.05em;">
-              Postes saisis
-            </div>
-          </div>
-          {% if stats_operateur.trs_moyen %}
-          <div class="text-center">
-            <div style="font-size:1.7rem;font-weight:800;line-height:1.1;
-              color:{% if stats_operateur.trs_moyen >= 65 %}var(--wp-leaf)
-                    {% elif stats_operateur.trs_moyen >= 50 %}var(--wp-ochre)
-                    {% else %}var(--wp-terracotta){% endif %};">
-              {{ stats_operateur.trs_moyen }}%
-            </div>
-            <div style="font-size:.7rem;color:var(--wp-muted);text-transform:uppercase;letter-spacing:.05em;">
-              TRS moyen
-            </div>
-          </div>
-          {% endif %}
-          {% if stats_operateur.meilleur_trs %}
-          <div class="text-center">
-            <div style="font-size:1.7rem;font-weight:800;color:var(--wp-leaf);line-height:1.1;">
-              {{ stats_operateur.meilleur_trs }}%
-            </div>
-            <div style="font-size:.7rem;color:var(--wp-muted);text-transform:uppercase;letter-spacing:.05em;">
-              Meilleur TRS
-            </div>
-          </div>
-          {% endif %}
-          {% if stats_operateur.trs_recent %}
-          <div class="text-center">
-            <div style="font-size:1.7rem;font-weight:800;color:var(--wp-ink);line-height:1.1;">
-              {{ stats_operateur.trs_recent }}%
-            </div>
-            <div style="font-size:.7rem;color:var(--wp-muted);text-transform:uppercase;letter-spacing:.05em;">
-              7 derniers jours
-            </div>
-          </div>
-          {% endif %}
-          {% if stats_operateur.tendance == 'up' %}
-          <span class="wp-delta-up" style="font-size:.88rem;">↑ En progression cette semaine</span>
-          {% elif stats_operateur.tendance == 'down' %}
-          <span class="wp-delta-down" style="font-size:.88rem;">↓ En baisse — la tendance peut s'inverser !</span>
-          {% endif %}
-        </div>
-      </div>
-    </div>
-  </div>
+{% if current_user.role == 'operateur' %}
+<div class="mb-4">
+  {% include 'saisie/_progression.html' %}
 </div>
 {% endif %}
 

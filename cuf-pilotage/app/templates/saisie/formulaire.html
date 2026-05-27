@@ -123,7 +123,7 @@
           <label class="form-label">
             Équipe <span style="color:var(--wp-terracotta);">*</span>
           </label>
-          <select name="numero_equipe" class="form-select" required>
+          <select name="numero_equipe" class="form-select" required onchange="majHorairesCreneau()">
             <option value="Matin"
               {% if (equipe and equipe.numero_equipe == 'Matin') or (not equipe and shift_initial == 'Matin') %}selected{% endif %}>
               Matin
@@ -137,7 +137,7 @@
         <div class="col-md-2" id="field-effectif">
           <label class="form-label">Effectif présent</label>
           <input type="number" name="effectif" class="form-control"
-                 value="{{ equipe.effectif if equipe else 10 }}" min="1" max="30">
+                 value="{{ equipe.effectif if equipe else effectif_defaut }}" min="1" max="30">
         </div>
         <div class="col-md-3" id="field-responsable">
           <label class="form-label">
@@ -370,6 +370,8 @@ const essencesOptions = `
 const causesArret = {{ causes_arret | tojson }};
 const aucunArretInitial = {% if equipe and equipe.aucun_arret_confirme %}true{% else %}false{% endif %};
 const capacitesEssences = {{ capacites_essences | tojson }};
+const horairesCreneaux = {{ horaires_creneaux | tojson }};
+const modeCreation = {% if equipe %}false{% else %}true{% endif %};
 
 function escapeHtml(value) {
     return String(value ?? '')
@@ -698,6 +700,28 @@ function mettreHeureMaintenant(index, champ) {
     if (cible) {
         cible.value = heureMaintenant();
         majProduction(index);
+    }
+}
+
+// F5 — Préremplit les horaires du 1er passage selon le créneau choisi.
+// N'écrase jamais une heure saisie manuellement : agit si le champ est vide
+// ou s'il correspond encore à un horaire standard (donc auto-rempli, non touché).
+function majHorairesCreneau() {
+    if (!modeCreation) return;
+    const sel = document.querySelector('select[name="numero_equipe"]');
+    const h = sel ? horairesCreneaux[sel.value] : null;
+    if (!h) return;
+    const debut = document.querySelector('.prod-debut-0');
+    const fin   = document.querySelector('.prod-fin-0');
+    if (!debut || !fin) return;
+    const vide = !debut.value && !fin.value;
+    const estStandard = Object.values(horairesCreneaux).some(
+        c => c.debut === debut.value && c.fin === fin.value
+    );
+    if (vide || estStandard) {
+        debut.value = h.debut || '';
+        fin.value = h.fin || '';
+        majProduction(0);
     }
 }
 
@@ -1039,6 +1063,7 @@ if (productionsDonnees.length > 0) {
     productionsDonnees.forEach(p => ajouterProductionAvecDonnees(p));
 } else {
     ajouterProduction();
+    majHorairesCreneau();
 }
 
 arretsDonnees.forEach(a => ajouterArretAvecDonnees(a));

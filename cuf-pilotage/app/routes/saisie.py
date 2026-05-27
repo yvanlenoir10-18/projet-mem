@@ -707,6 +707,26 @@ def _render_form(equipe=None):
         if val:
             capacites_essences[e] = float(val)
 
+    # F5 — Horaires standards par créneau + effectif du dernier poste (préremplissage)
+    horaires_creneaux = {
+        'Matin': {
+            'debut': Parametre.get('shift_matin_debut', '06:00'),
+            'fin':   Parametre.get('shift_matin_fin', '14:00'),
+        },
+        'Apres-midi': {
+            'debut': Parametre.get('shift_apresmidi_debut', '14:00'),
+            'fin':   Parametre.get('shift_apresmidi_fin', '22:00'),
+        },
+    }
+    effectif_defaut = 10
+    if equipe is None:
+        derniere = (Equipe.query
+                    .filter_by(user_id=current_user.id)
+                    .order_by(Equipe.date.desc(), Equipe.cree_le.desc())
+                    .first())
+        if derniere and derniere.effectif:
+            effectif_defaut = derniere.effectif
+
     return render_template('saisie/formulaire.html',
                            essences=Config.ESSENCES,
                            machines=Config.MACHINES,
@@ -718,7 +738,9 @@ def _render_form(equipe=None):
                            productions_data=productions_data,
                            arrets_data=arrets_data,
                            form_action=form_action,
-                           capacites_essences=capacites_essences)
+                           capacites_essences=capacites_essences,
+                           horaires_creneaux=horaires_creneaux,
+                           effectif_defaut=effectif_defaut)
 
 
 # ── Création ─────────────────────────────────────────────────────────────────

@@ -148,6 +148,17 @@ def _init_donnees_defaut():
         if not Parametre.query.filter_by(cle=cle).first():
             db.session.add(Parametre(cle=cle, valeur=valeur, description=desc))
 
+    # F5 — Horaires standards par créneau (préremplissage du 1er passage)
+    horaires_creneaux = [
+        ('shift_matin_debut',     '06:00', 'Heure de début standard du poste Matin'),
+        ('shift_matin_fin',       '14:00', 'Heure de fin standard du poste Matin'),
+        ('shift_apresmidi_debut', '14:00', 'Heure de début standard du poste Après-midi'),
+        ('shift_apresmidi_fin',   '22:00', 'Heure de fin standard du poste Après-midi'),
+    ]
+    for cle, valeur, desc in horaires_creneaux:
+        if not Parametre.query.filter_by(cle=cle).first():
+            db.session.add(Parametre(cle=cle, valeur=valeur, description=desc))
+
     db.session.commit()
 
 

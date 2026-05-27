@@ -1317,8 +1317,11 @@ def _stats_operateur(user_id):
     Ne compte que les postes effectivement soumis et porteurs d'un TRS, pour que
     la progression reflète des données validées, pas des brouillons.
     """
+    # Charge toutes les equipes de l'opérateur en un seul appel DB.
+    toutes = Equipe.query.filter_by(user_id=user_id).all()
+
     soumises = [
-        e for e in Equipe.query.filter_by(user_id=user_id).all()
+        e for e in toutes
         if e.statut in ('soumis', 'a_verifier', 'verrouille', 'valide_chef') and e.trs_global
     ]
     nb = len(soumises)
@@ -1337,10 +1340,13 @@ def _stats_operateur(user_id):
         tendance = 'flat'
 
     # F6 — Objectif hebdomadaire de régularité (nb de postes saisis, jamais le TRS → pas de biais H3)
+    # Compte tous les postes soumis cette semaine, y compris ceux renvoyés en correction
+    # (l'opérateur A soumis la fiche : elle compte pour la régularité même si renvoyée).
     debut_semaine = ref - timedelta(days=ref.weekday())  # lundi de la semaine courante
     postes_semaine = sum(
-        1 for e in Equipe.query.filter_by(user_id=user_id).all()
-        if e.statut in ('soumis', 'a_verifier', 'verrouille', 'valide_chef') and e.date >= debut_semaine
+        1 for e in toutes
+        if e.statut in ('soumis', 'a_verifier', 'a_corriger', 'verrouille', 'valide_chef')
+        and e.date >= debut_semaine
     )
     try:
         objectif_hebdo = int(Parametre.get('objectif_postes_semaine', 5))

@@ -1,6 +1,6 @@
 {# Composant de progression opérateur — partagé entre l'accueil et l'historique (F1).
    Attend une variable `stats_operateur` (dict) ou None. #}
-{% if stats_operateur is not none %}
+{% if stats_operateur is defined and stats_operateur is not none %}
 {% set s = stats_operateur %}
 {% set trs_class = 'is-good' if s.trs_moyen and s.trs_moyen >= 65 else ('is-mid' if s.trs_moyen and s.trs_moyen >= 50 else 'is-low') %}
 <div class="wp-progress">

@@ -369,6 +369,7 @@ const essencesOptions = `
 
 const causesArret = {{ causes_arret | tojson }};
 const aucunArretInitial = {% if equipe and equipe.aucun_arret_confirme %}true{% else %}false{% endif %};
+const capacitesEssences = {{ capacites_essences | tojson }};
 
 function escapeHtml(value) {
     return String(value ?? '')
@@ -792,18 +793,36 @@ function majProduction(index) {
         resume.textContent = `${essence} · ${horaire}`;
     }
 
-    let message = '';
+    let message = ‘’;
     if (duree !== null && duree <= 0) {
-        message = 'L’heure de fin doit être après l’heure de début.';
+        message = ‘L’heure de fin doit être après l’heure de début.’;
     } else if (entree > 0 && totalSorti > entree + 0.01) {
-        message = 'Conforme + déclassé dépasse le volume entrée.';
+        message = ‘Conforme + déclassé dépasse le volume entrée.’;
     }
 
-    if (alerte) {
-        alerte.hidden = !message;
-        alerte.textContent = message;
+    // F4 — Poka-yoke volume : deux niveaux non-bloquants (orange / rouge)
+    let rangeMessage = ‘’;
+    let rangeIsWarning = false;
+    if (!message) {
+        const capaciteH = essence ? (capacitesEssences[essence] ?? null) : null;
+        if (capaciteH && duree !== null && duree > 0 && entree > 0) {
+            const capaciteCreneau = capaciteH * (duree / 60);
+            if (entree > capaciteCreneau * 1.3) {
+                rangeMessage = `Volume impossible pour ce créneau (max théorique : ${capaciteCreneau.toFixed(2)} m³) — vérifiez la saisie.`;
+            } else if (entree > capaciteCreneau) {
+                rangeMessage = `Volume inhabituellement élevé — dépasse la capacité théorique du créneau (${capaciteCreneau.toFixed(2)} m³).`;
+                rangeIsWarning = true;
+            }
+        }
     }
-    if (carte) carte.classList.toggle('has-warning', Boolean(message));
+
+    const displayMessage = message || rangeMessage;
+    if (alerte) {
+        alerte.hidden = !displayMessage;
+        alerte.textContent = displayMessage;
+        alerte.classList.toggle(‘is-warning’, Boolean(rangeIsWarning));
+    }
+    if (carte) carte.classList.toggle(‘has-warning’, Boolean(displayMessage));
 
     const complet = essence && debut && fin && entree > 0 && conforme >= 0 && declass >= 0 && !message;
     if (etat) {

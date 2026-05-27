@@ -293,6 +293,9 @@ body {
   margin-top: 10px; color: var(--wp-terracotta); background: rgba(216,113,73,.10);
   border-radius: 10px; padding: 8px 10px; font-size: .82rem; font-weight: 700;
 }
+.wp-production-alert.is-warning {
+  color: var(--wp-ochre); background: rgba(188,140,56,.10);
+}
 .wp-volume-helper {
   margin-top: 12px; border: 1px dashed rgba(31,92,61,.24); border-radius: 12px;
   background: rgba(31,92,61,.035); padding: 12px;

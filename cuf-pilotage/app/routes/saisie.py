@@ -700,6 +700,13 @@ def _render_form(equipe=None):
     if shift_initial not in ('Matin', 'Apres-midi'):
         shift_initial = 'Matin'
 
+    # F4 — Capacités théoriques par essence (poka-yoke volume)
+    capacites_essences = {}
+    for e in Config.ESSENCES:
+        val = Parametre.get(f'capacite_{normalise_essence(e)}_h')
+        if val:
+            capacites_essences[e] = float(val)
+
     return render_template('saisie/formulaire.html',
                            essences=Config.ESSENCES,
                            machines=Config.MACHINES,
@@ -710,7 +717,8 @@ def _render_form(equipe=None):
                            equipe=equipe,
                            productions_data=productions_data,
                            arrets_data=arrets_data,
-                           form_action=form_action)
+                           form_action=form_action,
+                           capacites_essences=capacites_essences)
 
 
 # ── Création ─────────────────────────────────────────────────────────────────

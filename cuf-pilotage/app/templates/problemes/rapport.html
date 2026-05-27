@@ -25,6 +25,19 @@
   </div>
   <div class="d-flex gap-2">
     <a href="{{ url_for('problemes.ishikawa', probleme_id=probleme.id) }}" class="btn btn-sm btn-outline-secondary">Modifier</a>
+    <a href="{{ url_for('dashboard.nouvelle_action_chef',
+                        origine_type='probleme',
+                        probleme_id=probleme.id,
+                        origine_label='Résolution #' ~ probleme.id ~ ' - ' ~ probleme.titre,
+                        origine_url=url_for('problemes.rapport', probleme_id=probleme.id),
+                        titre='Action suite analyse #' ~ probleme.id,
+                        type_action='organisation',
+                        description=probleme.actions_correctives or ('Traiter la cause racine : ' ~ (racine.description if racine else probleme.titre)),
+                        responsable=probleme.responsable_action or 'Chef scierie',
+                        echeance=probleme.delai_action.isoformat() if probleme.delai_action else '') }}"
+       class="btn btn-sm btn-success">
+      <i class="bi bi-check2-square"></i> Créer action
+    </a>
     <button onclick="window.print()" class="btn btn-sm btn-primary">
       <i class="bi bi-printer"></i> Imprimer
     </button>

@@ -74,6 +74,30 @@
   </div>
 </div>
 
+{% set action_stats = stats_actions_chef|default({}) %}
+<div class="wp-card mb-4" style="border-left:4px solid {% if action_stats.retard|default(0) > 0 %}var(--wp-terracotta){% else %}var(--wp-sky){% endif %};">
+  <div class="p-3 d-flex justify-content-between align-items-center gap-3 flex-wrap">
+    <div>
+      <div style="font-weight:900;color:var(--wp-ink);">
+        <i class="bi bi-check2-square" style="color:{% if action_stats.retard|default(0) > 0 %}var(--wp-terracotta){% else %}var(--wp-sky){% endif %};"></i>
+        Actions Chef
+      </div>
+      <div style="font-size:.82rem;color:var(--wp-muted);">
+        {{ action_stats.ouvertes|default(0) }} ouverte{{ 's' if action_stats.ouvertes|default(0) > 1 }}
+        · {{ action_stats.retard|default(0) }} en retard.
+      </div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="{{ url_for('dashboard.nouvelle_action_chef') }}" class="btn btn-sm btn-outline-primary">
+        Nouvelle action
+      </a>
+      <a href="{{ url_for('dashboard.actions_chef') }}" class="btn btn-sm btn-primary">
+        Suivre les actions
+      </a>
+    </div>
+  </div>
+</div>
+
 {% if not postes %}
 <div class="wp-card p-4 text-center">
   <i class="bi bi-inbox fs-2 mb-2 d-block" style="color:var(--wp-muted);"></i>

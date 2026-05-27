@@ -159,7 +159,18 @@
               <td class="text-end"><span class="badge bg-{{ e.couleur }}">{{ e.rendement }}%</span></td>
               <td class="text-end">
                 {% if e.couleur != 'success' %}
-                <a href="{{ e.analyse_url }}" class="btn btn-sm btn-outline-primary">Analyser</a>
+                <div class="btn-group btn-group-sm">
+                  <a href="{{ e.analyse_url }}" class="btn btn-outline-primary">Analyser</a>
+                  <a href="{{ url_for('dashboard.nouvelle_action_chef',
+                                      origine_type='libre',
+                                      origine_label='Qualité essence ' ~ e.essence,
+                                      origine_url=url_for('dashboard.qualite_chef', jours=jours, mode=mode),
+                                      titre='Action qualité ' ~ e.essence,
+                                      type_action='qualite',
+                                      responsable='Chef équipe',
+                                      description='Vérifier le déclassement ou le rendement matière de ' ~ e.essence ~ ' : rendement ' ~ e.rendement ~ '%, déclassé ' ~ e.declass_pct ~ '%.') }}"
+                     class="btn btn-outline-success">Action</a>
+                </div>
                 {% else %}
                 <span style="color:var(--wp-muted);">—</span>
                 {% endif %}
@@ -243,6 +254,16 @@
             <div class="btn-group btn-group-sm">
               <a href="{{ f.href }}" class="btn btn-outline-primary">Fiche</a>
               <a href="{{ f.analyse_url }}" class="btn btn-primary">Analyser</a>
+              <a href="{{ url_for('dashboard.nouvelle_action_chef',
+                                  origine_type='fiche',
+                                  equipe_id=f.id,
+                                  origine_label='Fiche qualité #' ~ f.id,
+                                  origine_url=f.href,
+                                  titre='Action qualité fiche #' ~ f.id,
+                                  type_action='qualite',
+                                  responsable='Chef équipe',
+                                  description='Contrôler la qualité matière de la fiche #' ~ f.id ~ ' : rendement ' ~ f.rendement ~ '%, déclassé ' ~ f.declass_pct ~ '%.') }}"
+                 class="btn btn-outline-success">Action</a>
             </div>
           </td>
         </tr>

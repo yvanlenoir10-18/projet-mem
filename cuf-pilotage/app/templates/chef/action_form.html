@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+{% block title %}Nouvelle action Chef · wood_pilot{% endblock %}
+{% block page_title %}Nouvelle action Chef{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('dashboard.actions_chef') }}"
+     class="wp-icon-btn" style="text-decoration:none;" aria-label="Retour">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <div class="wp-section-title mb-1">
+      <i class="bi bi-check2-square"></i> Créer une action
+    </div>
+    <div style="font-size:.84rem;color:var(--wp-muted);">
+      Une décision simple, un responsable, un délai et un statut.
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <form method="POST" action="{{ url_for('dashboard.nouvelle_action_chef') }}" class="wp-card">
+      {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+      <input type="hidden" name="origine_type" value="{{ action.origine_type }}">
+      <input type="hidden" name="origine_label" value="{{ action.origine_label or '' }}">
+      <input type="hidden" name="origine_url" value="{{ action.origine_url or '' }}">
+      <input type="hidden" name="equipe_id" value="{{ action.equipe_id or '' }}">
+      <input type="hidden" name="probleme_id" value="{{ action.probleme_id or '' }}">
+      <input type="hidden" name="machine" value="{{ action.machine or '' }}">
+
+      <div class="wp-card-header">
+        <i class="bi bi-pencil-square"></i> Décision du chef
+      </div>
+      <div class="p-3">
+        {% if action.origine_label %}
+        <div class="mb-3" style="border-left:3px solid var(--wp-sky);background:#f7fbff;padding:.8rem;border-radius:8px;">
+          <div style="font-size:.75rem;color:var(--wp-muted);font-weight:800;text-transform:uppercase;">Source</div>
+          <div style="font-weight:800;color:var(--wp-ink);">{{ action.origine_label }}</div>
+          {% if action.origine_url %}
+          <a href="{{ action.origine_url }}" style="font-size:.78rem;">Ouvrir la source</a>
+          {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="mb-3">
+          <label class="form-label">Titre de l'action</label>
+          <input type="text" name="titre" class="form-control" required
+                 value="{{ action.titre }}"
+                 placeholder="Exemple : Vérifier la Bicoupe après arrêts répétés">
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Type d'action</label>
+            <select name="type_action" class="form-select">
+              {% for code, label in types_action %}
+              <option value="{{ code }}" {% if action.type_action == code %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Statut initial</label>
+            <select name="statut" class="form-select" id="statutAction">
+              {% for code, meta in statuts.items() %}
+              <option value="{{ code }}" {% if action.statut == code %}selected{% endif %}>{{ meta[0] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <label class="form-label">Action décidée</label>
+          <textarea name="description" class="form-control" rows="4" required
+                    placeholder="Exemple : Appeler maintenance, contrôler courroie et roulements, puis noter le résultat avant le prochain poste.">{{ action.description }}</textarea>
+        </div>
+
+        <div class="row g-3 mt-1">
+          <div class="col-md-6">
+            <label class="form-label">Responsable</label>
+            <input type="text" name="responsable" class="form-control" required
+                   value="{{ action.responsable }}"
+                   list="responsables-suggeres"
+                   placeholder="Maintenance, Chef parc, Chef équipe...">
+            <datalist id="responsables-suggeres">
+              <option value="Maintenance">
+              <option value="Chef parc">
+              <option value="Chef équipe matin">
+              <option value="Chef équipe après-midi">
+              <option value="Chef scierie">
+              <option value="Admin">
+            </datalist>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Délai souhaité</label>
+            <input type="date" name="echeance" class="form-control"
+                   value="{{ action.echeance }}">
+            <div class="form-text" style="font-size:.75rem;">
+              Si le délai est dépassé, l'action apparaîtra dans les alertes du chef.
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3" id="motifSansAction" style="display:{% if action.statut == 'classe_sans_action' %}block{% else %}none{% endif %};">
+          <label class="form-label">Motif du classement sans action</label>
+          <textarea name="motif_classe_sans_action" class="form-control" rows="2"
+                    placeholder="Exemple : écart faible, situation déjà connue, pièce déjà commandée.">{{ action.motif_classe_sans_action }}</textarea>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 mt-4">
+          <a href="{{ url_for('dashboard.actions_chef') }}" class="btn btn-outline-secondary">Annuler</a>
+          <button class="btn btn-primary">
+            <i class="bi bi-check2-square"></i> Créer l'action
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="wp-card mb-3">
+      <div class="wp-card-header">
+        <i class="bi bi-lightbulb"></i> Exemples utiles
+      </div>
+      <div class="p-3 d-grid gap-3" style="font-size:.84rem;color:var(--wp-muted);">
+        <div>
+          <strong style="color:var(--wp-ink);">Machine</strong><br>
+          Bicoupe arrêtée 3 fois : contrôler courroie et roulements avant vendredi.
+        </div>
+        <div>
+          <strong style="color:var(--wp-ink);">Approvisionnement</strong><br>
+          Manque de bois : synchroniser parc et ligne avant le poste matin.
+        </div>
+        <div>
+          <strong style="color:var(--wp-ink);">Qualité</strong><br>
+          Déclassé Ayous élevé : vérifier réglage coupe et qualité grumes.
+        </div>
+        <div>
+          <strong style="color:var(--wp-ink);">Fiche</strong><br>
+          Arrêt long sans commentaire : rappeler la règle de commentaire terrain.
+        </div>
+      </div>
+    </div>
+
+    <div class="wp-card" style="border-left:4px solid var(--wp-leaf);">
+      <div class="p-3" style="font-size:.84rem;color:var(--wp-muted);line-height:1.45;">
+        <strong style="color:var(--wp-ink);">Choix V1 :</strong>
+        le responsable reste en texte libre. C'est plus réaliste au début, car la personne responsable n'a pas toujours un compte dans l'application.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const statutAction = document.getElementById('statutAction');
+const motifSansAction = document.getElementById('motifSansAction');
+if (statutAction && motifSansAction) {
+  statutAction.addEventListener('change', () => {
+    motifSansAction.style.display = statutAction.value === 'classe_sans_action' ? 'block' : 'none';
+  });
+}
+</script>
+
+{% endblock %}

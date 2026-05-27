@@ -61,6 +61,10 @@
          href="{{ url_for('problemes.liste') }}">
         <span class="wp-nav-ic"><i class="bi bi-diagram-3"></i></span>Résolution
       </a>
+      <a class="wp-nav-link {% if request.endpoint in ('dashboard.actions_chef', 'dashboard.nouvelle_action_chef') %}active{% endif %}"
+         href="{{ url_for('dashboard.actions_chef') }}">
+        <span class="wp-nav-ic"><i class="bi bi-check2-square"></i></span>Actions Chef
+      </a>
       {% endif %}
 
       {% if current_user.role == 'pdg' %}
@@ -158,6 +162,8 @@
           <span class="wp-nav-ic"><i class="bi bi-exclamation-triangle"></i></span>Causes d'arrêts</a>
         <a class="wp-nav-link" href="{{ url_for('problemes.liste') }}">
           <span class="wp-nav-ic"><i class="bi bi-diagram-3"></i></span>Résolution</a>
+        <a class="wp-nav-link" href="{{ url_for('dashboard.actions_chef') }}">
+          <span class="wp-nav-ic"><i class="bi bi-check2-square"></i></span>Actions Chef</a>
         {% endif %}
         {% if current_user.role == 'pdg' %}
         <span class="wp-nav-section">Direction</span>

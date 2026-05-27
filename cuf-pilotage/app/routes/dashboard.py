@@ -6,14 +6,14 @@ Routes des tableaux de bord.
 """
 from collections import defaultdict
 import statistics
-from flask import Blueprint, render_template, request, send_file, abort, url_for
-from flask_login import login_required
+from flask import Blueprint, render_template, request, send_file, abort, url_for, redirect, flash
+from flask_login import login_required, current_user
 from datetime import date, datetime, timedelta
 import io
 from ..models import (
     db, User, Equipe, Parametre, STATUT_A_CORRIGER, STATUT_A_VERIFIER,
     STATUT_BROUILLON, STATUT_VALIDE_CHEF, STATUT_VERROUILLE,
-    STATUTS_ANALYSES, STATUTS_NON_ANALYSES, Probleme,
+    STATUTS_ANALYSES, STATUTS_NON_ANALYSES, Probleme, ActionChef,
 )
 from ..services.trs import (
     pareto_arrets, couleur_trs,
@@ -42,6 +42,62 @@ def _format_duree(minutes):
     if m == 0:
         return f"{h}h00"
     return f"{h}h{m:02d}"
+
+
+def _parse_date_action(valeur):
+    valeur = (valeur or '').strip()
+    if not valeur:
+        return None
+    try:
+        return date.fromisoformat(valeur)
+    except ValueError:
+        return None
+
+
+def _action_statut_meta(statut):
+    label, couleur = ACTION_CHEF_STATUTS.get(statut, (statut or 'Inconnu', 'secondary'))
+    return {'label': label, 'couleur': couleur}
+
+
+def _action_type_label(type_action):
+    return dict(ACTION_CHEF_TYPES).get(type_action, type_action or 'Autre')
+
+
+def _stats_actions_chef():
+    today = date.today()
+    ouvertes_query = ActionChef.query.filter(ActionChef.statut.in_(ACTION_CHEF_STATUTS_OUVERTS))
+    return {
+        'ouvertes': ouvertes_query.count(),
+        'retard': ouvertes_query.filter(ActionChef.echeance < today).count(),
+        'a_faire': ActionChef.query.filter_by(statut='a_faire').count(),
+        'en_cours': ActionChef.query.filter_by(statut='en_cours').count(),
+        'fait': ActionChef.query.filter_by(statut='fait').count(),
+    }
+
+
+def _ligne_action_chef(action):
+    statut = _action_statut_meta(action.statut)
+    return {
+        'id': action.id,
+        'titre': action.titre,
+        'type_action': action.type_action,
+        'type_label': _action_type_label(action.type_action),
+        'description': action.description,
+        'responsable': action.responsable,
+        'echeance': action.echeance,
+        'echeance_fmt': action.echeance.strftime('%d/%m/%Y') if action.echeance else 'Sans délai',
+        'statut': action.statut,
+        'statut_label': statut['label'],
+        'statut_couleur': statut['couleur'],
+        'retard': action.est_en_retard,
+        'origine_type': action.origine_type,
+        'origine_label': action.origine_label,
+        'origine_url': action.origine_url,
+        'machine': action.machine,
+        'motif_classe_sans_action': action.motif_classe_sans_action,
+        'cree_par': action.cree_par.nom if action.cree_par else '—',
+        'cree_le': action.cree_le,
+    }
 
 
 def _commentaires_validation(equipe):
@@ -77,6 +133,32 @@ _STATUTS_ANALYSES = STATUTS_ANALYSES
 
 _LABELS_JOURS_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
 _SHIFTS_JOUR = ('Matin', 'Apres-midi')
+
+ACTION_CHEF_STATUTS = {
+    'a_faire': ('À faire', 'warning'),
+    'en_cours': ('En cours', 'info'),
+    'fait': ('Fait', 'success'),
+    'abandonne': ('Abandonné', 'secondary'),
+    'classe_sans_action': ('Classé sans action', 'secondary'),
+}
+ACTION_CHEF_STATUTS_OUVERTS = ('a_faire', 'en_cours')
+ACTION_CHEF_TYPES = [
+    ('maintenance', 'Maintenance'),
+    ('approvisionnement', 'Approvisionnement bois'),
+    ('qualite', 'Qualité / matière'),
+    ('controle_fiche', 'Contrôle fiche'),
+    ('organisation', 'Organisation poste'),
+    ('formation', 'Formation / consigne'),
+    ('surveillance', 'Surveillance'),
+    ('autre', 'Autre'),
+]
+ACTION_CHEF_ORIGINES = {
+    'libre': 'Libre',
+    'fiche': 'Fiche',
+    'machine': 'Machine',
+    'probleme': 'Résolution',
+    'recommandation': 'Recommandation',
+}
 
 
 def _safe_float_param(cle, defaut):
@@ -366,6 +448,21 @@ def _postes_du_jour(aujourd_hui):
 
 def _actions_immediates(aujourd_hui, alertes):
     actions = []
+
+    actions_retard = ActionChef.query.filter(
+        ActionChef.statut.in_(ACTION_CHEF_STATUTS_OUVERTS),
+        ActionChef.echeance < aujourd_hui,
+    ).count()
+    if actions_retard:
+        actions.append({
+            'niveau': 'danger',
+            'icon': 'bi-alarm',
+            'titre': 'Actions en retard',
+            'detail': f"{actions_retard} action(s) chef ont dépassé leur délai.",
+            'href': url_for('dashboard.actions_chef', statut='retard'),
+            'cta': 'Traiter',
+            'priorite': 120,
+        })
 
     fiches = list(alertes.get('fiches_a_verifier', [])) if alertes else []
     for fiche in fiches[:5]:
@@ -1171,6 +1268,7 @@ def vue_chef():
     nb_problemes_ouverts = Probleme.query.filter(
         Probleme.statut.in_(('ouvert', 'en_analyse'))
     ).count()
+    stats_actions_chef = _stats_actions_chef()
 
     try:
         mois_sel  = int(request.args.get('mois',  0))
@@ -1206,7 +1304,8 @@ def vue_chef():
                                postes_du_jour=postes_du_jour,
                                actions_immediates=actions_immediates,
                                alertes=alertes,
-                               nb_problemes_ouverts=nb_problemes_ouverts)
+                               nb_problemes_ouverts=nb_problemes_ouverts,
+                               stats_actions_chef=stats_actions_chef)
 
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen    = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
@@ -1444,7 +1543,8 @@ def vue_chef():
                            postes_du_jour=postes_du_jour,
                            actions_immediates=actions_immediates,
                            alertes=alertes,
-                           nb_problemes_ouverts=nb_problemes_ouverts)
+                           nb_problemes_ouverts=nb_problemes_ouverts,
+                           stats_actions_chef=stats_actions_chef)
 
 
 @dashboard_bp.route('/chef/fiches')
@@ -1582,6 +1682,233 @@ def qualite_chef():
         shifts=shifts,
         fiches_a_surveiller=fiches_a_surveiller,
     )
+
+
+def _prefill_action_chef():
+    origine_type = request.args.get('origine_type', 'libre').strip() or 'libre'
+    if origine_type not in ACTION_CHEF_ORIGINES:
+        origine_type = 'libre'
+
+    equipe_id = None
+    probleme_id = None
+    try:
+        equipe_id = int(request.args.get('equipe_id') or 0) or None
+    except ValueError:
+        equipe_id = None
+    try:
+        probleme_id = int(request.args.get('probleme_id') or 0) or None
+    except ValueError:
+        probleme_id = None
+
+    equipe = Equipe.query.get(equipe_id) if equipe_id else None
+    probleme = Probleme.query.get(probleme_id) if probleme_id else None
+    machine = request.args.get('machine', '').strip()
+    origine_label = request.args.get('origine_label', '').strip()
+    origine_url = request.args.get('origine_url', '').strip()
+
+    if probleme:
+        origine_type = 'probleme'
+        origine_label = origine_label or f"Résolution #{probleme.id} - {probleme.titre}"
+        origine_url = origine_url or url_for('problemes.rapport', probleme_id=probleme.id)
+    elif equipe:
+        origine_type = 'fiche'
+        origine_label = origine_label or f"Fiche #{equipe.id} - {equipe.date.strftime('%d/%m/%Y')} {equipe.numero_equipe}"
+        origine_url = origine_url or url_for('saisie.detail_poste', poste_id=equipe.id)
+    elif machine:
+        origine_type = 'machine'
+        origine_label = origine_label or f"Machine - {machine}"
+        origine_url = origine_url or url_for('dashboard.machines_chef', machine=machine)
+
+    titre = request.args.get('titre', '').strip()
+    if not titre:
+        if machine:
+            titre = f"Action sur {machine}"
+        elif probleme:
+            titre = f"Action suite analyse #{probleme.id}"
+        elif equipe:
+            titre = f"Action suite fiche #{equipe.id}"
+        else:
+            titre = "Nouvelle action chef"
+
+    return {
+        'titre': titre,
+        'type_action': request.args.get('type_action', 'autre').strip() or 'autre',
+        'description': request.args.get('description', '').strip(),
+        'responsable': request.args.get('responsable', '').strip(),
+        'echeance': request.args.get('echeance', '').strip(),
+        'origine_type': origine_type,
+        'origine_label': origine_label,
+        'origine_url': origine_url,
+        'equipe_id': equipe.id if equipe else None,
+        'probleme_id': probleme.id if probleme else None,
+        'machine': machine,
+        'statut': 'a_faire',
+        'motif_classe_sans_action': '',
+    }
+
+
+@dashboard_bp.route('/chef/actions')
+@login_required
+@roles_required('chef', 'admin')
+def actions_chef():
+    """Liste des décisions et actions suivies par le chef scierie."""
+    statut = request.args.get('statut', 'ouvertes').strip()
+    origine_type = request.args.get('origine_type', '').strip()
+    q = request.args.get('q', '').strip()
+
+    query = ActionChef.query
+    today = date.today()
+    if statut == 'ouvertes':
+        query = query.filter(ActionChef.statut.in_(ACTION_CHEF_STATUTS_OUVERTS))
+    elif statut == 'retard':
+        query = query.filter(
+            ActionChef.statut.in_(ACTION_CHEF_STATUTS_OUVERTS),
+            ActionChef.echeance < today,
+        )
+    elif statut in ACTION_CHEF_STATUTS:
+        query = query.filter(ActionChef.statut == statut)
+
+    if origine_type in ACTION_CHEF_ORIGINES:
+        query = query.filter(ActionChef.origine_type == origine_type)
+
+    if q:
+        like = f"%{q}%"
+        query = query.filter(or_(
+            ActionChef.titre.ilike(like),
+            ActionChef.description.ilike(like),
+            ActionChef.responsable.ilike(like),
+            ActionChef.origine_label.ilike(like),
+            ActionChef.machine.ilike(like),
+        ))
+
+    actions = query.order_by(
+        ActionChef.echeance.is_(None),
+        ActionChef.echeance.asc(),
+        ActionChef.cree_le.desc(),
+    ).all()
+
+    return render_template(
+        'chef/actions.html',
+        actions=[_ligne_action_chef(a) for a in actions],
+        stats=_stats_actions_chef(),
+        filtres={'statut': statut, 'origine_type': origine_type, 'q': q},
+        statuts=ACTION_CHEF_STATUTS,
+        origines=ACTION_CHEF_ORIGINES,
+        types_action=ACTION_CHEF_TYPES,
+    )
+
+
+@dashboard_bp.route('/chef/actions/nouvelle', methods=['GET', 'POST'])
+@login_required
+@roles_required('chef', 'admin')
+def nouvelle_action_chef():
+    """Création d'une action légère de pilotage."""
+    valeurs = _prefill_action_chef()
+
+    if request.method == 'POST':
+        titre = request.form.get('titre', '').strip()
+        type_action = request.form.get('type_action', 'autre').strip()
+        description = request.form.get('description', '').strip()
+        responsable = request.form.get('responsable', '').strip()
+        echeance = _parse_date_action(request.form.get('echeance'))
+        statut = request.form.get('statut', 'a_faire').strip()
+        motif = request.form.get('motif_classe_sans_action', '').strip()
+        origine_type = request.form.get('origine_type', 'libre').strip()
+
+        if type_action not in dict(ACTION_CHEF_TYPES):
+            type_action = 'autre'
+        if statut not in ACTION_CHEF_STATUTS:
+            statut = 'a_faire'
+        if origine_type not in ACTION_CHEF_ORIGINES:
+            origine_type = 'libre'
+
+        erreurs = []
+        if len(titre) < 4:
+            erreurs.append("Donnez un titre clair à l'action.")
+        if len(description) < 10:
+            erreurs.append("Décrivez l'action à mener en au moins 10 caractères.")
+        if len(responsable) < 2:
+            erreurs.append("Indiquez un responsable, même sous forme simple : Maintenance, Chef parc, Chef équipe.")
+        if statut == 'classe_sans_action' and len(motif) < 10:
+            erreurs.append("Le motif est obligatoire pour classer sans action.")
+
+        try:
+            equipe_id = int(request.form.get('equipe_id') or 0) or None
+        except ValueError:
+            equipe_id = None
+        try:
+            probleme_id = int(request.form.get('probleme_id') or 0) or None
+        except ValueError:
+            probleme_id = None
+
+        if erreurs:
+            for erreur in erreurs:
+                flash(erreur, 'danger')
+            valeurs.update(request.form.to_dict())
+            valeurs['equipe_id'] = equipe_id
+            valeurs['probleme_id'] = probleme_id
+            valeurs['echeance'] = request.form.get('echeance', '')
+            return render_template(
+                'chef/action_form.html',
+                action=valeurs,
+                types_action=ACTION_CHEF_TYPES,
+                statuts=ACTION_CHEF_STATUTS,
+                origines=ACTION_CHEF_ORIGINES,
+            )
+
+        action = ActionChef(
+            titre=titre,
+            type_action=type_action,
+            description=description,
+            responsable=responsable,
+            echeance=echeance,
+            statut=statut,
+            motif_classe_sans_action=motif if statut == 'classe_sans_action' else None,
+            origine_type=origine_type,
+            origine_label=request.form.get('origine_label', '').strip() or None,
+            origine_url=request.form.get('origine_url', '').strip() or None,
+            equipe_id=equipe_id,
+            probleme_id=probleme_id,
+            machine=request.form.get('machine', '').strip() or None,
+            cree_par_id=current_user.id,
+            termine_le=datetime.utcnow() if statut in ('fait', 'abandonne', 'classe_sans_action') else None,
+        )
+        db.session.add(action)
+        db.session.commit()
+        flash("Action chef créée. Elle restera visible jusqu'à son traitement.", 'success')
+        return redirect(url_for('dashboard.actions_chef'))
+
+    return render_template(
+        'chef/action_form.html',
+        action=valeurs,
+        types_action=ACTION_CHEF_TYPES,
+        statuts=ACTION_CHEF_STATUTS,
+        origines=ACTION_CHEF_ORIGINES,
+    )
+
+
+@dashboard_bp.route('/chef/actions/<int:action_id>/statut', methods=['POST'])
+@login_required
+@roles_required('chef', 'admin')
+def changer_statut_action_chef(action_id):
+    """Mise à jour rapide du statut d'une action."""
+    action = ActionChef.query.get_or_404(action_id)
+    statut = request.form.get('statut', '').strip()
+    motif = request.form.get('motif_classe_sans_action', '').strip()
+
+    if statut not in ACTION_CHEF_STATUTS:
+        flash("Statut d'action invalide.", 'danger')
+        return redirect(url_for('dashboard.actions_chef'))
+    if statut == 'classe_sans_action' and len(motif) < 10:
+        flash("Motif obligatoire pour classer une action sans suite.", 'danger')
+        return redirect(url_for('dashboard.actions_chef'))
+
+    action.statut = statut
+    action.motif_classe_sans_action = motif if statut == 'classe_sans_action' else None
+    action.termine_le = datetime.utcnow() if statut in ('fait', 'abandonne', 'classe_sans_action') else None
+    db.session.commit()
+    flash("Statut de l'action mis à jour.", 'success')
+    return redirect(request.referrer or url_for('dashboard.actions_chef'))
 
 
 @dashboard_bp.route('/pdg')

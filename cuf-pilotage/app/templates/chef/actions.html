@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+{% block title %}Actions Chef · wood_pilot{% endblock %}
+{% block page_title %}Actions Chef{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <div class="wp-section-title mb-1">
+      <i class="bi bi-check2-square"></i> Plan d'action chef
+    </div>
+    <div style="font-size:.84rem;color:var(--wp-muted);">
+      Décisions opérationnelles à suivre après une fiche, une machine, une analyse ou une alerte.
+    </div>
+  </div>
+  <a href="{{ url_for('dashboard.nouvelle_action_chef') }}" class="btn btn-sm btn-primary">
+    <i class="bi bi-plus-circle"></i> Nouvelle action
+  </a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('dashboard.actions_chef', statut='ouvertes') }}" class="wp-kpi d-block" style="text-decoration:none;color:inherit;">
+      <div class="wp-kpi-label">Ouvertes</div>
+      <div class="wp-kpi-value">{{ stats.ouvertes }}</div>
+      <div class="wp-kpi-sub">à faire + en cours</div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('dashboard.actions_chef', statut='retard') }}" class="wp-kpi d-block" style="text-decoration:none;color:inherit;">
+      <div class="wp-kpi-label">En retard</div>
+      <div class="wp-kpi-value" style="color:var(--wp-terracotta);">{{ stats.retard }}</div>
+      <div class="wp-kpi-sub">délai dépassé</div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('dashboard.actions_chef', statut='a_faire') }}" class="wp-kpi d-block" style="text-decoration:none;color:inherit;">
+      <div class="wp-kpi-label">À faire</div>
+      <div class="wp-kpi-value" style="color:var(--wp-ochre);">{{ stats.a_faire }}</div>
+      <div class="wp-kpi-sub">pas encore lancées</div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('dashboard.actions_chef', statut='en_cours') }}" class="wp-kpi d-block" style="text-decoration:none;color:inherit;">
+      <div class="wp-kpi-label">En cours</div>
+      <div class="wp-kpi-value" style="color:var(--wp-sky);">{{ stats.en_cours }}</div>
+      <div class="wp-kpi-sub">suivi opérationnel</div>
+    </a>
+  </div>
+</div>
+
+<form method="GET" action="{{ url_for('dashboard.actions_chef') }}" class="wp-card mb-4">
+  <div class="p-3">
+    <div class="row g-3 align-items-end">
+      <div class="col-6 col-md-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Statut</label>
+        <select name="statut" class="form-select">
+          <option value="ouvertes" {% if filtres.statut == 'ouvertes' %}selected{% endif %}>Ouvertes</option>
+          <option value="retard" {% if filtres.statut == 'retard' %}selected{% endif %}>En retard</option>
+          {% for code, meta in statuts.items() %}
+          <option value="{{ code }}" {% if filtres.statut == code %}selected{% endif %}>{{ meta[0] }}</option>
+          {% endfor %}
+          <option value="tous" {% if filtres.statut == 'tous' %}selected{% endif %}>Toutes</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Origine</label>
+        <select name="origine_type" class="form-select">
+          <option value="">Toutes</option>
+          {% for code, label in origines.items() %}
+          <option value="{{ code }}" {% if filtres.origine_type == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Recherche</label>
+        <input type="search" name="q" value="{{ filtres.q }}" class="form-control"
+               placeholder="Machine, responsable, action...">
+      </div>
+      <div class="col-12 col-md-2 d-flex gap-2">
+        <button class="btn btn-primary flex-fill"><i class="bi bi-funnel"></i> Filtrer</button>
+        <a href="{{ url_for('dashboard.actions_chef') }}" class="btn btn-outline-secondary">Reset</a>
+      </div>
+    </div>
+  </div>
+</form>
+
+{% if actions %}
+<div class="d-grid gap-3">
+  {% for action in actions %}
+  <div class="wp-card" style="border-left:4px solid {% if action.retard %}var(--wp-terracotta){% elif action.statut == 'en_cours' %}var(--wp-sky){% elif action.statut == 'fait' %}var(--wp-leaf){% else %}var(--wp-ochre){% endif %};">
+    <div class="p-3">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div style="min-width:0;flex:1;">
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+            <span class="badge bg-{{ action.statut_couleur }}">{{ action.statut_label }}</span>
+            {% if action.retard %}
+            <span class="badge bg-danger"><i class="bi bi-alarm"></i> En retard</span>
+            {% endif %}
+            <span class="wp-pill wp-pill-neutral">{{ action.type_label }}</span>
+            {% if action.origine_label %}
+            <span style="font-size:.76rem;color:var(--wp-muted);">
+              Source : {{ action.origine_label }}
+            </span>
+            {% endif %}
+          </div>
+          <h2 style="font-size:1rem;font-weight:900;color:var(--wp-ink);margin:0 0 .35rem;">
+            {{ action.titre }}
+          </h2>
+          <div style="font-size:.84rem;color:var(--wp-muted);line-height:1.45;">
+            {{ action.description }}
+          </div>
+          {% if action.motif_classe_sans_action %}
+          <div style="font-size:.8rem;color:var(--wp-muted);margin-top:.5rem;">
+            <strong>Motif sans action :</strong> {{ action.motif_classe_sans_action }}
+          </div>
+          {% endif %}
+          <div class="d-flex gap-3 flex-wrap mt-3" style="font-size:.78rem;color:var(--wp-muted);">
+            <span><i class="bi bi-person"></i> Responsable : <strong style="color:var(--wp-ink);">{{ action.responsable }}</strong></span>
+            <span><i class="bi bi-calendar-event"></i> Délai : <strong style="color:var(--wp-ink);">{{ action.echeance_fmt }}</strong></span>
+            <span><i class="bi bi-person-check"></i> Créée par : {{ action.cree_par }}</span>
+            {% if action.machine %}<span><i class="bi bi-tools"></i> {{ action.machine }}</span>{% endif %}
+          </div>
+        </div>
+        <div class="d-flex flex-column gap-2" style="min-width:220px;">
+          {% if action.origine_url %}
+          <a href="{{ action.origine_url }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-box-arrow-up-right"></i> Ouvrir la source
+          </a>
+          {% endif %}
+          <form method="POST" action="{{ url_for('dashboard.changer_statut_action_chef', action_id=action.id) }}">
+            {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+            <label class="form-label" style="font-size:.76rem;font-weight:800;">Changer le statut</label>
+            <select name="statut" class="form-select form-select-sm mb-2" onchange="this.form.querySelector('.motif-action').style.display = this.value === 'classe_sans_action' ? 'block' : 'none';">
+              {% for code, meta in statuts.items() %}
+              <option value="{{ code }}" {% if action.statut == code %}selected{% endif %}>{{ meta[0] }}</option>
+              {% endfor %}
+            </select>
+            <textarea name="motif_classe_sans_action"
+                      class="form-control form-control-sm motif-action mb-2"
+                      rows="2"
+                      style="display:{% if action.statut == 'classe_sans_action' %}block{% else %}none{% endif %};"
+                      placeholder="Motif obligatoire si classé sans action">{{ action.motif_classe_sans_action or '' }}</textarea>
+            <button class="btn btn-sm btn-primary w-100">Mettre à jour</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="wp-card p-4 text-center">
+  <i class="bi bi-check2-circle fs-2 d-block mb-2" style="color:var(--wp-muted);"></i>
+  <div style="font-weight:800;color:var(--wp-ink);">Aucune action dans cette vue.</div>
+  <div style="font-size:.84rem;color:var(--wp-muted);margin-top:.3rem;">
+    Créez une action quand un problème exige un suivi : maintenance, bois, qualité, formation ou contrôle.
+  </div>
+  <a href="{{ url_for('dashboard.nouvelle_action_chef') }}" class="btn btn-primary mt-3">
+    Créer une action
+  </a>
+</div>
+{% endif %}
+
+{% endblock %}

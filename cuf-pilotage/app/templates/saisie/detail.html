@@ -97,6 +97,20 @@
     </form>
     {% endif %}
     {% endif %}
+    {% if current_user.role in ('chef', 'admin') %}
+    <a href="{{ url_for('dashboard.nouvelle_action_chef',
+                        origine_type='fiche',
+                        equipe_id=poste.id,
+                        origine_label='Fiche #' ~ poste.id ~ ' - ' ~ poste.date.strftime('%d/%m/%Y') ~ ' ' ~ poste.numero_equipe,
+                        origine_url=url_for('saisie.detail_poste', poste_id=poste.id),
+                        titre='Action suite fiche #' ~ poste.id,
+                        type_action='controle_fiche',
+                        responsable='Chef scierie',
+                        description='Traiter le point observé sur la fiche #' ~ poste.id ~ ' avant clôture ou validation définitive.') }}"
+       class="btn btn-outline-success d-flex align-items-center gap-1">
+      <i class="bi bi-check2-square"></i> Créer action
+    </a>
+    {% endif %}
     <a href="{{ url_for('saisie.fiche_poste', poste_id=poste.id) }}"
        target="_blank"
        class="btn btn-outline-secondary d-flex align-items-center gap-1">

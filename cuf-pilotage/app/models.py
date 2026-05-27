@@ -407,3 +407,47 @@ class PourquoiNiveau(db.Model):
 
     def __repr__(self):
         return f'<PourquoiNiveau cause={self.cause_id} n={self.niveau}>'
+
+
+class ActionChef(db.Model):
+    """
+    Action légère de pilotage décidée par le chef scierie.
+    Elle peut partir d'une fiche, d'une machine, d'un problème Ishikawa ou être libre.
+    """
+    __tablename__ = 'action_chef'
+
+    id = db.Column(db.Integer, primary_key=True)
+    titre = db.Column(db.String(200), nullable=False)
+    type_action = db.Column(db.String(50), nullable=False, default='autre')
+    description = db.Column(db.Text, nullable=False)
+    responsable = db.Column(db.String(120), nullable=False)
+    echeance = db.Column(db.Date)
+    statut = db.Column(db.String(30), nullable=False, default='a_faire')
+    motif_classe_sans_action = db.Column(db.Text)
+
+    origine_type = db.Column(db.String(30), nullable=False, default='libre')
+    origine_label = db.Column(db.String(200))
+    origine_url = db.Column(db.String(300))
+    equipe_id = db.Column(db.Integer, db.ForeignKey('equipe.id'))
+    probleme_id = db.Column(db.Integer, db.ForeignKey('probleme.id'))
+    machine = db.Column(db.String(50))
+
+    cree_par_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    cree_le = db.Column(db.DateTime, default=datetime.utcnow)
+    modifie_le = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    termine_le = db.Column(db.DateTime)
+
+    cree_par = db.relationship('User', lazy=True)
+    equipe = db.relationship('Equipe', lazy=True)
+    probleme = db.relationship('Probleme', lazy=True)
+
+    @property
+    def est_terminee(self):
+        return self.statut in ('fait', 'abandonne', 'classe_sans_action')
+
+    @property
+    def est_en_retard(self):
+        return bool(self.echeance and self.echeance < date.today() and not self.est_terminee)
+
+    def __repr__(self):
+        return f'<ActionChef {self.id} {self.statut} {self.titre}>'

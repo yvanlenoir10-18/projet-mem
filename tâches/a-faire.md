@@ -710,3 +710,19 @@ Objectif : montrer où part la matière et identifier les essences/fiches qui cr
 - [x] Relier la navigation, `Aujourd'hui`, les fiches et le module Résolution.
 - [x] Vérifier le rendu, les filtres et les accès rôles.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.8 — Profil Chef Scierie : Plan d'action léger
+
+Objectif : transformer un problème vu par le chef en décision suivie avec responsable, délai, statut et alerte de retard.
+
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Ajouter le modèle `ActionChef`.
+- [x] Créer les routes `/dashboard/chef/actions`, `/dashboard/chef/actions/nouvelle` et changement rapide de statut.
+- [x] Créer les écrans liste actions et création action.
+- [x] Ajouter la navigation `Actions Chef`.
+- [x] Relier les actions depuis Machines & Arrêts, Production, Qualité, Résolution et détail fiche.
+- [x] Afficher les actions en retard dans les actions immédiates du chef.
+- [x] Vérifier création, retard, statuts, accès PDG interdit et classement sans action avec motif.
+- [x] Commit et push GitHub.

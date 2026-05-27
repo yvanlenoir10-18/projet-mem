@@ -143,6 +143,15 @@
             <a href="{{ j.href }}" class="btn btn-sm btn-outline-primary">Voir fiches</a>
             {% if j.pct < 75 %}
             <a href="{{ j.analyse_url }}" class="btn btn-sm btn-primary">Analyser</a>
+            <a href="{{ url_for('dashboard.nouvelle_action_chef',
+                                origine_type='libre',
+                                origine_label='Objectif non atteint ' ~ j.date_fmt,
+                                origine_url=j.href,
+                                titre='Action objectif ' ~ j.date_fmt,
+                                type_action='organisation',
+                                responsable='Chef scierie',
+                                description='Comprendre et traiter l’écart objectif du ' ~ j.date_fmt ~ ' : atteinte ' ~ j.pct ~ '%, écart ' ~ j.ecart ~ ' m³.') }}"
+               class="btn btn-sm btn-outline-success">Action</a>
             {% endif %}
           </div>
         </div>
@@ -236,7 +245,18 @@
               <td class="text-end"><span class="badge bg-{{ e.couleur }}">{{ e.rendement }}%</span></td>
               <td class="text-end">
                 {% if e.couleur != 'success' %}
-                <a href="{{ e.analyse_url }}" class="btn btn-sm btn-outline-primary">Analyser</a>
+                <div class="btn-group btn-group-sm">
+                  <a href="{{ e.analyse_url }}" class="btn btn-outline-primary">Analyser</a>
+                  <a href="{{ url_for('dashboard.nouvelle_action_chef',
+                                      origine_type='libre',
+                                      origine_label='Production essence ' ~ e.essence,
+                                      origine_url=url_for('dashboard.production_chef', jours=jours, mode=mode),
+                                      titre='Action production ' ~ e.essence,
+                                      type_action='organisation',
+                                      responsable='Chef scierie',
+                                      description='Vérifier la production de ' ~ e.essence ~ ' : rendement ' ~ e.rendement ~ '%, déclassé ' ~ e.declass_pct ~ '%.') }}"
+                     class="btn btn-outline-success">Action</a>
+                </div>
                 {% else %}
                 <span style="color:var(--wp-muted);">—</span>
                 {% endif %}

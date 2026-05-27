@@ -1319,7 +1319,7 @@ def _stats_operateur(user_id):
     """
     soumises = [
         e for e in Equipe.query.filter_by(user_id=user_id).all()
-        if e.statut in ('soumis', 'verrouille', 'valide_chef') and e.trs_global
+        if e.statut in ('soumis', 'a_verifier', 'verrouille', 'valide_chef') and e.trs_global
     ]
     nb = len(soumises)
     trs_moyen = round(sum(e.trs_global for e in soumises) / nb, 1) if nb else None
@@ -1340,7 +1340,7 @@ def _stats_operateur(user_id):
     debut_semaine = ref - timedelta(days=ref.weekday())  # lundi de la semaine courante
     postes_semaine = sum(
         1 for e in Equipe.query.filter_by(user_id=user_id).all()
-        if e.statut in ('soumis', 'verrouille', 'valide_chef') and e.date >= debut_semaine
+        if e.statut in ('soumis', 'a_verifier', 'verrouille', 'valide_chef') and e.date >= debut_semaine
     )
     try:
         objectif_hebdo = int(Parametre.get('objectif_postes_semaine', 5))
@@ -1354,7 +1354,7 @@ def _stats_operateur(user_id):
     if nb >= 2:
         derniere = max(soumises, key=lambda e: (e.date, e.cree_le or datetime.min))
         autres = [e.trs_global for e in soumises if e is not derniere]
-        if autres and derniere.trs_global == meilleur and derniere.trs_global > max(autres):
+        if autres and derniere.trs_global is not None and derniere.trs_global > max(autres):
             record_battu = True
             record_trs = derniere.trs_global
 

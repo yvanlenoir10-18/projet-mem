@@ -817,15 +817,15 @@ function majProduction(index) {
         resume.textContent = `${essence} · ${horaire}`;
     }
 
-    let message = ‘’;
+    let message = '';
     if (duree !== null && duree <= 0) {
-        message = ‘L’heure de fin doit être après l’heure de début.’;
+        message = "L'heure de fin doit être après l'heure de début.";
     } else if (entree > 0 && totalSorti > entree + 0.01) {
-        message = ‘Conforme + déclassé dépasse le volume entrée.’;
+        message = 'Conforme + déclassé dépasse le volume entrée.';
     }
 
     // F4 — Poka-yoke volume : deux niveaux non-bloquants (orange / rouge)
-    let rangeMessage = ‘’;
+    let rangeMessage = '';
     let rangeIsWarning = false;
     if (!message) {
         const capaciteH = essence ? (capacitesEssences[essence] ?? null) : null;
@@ -844,9 +844,9 @@ function majProduction(index) {
     if (alerte) {
         alerte.hidden = !displayMessage;
         alerte.textContent = displayMessage;
-        alerte.classList.toggle(‘is-warning’, Boolean(rangeIsWarning));
+        alerte.classList.toggle('is-warning', Boolean(rangeIsWarning));
     }
-    if (carte) carte.classList.toggle(‘has-warning’, Boolean(displayMessage));
+    if (carte) carte.classList.toggle('has-warning', Boolean(displayMessage));
 
     const complet = essence && debut && fin && entree > 0 && conforme >= 0 && declass >= 0 && !message;
     if (etat) {

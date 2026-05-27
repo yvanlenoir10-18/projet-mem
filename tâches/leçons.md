@@ -110,6 +110,10 @@
 **Contexte :** Plusieurs `python run.py` lancés en parallèle ont servi des versions différentes du code. Résultat : `BuildError` sur `dashboard.production_chef` et `UndefinedError` sur `stats_operateur`, alors que le code local était déjà corrigé.
 **Règle :** Avant de diagnostiquer une route Flask, vérifier les processus qui écoutent sur `5000`. Utiliser `scripts/redemarrer_wood_pilot.ps1` pour tuer les anciennes instances, libérer le port et relancer l'application avec le `venv`. Tester ensuite les pages critiques avec `test_client`.
 
+### R25 — Pas de guillemets typographiques dans le JavaScript
+**Contexte :** Le formulaire de saisie opérateur ne permettait plus d'utiliser correctement les boutons dynamiques, car le JavaScript rendu contenait `let message = ‘’;`. Le navigateur arrêtait le script avant d'initialiser la saisie.
+**Règle :** Dans tout bloc `<script>`, utiliser uniquement des guillemets ASCII (`'`, `"`, `` ` ``). Après modification d'un template avec JavaScript inline, valider le script rendu avec `new Function(...)` ou un test navigateur, pas seulement `compileall`.
+
 ---
 
 ## 📅 HISTORIQUE DES CORRECTIONS
@@ -138,3 +142,4 @@
 | 2026-05-24 | Journal d'audit trop technique dans le détail fiche | R22 |
 | 2026-05-27 | Helper formulaire P3.5 ambigu `default/limite` | R23 |
 | 2026-05-27 | Serveurs Flask multiples sur le port 5000 | R24 |
+| 2026-05-27 | Guillemets typographiques cassant le JavaScript de saisie | R25 |

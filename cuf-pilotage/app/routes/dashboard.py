@@ -11,7 +11,7 @@ from flask_login import login_required
 from datetime import date, datetime, timedelta
 import io
 from ..models import (
-    db, Equipe, Parametre, STATUT_A_CORRIGER, STATUT_A_VERIFIER,
+    db, User, Equipe, Parametre, STATUT_A_CORRIGER, STATUT_A_VERIFIER,
     STATUT_BROUILLON, STATUT_VALIDE_CHEF, STATUT_VERROUILLE,
     STATUTS_ANALYSES, STATUTS_NON_ANALYSES,
 )
@@ -390,7 +390,7 @@ def _actions_immediates(aujourd_hui, alertes):
             'icon': 'bi-arrow-return-left',
             'titre': 'Fiches renvoyées en correction',
             'detail': f"{corrections} fiche(s) attendent un retour opérateur.",
-            'href': url_for('saisie.historique', statut=STATUT_A_CORRIGER),
+            'href': url_for('dashboard.fiches_chef', statut=STATUT_A_CORRIGER),
             'cta': 'Suivre',
             'priorite': 50,
         })
@@ -402,7 +402,7 @@ def _actions_immediates(aujourd_hui, alertes):
             'icon': 'bi-calendar-x',
             'titre': 'Postes non saisis',
             'detail': f"{len(manquants)} poste(s) manquant(s) sur les 7 derniers jours.",
-            'href': url_for('saisie.historique'),
+            'href': url_for('dashboard.fiches_chef', statut='tous'),
             'cta': 'Voir',
             'priorite': 60,
         })
@@ -414,13 +414,140 @@ def _actions_immediates(aujourd_hui, alertes):
             'icon': 'bi-hourglass-split',
             'titre': 'Brouillons anciens',
             'detail': f"{len(brouillons)} brouillon(s) ont plus de 2 jours.",
-            'href': url_for('saisie.historique', statut=STATUT_BROUILLON),
+            'href': url_for('dashboard.fiches_chef', statut=STATUT_BROUILLON),
             'cta': 'Suivre',
             'priorite': 40,
         })
 
     actions.sort(key=lambda item: item['priorite'], reverse=True)
     return actions[:8]
+
+
+def _statut_fiche_chef(statut):
+    labels = {
+        STATUT_BROUILLON: ('Brouillon', 'warning'),
+        STATUT_A_VERIFIER: ('Chez le chef', 'info'),
+        STATUT_A_CORRIGER: ('À corriger', 'warning'),
+        STATUT_VALIDE_CHEF: ('Validée', 'success'),
+        STATUT_VERROUILLE: ('Clôturée', 'secondary'),
+    }
+    return labels.get(statut, (statut or 'Inconnu', 'secondary'))
+
+
+def _periode_fiches_chef(periode):
+    aujourd_hui = date.today()
+    if periode == 'aujourd_hui':
+        return aujourd_hui, aujourd_hui, "Aujourd'hui"
+    if periode == 'semaine':
+        return aujourd_hui - timedelta(days=aujourd_hui.weekday()), aujourd_hui, "Cette semaine"
+    if periode == 'mois':
+        return date(aujourd_hui.year, aujourd_hui.month, 1), aujourd_hui, "Ce mois"
+    if periode == 'tout':
+        return None, None, "Toutes les dates"
+    return aujourd_hui - timedelta(days=30), aujourd_hui, "30 derniers jours"
+
+
+def _action_fiche_chef(equipe):
+    if equipe.statut == STATUT_A_VERIFIER:
+        return {'label': 'Contrôler', 'couleur': 'primary'}
+    if equipe.statut == STATUT_A_CORRIGER:
+        return {'label': 'Suivre', 'couleur': 'warning'}
+    if equipe.statut == STATUT_BROUILLON:
+        return {'label': 'Voir brouillon', 'couleur': 'secondary'}
+    return {'label': 'Voir', 'couleur': 'outline-secondary'}
+
+
+def _fiches_chef_query(filtres):
+    query = Equipe.query
+
+    debut, fin, label = _periode_fiches_chef(filtres['periode'])
+    if debut:
+        query = query.filter(Equipe.date >= debut)
+    if fin:
+        query = query.filter(Equipe.date <= fin)
+
+    statut = filtres['statut']
+    if statut == 'validees':
+        query = query.filter(Equipe.statut.in_((STATUT_VALIDE_CHEF, STATUT_VERROUILLE)))
+    elif statut in (STATUT_BROUILLON, STATUT_A_VERIFIER, STATUT_A_CORRIGER, STATUT_VALIDE_CHEF, STATUT_VERROUILLE):
+        query = query.filter(Equipe.statut == statut)
+
+    if filtres['equipe'] in ('Matin', 'Apres-midi'):
+        query = query.filter(Equipe.numero_equipe == filtres['equipe'])
+
+    if filtres['operateur_id']:
+        query = query.filter(Equipe.user_id == filtres['operateur_id'])
+
+    return query.order_by(Equipe.date.desc(), Equipe.cree_le.desc()).all(), label
+
+
+def _ligne_fiche_chef(equipe):
+    anomalies = detecte_anomalies(equipe)
+    nb_bloquantes = sum(1 for a in anomalies if a.get('niveau') == 'danger')
+    nb_warnings = sum(1 for a in anomalies if a.get('niveau') == 'warning')
+    statut_label, statut_couleur = _statut_fiche_chef(equipe.statut)
+    action = _action_fiche_chef(equipe)
+
+    return {
+        'id': equipe.id,
+        'date': equipe.date,
+        'date_fmt': equipe.date.strftime('%d/%m/%Y') if equipe.date else '—',
+        'equipe': equipe.numero_equipe,
+        'operateur': equipe.operateur_nom or (equipe.saisie_par.nom if equipe.saisie_par else 'Non renseigné'),
+        'rempli_par': equipe.rempli_par_nom or (equipe.saisie_par.nom if equipe.saisie_par else 'Non renseigné'),
+        'essences': equipe.essences_label or '—',
+        'volume': round(equipe.volume_conforme, 2),
+        'volume_sorti': round(equipe.volume_sorti, 2),
+        'trs': equipe.trs_global,
+        'arrets_min': equipe.duree_totale_arrets,
+        'arrets_fmt': _format_duree(equipe.duree_totale_arrets),
+        'statut': equipe.statut,
+        'statut_label': statut_label,
+        'statut_couleur': statut_couleur,
+        'nb_anomalies': len(anomalies),
+        'nb_bloquantes': nb_bloquantes,
+        'nb_warnings': nb_warnings,
+        'premiere_anomalie': anomalies[0]['titre'] if anomalies else '',
+        'action': action,
+        'href': url_for('saisie.detail_poste', poste_id=equipe.id),
+        'search_blob': ' '.join([
+            str(equipe.id),
+            equipe.date.isoformat() if equipe.date else '',
+            equipe.numero_equipe or '',
+            equipe.operateur_nom or '',
+            equipe.rempli_par_nom or '',
+            equipe.essences_label or '',
+            ' '.join(a.machine for a in equipe.arrets),
+            ' '.join(a.cause for a in equipe.arrets),
+        ]).lower(),
+    }
+
+
+def _filtrer_lignes_fiches(lignes, filtres):
+    recherche = filtres['q'].lower()
+    niveau = filtres['anomalies']
+
+    if recherche:
+        lignes = [l for l in lignes if recherche in l['search_blob']]
+    if niveau == 'bloquantes':
+        lignes = [l for l in lignes if l['nb_bloquantes'] > 0]
+    elif niveau == 'avertissements':
+        lignes = [l for l in lignes if l['nb_warnings'] > 0 and l['nb_bloquantes'] == 0]
+    elif niveau == 'sans':
+        lignes = [l for l in lignes if l['nb_anomalies'] == 0]
+    return lignes
+
+
+def _compteurs_fiches_chef(lignes):
+    return {
+        'total': len(lignes),
+        'a_verifier': sum(1 for l in lignes if l['statut'] == STATUT_A_VERIFIER),
+        'a_corriger': sum(1 for l in lignes if l['statut'] == STATUT_A_CORRIGER),
+        'brouillons': sum(1 for l in lignes if l['statut'] == STATUT_BROUILLON),
+        'validees': sum(1 for l in lignes if l['statut'] in (STATUT_VALIDE_CHEF, STATUT_VERROUILLE)),
+        'bloquantes': sum(1 for l in lignes if l['nb_bloquantes'] > 0),
+        'warnings': sum(1 for l in lignes if l['nb_warnings'] > 0),
+    }
 
 
 def _get_equipes_periode(jours=30):
@@ -713,6 +840,52 @@ def vue_chef():
                            postes_du_jour=postes_du_jour,
                            actions_immediates=actions_immediates,
                            alertes=alertes)
+
+
+@dashboard_bp.route('/chef/fiches')
+@login_required
+@roles_required('chef', 'admin')
+def fiches_chef():
+    """Liste de contrôle des fiches côté chef scierie."""
+    filtres = {
+        'statut': request.args.get('statut', STATUT_A_VERIFIER).strip(),
+        'periode': request.args.get('periode', '30j').strip(),
+        'equipe': request.args.get('equipe', '').strip(),
+        'operateur_id': request.args.get('operateur_id', '').strip(),
+        'anomalies': request.args.get('anomalies', '').strip(),
+        'q': request.args.get('q', '').strip(),
+    }
+    try:
+        filtres['operateur_id'] = int(filtres['operateur_id']) if filtres['operateur_id'] else None
+    except ValueError:
+        filtres['operateur_id'] = None
+
+    equipes, label_periode_fiches = _fiches_chef_query(filtres)
+    lignes_base = [_ligne_fiche_chef(equipe) for equipe in equipes]
+    compteurs_base = _compteurs_fiches_chef(lignes_base)
+    lignes = _filtrer_lignes_fiches(lignes_base, filtres)
+    compteurs_resultats = _compteurs_fiches_chef(lignes)
+
+    utilisateurs = User.query.filter(
+        User.role.in_(('operateur', 'chef', 'admin'))
+    ).order_by(User.nom.asc()).all()
+
+    return render_template(
+        'chef/fiches.html',
+        fiches=lignes,
+        compteurs_base=compteurs_base,
+        compteurs_resultats=compteurs_resultats,
+        filtres=filtres,
+        label_periode=label_periode_fiches,
+        utilisateurs=utilisateurs,
+        statuts={
+            STATUT_A_VERIFIER: 'Chez le chef',
+            STATUT_A_CORRIGER: 'À corriger',
+            STATUT_BROUILLON: 'Brouillons',
+            'validees': 'Validées / clôturées',
+            'tous': 'Tous les statuts',
+        },
+    )
 
 
 @dashboard_bp.route('/pdg')

@@ -642,3 +642,15 @@ Objectif : aider le chef à valider vite, sans laisser passer les incohérences 
 - [x] Demander une confirmation et un motif si le chef valide malgré avertissements orange.
 - [x] Mettre en évidence les arrêts longs dans la table des arrêts.
 - [x] Vérifier le rendu détail fiche et les parcours validation bloquée / validation avec avertissement.
+
+---
+
+## ⏳ P3.3 — Profil Chef Scierie : page Fiches chef
+
+Objectif : donner au chef une liste de contrôle dédiée aux fiches, au lieu de l'obliger à passer par l'historique opérateur.
+
+- [x] Créer la route `/dashboard/chef/fiches`.
+- [x] Ajouter les filtres : statut, période, équipe, utilisateur, anomalies, recherche rapide.
+- [x] Afficher une liste actionnable : fiche, date, équipe, opérateur, essences, volume, TRS, arrêts, anomalies, statut, action.
+- [x] Relier le dashboard Chef et la navigation à cette nouvelle page.
+- [x] Vérifier le rendu et les filtres avant commit.

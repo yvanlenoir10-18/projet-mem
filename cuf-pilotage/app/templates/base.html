@@ -33,6 +33,10 @@
          href="{{ url_for('dashboard.vue_chef') }}">
         <span class="wp-nav-ic"><i class="bi bi-speedometer2"></i></span>Tableau de bord
       </a>
+      <a class="wp-nav-link {% if request.endpoint == 'dashboard.fiches_chef' %}active{% endif %}"
+         href="{{ url_for('dashboard.fiches_chef') }}">
+        <span class="wp-nav-ic"><i class="bi bi-clipboard-check"></i></span>Fiches chef
+      </a>
       <a class="wp-nav-link {% if request.endpoint == 'dashboard.pertes' %}active{% endif %}"
          href="{{ url_for('dashboard.pertes') }}">
         <span class="wp-nav-ic"><i class="bi bi-cash-stack"></i></span>Pertes financières
@@ -124,6 +128,8 @@
         <span class="wp-nav-section">Pilotage</span>
         <a class="wp-nav-link" href="{{ url_for('dashboard.vue_chef') }}">
           <span class="wp-nav-ic"><i class="bi bi-speedometer2"></i></span>Tableau de bord</a>
+        <a class="wp-nav-link" href="{{ url_for('dashboard.fiches_chef') }}">
+          <span class="wp-nav-ic"><i class="bi bi-clipboard-check"></i></span>Fiches chef</a>
         <a class="wp-nav-link" href="{{ url_for('dashboard.pertes') }}">
           <span class="wp-nav-ic"><i class="bi bi-cash-stack"></i></span>Pertes financières</a>
         <a class="wp-nav-link" href="{{ url_for('analyse.arrets') }}">

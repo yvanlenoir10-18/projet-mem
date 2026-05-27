@@ -17,7 +17,7 @@
       Vue courte pour décider vite : actions, objectif, arrêts, rendement et postes du jour.
     </div>
   </div>
-  <a href="{{ url_for('saisie.historique', statut='a_verifier') }}"
+  <a href="{{ url_for('dashboard.fiches_chef', statut='a_verifier') }}"
      class="btn btn-sm btn-outline-primary">
     <i class="bi bi-clipboard-check"></i> Fiches à traiter
   </a>
@@ -87,7 +87,7 @@
   </div>
 
   <div class="col-12 col-md-6 col-xl">
-    <a href="{{ url_for('saisie.historique', statut='a_verifier') }}"
+    <a href="{{ url_for('dashboard.fiches_chef', statut='a_verifier') }}"
        class="wp-card h-100 p-3 d-block"
        style="text-decoration:none;color:inherit;">
       <div class="wp-kpi-label">Fiches à traiter</div>

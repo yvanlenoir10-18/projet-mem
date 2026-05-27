@@ -737,6 +737,244 @@ def _synthese_machines(machines, arrets):
     }
 
 
+def _equipes_production(jours, mode):
+    jours, depuis, label = _periode_depuis_jours(jours)
+    statuts = list(STATUTS_ANALYSES)
+    if mode == 'temps_reel':
+        statuts.append(STATUT_A_VERIFIER)
+    query = Equipe.query.filter(Equipe.statut.in_(tuple(statuts)))
+    if depuis:
+        query = query.filter(Equipe.date >= depuis)
+    return query.order_by(Equipe.date.desc(), Equipe.numero_equipe.asc()).all(), jours, label
+
+
+def _rendement_matiere(volume_entree, volume_sorti):
+    return round((volume_sorti / volume_entree) * 100, 1) if volume_entree else 0
+
+
+def _couleur_atteinte(pct):
+    if pct >= 100:
+        return 'success'
+    if pct >= 75:
+        return 'warning'
+    return 'danger'
+
+
+def _resume_production(equipes):
+    objectif_poste = _safe_float_param('objectif_m3', 12.5)
+    objectif_jour = objectif_poste * 2
+
+    par_jour = defaultdict(list)
+    for equipe in equipes:
+        par_jour[equipe.date].append(equipe)
+
+    jours_lignes = []
+    for jour, equipes_jour in sorted(par_jour.items(), reverse=True):
+        volume = sum(e.volume_conforme for e in equipes_jour)
+        volume_sorti = sum(e.volume_sorti for e in equipes_jour)
+        volume_entree = sum(e.volume_entree for e in equipes_jour)
+        objectif = objectif_jour
+        pct = round((volume / objectif) * 100, 1) if objectif else 0
+        arrets = sum(e.duree_totale_arrets for e in equipes_jour)
+        jours_lignes.append({
+            'date': jour,
+            'date_iso': jour.isoformat(),
+            'date_fmt': jour.strftime('%d/%m/%Y'),
+            'label_court': _LABELS_JOURS_FR[jour.weekday()] if jour.weekday() < len(_LABELS_JOURS_FR) else '',
+            'nb_postes': len(equipes_jour),
+            'volume': round(volume, 2),
+            'volume_sorti': round(volume_sorti, 2),
+            'objectif': round(objectif, 2),
+            'pct': pct,
+            'pct_barre': min(100, pct),
+            'ecart': round(volume - objectif, 2),
+            'couleur': _couleur_atteinte(pct),
+            'rendement': _rendement_matiere(volume_entree, volume_sorti),
+            'arrets': arrets,
+            'arrets_fmt': _format_duree(arrets),
+            'href': url_for('dashboard.fiches_chef', statut='tous', periode='tout', q=jour.isoformat()),
+            'analyse_url': url_for(
+                'problemes.nouveau',
+                origine_type='machine',
+                origine_label=f'Production sous objectif - {jour.strftime("%d/%m/%Y")}',
+                contexte_quoi='Production sous objectif',
+                contexte_quand=jour.strftime('%d/%m/%Y'),
+                contexte_combien=f'{round(volume, 2)} m³ réalisés sur {round(objectif, 2)} m³ attendus',
+                origine_url=url_for('dashboard.production_chef', jours=30),
+            ),
+        })
+
+    total_volume = sum(j['volume'] for j in jours_lignes)
+    total_objectif = sum(j['objectif'] for j in jours_lignes)
+    total_sorti = sum(e.volume_sorti for e in equipes)
+    total_entree = sum(e.volume_entree for e in equipes)
+    total_arrets = sum(e.duree_totale_arrets for e in equipes)
+    pct_total = round((total_volume / total_objectif) * 100, 1) if total_objectif else 0
+
+    return {
+        'objectif_poste': round(objectif_poste, 2),
+        'objectif_jour': round(objectif_jour, 2),
+        'volume': round(total_volume, 2),
+        'objectif': round(total_objectif, 2),
+        'pct': pct_total,
+        'pct_barre': min(100, pct_total),
+        'ecart': round(total_volume - total_objectif, 2),
+        'couleur': _couleur_atteinte(pct_total),
+        'rendement': _rendement_matiere(total_entree, total_sorti),
+        'arrets': total_arrets,
+        'arrets_fmt': _format_duree(total_arrets),
+        'nb_postes': len(equipes),
+        'nb_jours': len(jours_lignes),
+        'jours': jours_lignes,
+        'jours_sous_objectif': [j for j in jours_lignes if j['pct'] < 75][:8],
+    }
+
+
+def _comparaison_equipes_production(equipes):
+    groupes = []
+    for shift in _SHIFTS_JOUR:
+        items = [e for e in equipes if e.numero_equipe == shift]
+        volume = sum(e.volume_conforme for e in items)
+        sortie = sum(e.volume_sorti for e in items)
+        entree = sum(e.volume_entree for e in items)
+        arrets = sum(e.duree_totale_arrets for e in items)
+        trs_vals = [e.trs_global for e in items if e.trs_global is not None]
+        objectif = _safe_float_param('objectif_m3', 12.5) * len(items)
+        pct = round((volume / objectif) * 100, 1) if objectif else 0
+        groupes.append({
+            'shift': shift,
+            'nb_postes': len(items),
+            'volume': round(volume, 2),
+            'objectif': round(objectif, 2),
+            'pct': pct,
+            'couleur': _couleur_atteinte(pct),
+            'rendement': _rendement_matiere(entree, sortie),
+            'arrets': arrets,
+            'arrets_fmt': _format_duree(arrets),
+            'trs': round(sum(trs_vals) / len(trs_vals), 1) if trs_vals else None,
+        })
+    return groupes
+
+
+def _analyse_essences_production(equipes):
+    stats = defaultdict(lambda: {
+        'essence': '',
+        'entree': 0.0,
+        'conforme': 0.0,
+        'declass': 0.0,
+        'dechets': 0.0,
+        'postes': set(),
+    })
+    for equipe in equipes:
+        for prod in equipe.productions:
+            essence = prod.essence or 'Non renseignée'
+            s = stats[essence]
+            s['essence'] = essence
+            s['entree'] += prod.volume_entree or 0
+            s['conforme'] += prod.volume_conforme or 0
+            s['declass'] += prod.volume_declass or 0
+            s['dechets'] += prod.volume_dechets or 0
+            s['postes'].add(equipe.id)
+
+    lignes = []
+    for s in stats.values():
+        sortie = s['conforme'] + s['declass']
+        declass_pct = round((s['declass'] / sortie) * 100, 1) if sortie else 0
+        rendement = _rendement_matiere(s['entree'], sortie)
+        if rendement < 55 or declass_pct > _safe_float_param('seuil_declass_pct', 30):
+            couleur = 'danger'
+        elif rendement < 65:
+            couleur = 'warning'
+        else:
+            couleur = 'success'
+        lignes.append({
+            'essence': s['essence'],
+            'entree': round(s['entree'], 2),
+            'conforme': round(s['conforme'], 2),
+            'declass': round(s['declass'], 2),
+            'dechets': round(s['dechets'], 2),
+            'sortie': round(sortie, 2),
+            'rendement': rendement,
+            'declass_pct': declass_pct,
+            'nb_postes': len(s['postes']),
+            'couleur': couleur,
+            'analyse_url': url_for(
+                'problemes.nouveau',
+                origine_type='manuel',
+                origine_label=f'Essence à surveiller - {s["essence"]}',
+                contexte_quoi=f'Rendement ou déclassement à surveiller sur {s["essence"]}',
+                contexte_ou=s['essence'],
+                contexte_combien=f'Rendement {rendement}% · déclassé {declass_pct}%',
+                origine_url=url_for('dashboard.production_chef', jours=30),
+            ),
+        })
+    lignes.sort(key=lambda item: (item['rendement'], -item['declass_pct']))
+    return lignes
+
+
+def _postes_extremes_production(equipes):
+    objectif_poste = _safe_float_param('objectif_m3', 12.5)
+    lignes = []
+    for e in equipes:
+        pct = round((e.volume_conforme / objectif_poste) * 100, 1) if objectif_poste else 0
+        lignes.append({
+            'id': e.id,
+            'date': e.date,
+            'date_fmt': e.date.strftime('%d/%m/%Y') if e.date else '—',
+            'shift': e.numero_equipe,
+            'operateur': e.operateur_nom or (e.saisie_par.nom if e.saisie_par else 'Non renseigné'),
+            'essences': e.essences_label or '—',
+            'volume': round(e.volume_conforme, 2),
+            'objectif': round(objectif_poste, 2),
+            'pct': pct,
+            'couleur': _couleur_atteinte(pct),
+            'arrets_fmt': _format_duree(e.duree_totale_arrets),
+            'href': url_for('saisie.detail_poste', poste_id=e.id),
+            'analyse_url': url_for(
+                'problemes.nouveau',
+                origine_type='fiche',
+                origine_label=f'Poste sous objectif #{e.id}',
+                equipe_id=e.id,
+                contexte_quoi='Poste sous objectif de production',
+                contexte_quand=f'{e.date.strftime("%d/%m/%Y")} · {e.numero_equipe}' if e.date else e.numero_equipe,
+                contexte_ou=e.essences_label,
+                contexte_combien=f'{round(e.volume_conforme, 2)} m³ sur {round(objectif_poste, 2)} m³',
+                origine_url=url_for('saisie.detail_poste', poste_id=e.id),
+            ),
+        })
+    lignes.sort(key=lambda item: item['pct'])
+    return {
+        'pires': lignes[:8],
+        'meilleurs': list(reversed(lignes[-5:])) if lignes else [],
+    }
+
+
+def _projection_production_active():
+    shift_actif, minutes_ecoulees = _poste_actif_maintenant()
+    if not shift_actif:
+        return None
+    fiches = Equipe.query.filter(
+        Equipe.date == date.today(),
+        Equipe.numero_equipe == shift_actif,
+        Equipe.statut.in_((STATUT_BROUILLON, STATUT_A_VERIFIER)),
+    ).all()
+    volume = sum(e.volume_conforme for e in fiches)
+    if not fiches or volume <= 0:
+        return None
+    projection = volume * (480 / max(1, minutes_ecoulees))
+    objectif_poste = _safe_float_param('objectif_m3', 12.5)
+    pct = round((projection / objectif_poste) * 100, 1) if objectif_poste else 0
+    return {
+        'shift': shift_actif,
+        'minutes_ecoulees': minutes_ecoulees,
+        'volume_actuel': round(volume, 2),
+        'projection': round(projection, 2),
+        'objectif': round(objectif_poste, 2),
+        'pct': pct,
+        'couleur': _couleur_atteinte(pct),
+    }
+
+
 def _get_equipes_periode(jours=30):
     depuis = date.today() - timedelta(days=jours)
     return Equipe.query.filter(
@@ -1110,6 +1348,36 @@ def machines_chef():
         recurrences=recurrences,
         synthese=synthese,
         machines_options=Config.MACHINES,
+    )
+
+
+@dashboard_bp.route('/chef/production')
+@login_required
+@roles_required('chef', 'admin')
+def production_chef():
+    """Production & Objectifs pour le chef scierie."""
+    jours = request.args.get('jours', 30)
+    mode = request.args.get('mode', 'officiel').strip()
+    if mode not in ('officiel', 'temps_reel'):
+        mode = 'officiel'
+
+    equipes, jours, label_periode = _equipes_production(jours, mode)
+    resume = _resume_production(equipes)
+    comparaison = _comparaison_equipes_production(equipes)
+    essences = _analyse_essences_production(equipes)
+    extremes = _postes_extremes_production(equipes)
+    projection = _projection_production_active()
+
+    return render_template(
+        'chef/production.html',
+        jours=jours,
+        mode=mode,
+        label_periode=label_periode,
+        resume=resume,
+        comparaison=comparaison,
+        essences=essences,
+        extremes=extremes,
+        projection=projection,
     )
 
 

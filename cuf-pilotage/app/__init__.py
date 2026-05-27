@@ -43,6 +43,7 @@ def create_app():
         db.create_all()
         _ensure_schema()
         _init_donnees_defaut()
+        _repair_seed_roles()
         _seed_donnees_demo()
 
     @app.errorhandler(404)
@@ -164,6 +165,30 @@ def _init_donnees_defaut():
         db.session.add(Parametre(
             cle='objectif_postes_semaine', valeur='5',
             description='Objectif de régularité : nombre de postes saisis par semaine'))
+
+    db.session.commit()
+
+
+def _repair_seed_roles():
+    """Corrige les rôles mal attribués lors des premiers seeds et ajoute les comptes manquants.
+
+    Cas connu : Agent Saisie (saisie@cuf.cm) se retrouve avec role='admin'
+    si la DB a été créée avant la liste de seed corrigée.
+    """
+    from .models import User
+
+    # Corriger le rôle de Agent Saisie si nécessaire
+    saisie = User.query.filter_by(email='saisie@cuf.cm').first()
+    if saisie and saisie.role != 'operateur':
+        saisie.role = 'operateur'
+        db.session.flush()
+
+    # Créer le compte admin s'il est absent
+    if not User.query.filter_by(email='admin@cuf.cm').first():
+        admin = User(nom='Administrateur', email='admin@cuf.cm', role='admin')
+        admin.set_password('cuf2026')
+        db.session.add(admin)
+        db.session.flush()
 
     db.session.commit()
 

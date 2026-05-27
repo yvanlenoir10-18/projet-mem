@@ -8,6 +8,7 @@
 {% if couleur_trs == 'success' %}{% set trs_color = 'var(--wp-leaf)' %}{% set trs_pill = 'success' %}
 {% elif couleur_trs == 'warning' %}{% set trs_color = 'var(--wp-ochre)' %}{% set trs_pill = 'warning' %}
 {% else %}{% set trs_color = 'var(--wp-terracotta)' %}{% set trs_pill = 'danger' %}{% endif %}
+{% set vc = validation_chef|default({}) %}
 
 {# ── Header ── #}
 <div class="d-flex justify-content-between align-items-start mb-4 gap-3 flex-wrap">
@@ -22,17 +23,31 @@
       </h1>
       <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap;">
         {% if poste.statut == 'verrouille' or poste.est_verrouille %}
-        <span class="wp-pill wp-pill-neutral"><i class="bi bi-lock"></i> Verrouillée</span>
+        <span class="wp-pill wp-pill-neutral"><i class="bi bi-lock"></i> Clôturée</span>
+        {% elif poste.statut == 'a_corriger' %}
+        <span class="wp-pill wp-pill-warning"><i class="bi bi-arrow-counterclockwise"></i> À corriger</span>
+        {% elif poste.statut == 'a_verifier' %}
+        <span class="wp-pill wp-pill-info"><i class="bi bi-hourglass-split"></i> Chez le chef</span>
+        {% elif poste.statut == 'valide_chef' %}
+        <span class="wp-pill wp-pill-success"><i class="bi bi-check2-circle"></i> Validée chef</span>
         {% elif poste.statut == 'soumis' %}
-        <span class="wp-pill wp-pill-success">Soumise</span>
+        <span class="wp-pill wp-pill-neutral"><i class="bi bi-archive"></i> Ancienne fiche</span>
         {% else %}
         <span class="wp-pill wp-pill-warning"><i class="bi bi-pencil"></i> Brouillon</span>
         {% endif %}
         {% if poste.soumis_le %}
         <span style="color:var(--wp-muted);font-size:.78rem;">
-          Soumise le {{ poste.soumis_le.strftime('%d/%m/%Y à %H:%M') }}
+          Envoyée le {{ poste.soumis_le.strftime('%d/%m/%Y à %H:%M') }}
         </span>
         {% endif %}
+        <span style="color:var(--wp-muted);font-size:.78rem;">
+          <i class="bi bi-person-badge"></i>
+          Responsable : {{ poste.operateur_nom or poste.saisie_par.nom }}
+        </span>
+        <span style="color:var(--wp-muted);font-size:.78rem;">
+          <i class="bi bi-pencil-square"></i>
+          Remplie par : {{ poste.rempli_par_nom or poste.saisie_par.nom }}
+        </span>
         {% if poste.modifie_par %}
         <span style="color:var(--wp-ochre);font-size:.78rem;">
           <i class="bi bi-pencil-square"></i>
@@ -44,13 +59,10 @@
   </div>
   <div class="d-flex gap-2 flex-wrap">
     {% if peut_soumettre %}
-    <form method="POST"
-          action="{{ url_for('saisie.soumettre_equipe', equipe_id=poste.id) }}"
-          onsubmit="return confirm('Soumettre cette équipe ? Les prix seront figés.')">
-      <button class="btn btn-primary d-flex align-items-center gap-1">
-        <i class="bi bi-send-check"></i> Soumettre
-      </button>
-    </form>
+    <a href="{{ url_for('saisie.verification_equipe', equipe_id=poste.id) }}"
+       class="btn btn-primary d-flex align-items-center gap-1">
+      <i class="bi bi-shield-check"></i> Vérifier avant envoi
+    </a>
     {% endif %}
     {% if peut_modifier %}
     <a href="{{ url_for('saisie.modifier_equipe', equipe_id=poste.id) }}"
@@ -58,29 +70,410 @@
       <i class="bi bi-pencil"></i> Modifier
     </a>
     {% endif %}
+    {% if peut_dupliquer %}
+    <form method="POST"
+          action="/saisie/poste/{{ poste.id }}/dupliquer"
+          onsubmit="return confirm('Créer un brouillon avec les mêmes essences et créneaux ? Les volumes, arrêts et commentaires ne seront pas copiés.')">
+      {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+      <button class="btn btn-outline-secondary d-flex align-items-center gap-1">
+        <i class="bi bi-files"></i> Reprendre structure
+      </button>
+    </form>
+    {% endif %}
+    {% if peut_valider_chef %}
+    {% if vc.nb_bloquantes|default(0) > 0 or vc.nb_avertissements|default(0) > 0 %}
+    <a href="#bloc-validation-chef"
+       class="btn btn-success d-flex align-items-center gap-1">
+      <i class="bi bi-shield-check"></i> Contrôler avant validation
+    </a>
+    {% else %}
+    <form method="POST"
+          action="{{ url_for('saisie.valider_chef_equipe', equipe_id=poste.id) }}"
+          onsubmit="return confirm('Valider cette fiche et l’intégrer aux tableaux de bord ?')">
+      {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+      <button class="btn btn-success d-flex align-items-center gap-1">
+        <i class="bi bi-check2-circle"></i> Valider chef
+      </button>
+    </form>
+    {% endif %}
+    {% endif %}
+    <a href="{{ url_for('saisie.fiche_poste', poste_id=poste.id) }}"
+       target="_blank"
+       class="btn btn-outline-secondary d-flex align-items-center gap-1">
+      <i class="bi bi-printer"></i> Imprimer fiche
+    </a>
+    {% if poste.fiche_papier_fichier %}
+    <a href="{{ url_for('saisie.fiche_papier_jointe', poste_id=poste.id) }}"
+       target="_blank"
+       class="btn btn-outline-secondary d-flex align-items-center gap-1">
+      <i class="bi bi-paperclip"></i> Voir fiche papier
+    </a>
+    {% endif %}
     {% if peut_verrouiller %}
     <form method="POST"
           action="{{ url_for('saisie.verrouiller_equipe', equipe_id=poste.id) }}"
-          onsubmit="return confirm('Verrouiller définitivement cette équipe ?')">
+          onsubmit="return confirm('Clôturer définitivement cette fiche ?')">
+      {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
       <button class="btn btn-outline-secondary d-flex align-items-center gap-1">
-        <i class="bi bi-lock"></i> Verrouiller
+        <i class="bi bi-lock"></i> Clôturer
       </button>
     </form>
     {% endif %}
     {% if peut_deverrouiller %}
     <form method="POST"
           action="{{ url_for('saisie.deverrouiller_equipe', equipe_id=poste.id) }}"
-          onsubmit="return confirm('Déverrouiller cette équipe ? (Admin uniquement)')">
+          onsubmit="return confirm('Rouvrir cette fiche clôturée ? (Admin uniquement)')">
+      {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
       <button class="btn btn-warning d-flex align-items-center gap-1">
-        <i class="bi bi-unlock"></i> Déverrouiller
+        <i class="bi bi-unlock"></i> Rouvrir
       </button>
     </form>
     {% endif %}
   </div>
 </div>
 
+{% if poste.statut == 'a_corriger' and poste.correction_motif %}
+<div class="wp-card mb-4"
+     style="border-left:4px solid var(--wp-ochre);background:#fffaf0;">
+  <div class="wp-card-header" style="color:var(--wp-ochre);">
+    <i class="bi bi-arrow-counterclockwise"></i>
+    Message du chef
+    {% if poste.correction_demandee_par %}
+    <span class="ms-auto" style="font-size:.75rem;color:var(--wp-muted);font-weight:500;">
+      Par {{ poste.correction_demandee_par }}
+      {% if poste.correction_demandee_le %}· {{ poste.correction_demandee_le.strftime('%d/%m/%Y à %H:%M') }}{% endif %}
+    </span>
+    {% endif %}
+  </div>
+  <div style="padding:1rem 1.25rem;color:var(--wp-ink);font-size:.9rem;line-height:1.5;">
+    {{ poste.correction_motif }}
+    {% if poste.correction_cible %}
+    <div style="margin-top:.85rem;">
+      <a href="{{ url_for('saisie.modifier_equipe', equipe_id=poste.id) }}#{{ poste.correction_cible }}"
+         class="btn btn-sm btn-warning d-inline-flex align-items-center gap-2">
+        <i class="bi bi-arrow-down-circle"></i>
+        Ouvrir la zone à corriger
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if vc.visible|default(false) %}
+<div id="bloc-validation-chef"
+     class="wp-card mb-4"
+     style="border-left:4px solid {% if vc.nb_bloquantes|default(0) > 0 %}var(--wp-terracotta){% elif vc.nb_avertissements|default(0) > 0 %}var(--wp-ochre){% else %}var(--wp-leaf){% endif %};">
+  <div class="wp-card-header">
+    <i class="bi bi-shield-check"
+       style="color:{% if vc.nb_bloquantes|default(0) > 0 %}var(--wp-terracotta){% elif vc.nb_avertissements|default(0) > 0 %}var(--wp-ochre){% else %}var(--wp-leaf){% endif %};"></i>
+    Validation chef
+    <span class="ms-auto d-flex gap-2 flex-wrap">
+      {% if vc.nb_bloquantes|default(0) > 0 %}
+      <span class="wp-pill wp-pill-danger">{{ vc.nb_bloquantes }} bloquant{{ 's' if vc.nb_bloquantes > 1 }}</span>
+      {% endif %}
+      {% if vc.nb_avertissements|default(0) > 0 %}
+      <span class="wp-pill wp-pill-warning">{{ vc.nb_avertissements }} avertissement{{ 's' if vc.nb_avertissements > 1 }}</span>
+      {% endif %}
+      {% if vc.nb_bloquantes|default(0) == 0 and vc.nb_avertissements|default(0) == 0 %}
+      <span class="wp-pill wp-pill-success">Prête à valider</span>
+      {% endif %}
+    </span>
+  </div>
+  <div style="padding:1rem 1.25rem;">
+    <div class="row g-2 mb-3">
+      {% for point in vc.points|default([]) %}
+      <div class="col-12 col-md">
+        <div style="border:1px solid {% if point.etat == 'danger' %}rgba(216,113,73,.35){% elif point.etat == 'warning' %}rgba(197,151,58,.35){% else %}rgba(63,138,92,.25){% endif %};
+                    border-radius:8px;padding:.75rem;background:#fff;">
+          <div style="display:flex;align-items:center;gap:.45rem;font-weight:850;color:var(--wp-ink);font-size:.82rem;">
+            {% if point.etat == 'danger' %}
+            <i class="bi bi-x-octagon" style="color:var(--wp-terracotta);"></i>
+            {% elif point.etat == 'warning' %}
+            <i class="bi bi-exclamation-triangle" style="color:var(--wp-ochre);"></i>
+            {% else %}
+            <i class="bi bi-check-circle" style="color:var(--wp-leaf);"></i>
+            {% endif %}
+            {{ point.label }}
+          </div>
+          <div style="font-size:.74rem;color:var(--wp-muted);margin-top:.35rem;line-height:1.35;">
+            {{ point.texte }}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% if vc.bloquantes|default([]) %}
+    <div style="background:#fdecea;border:1px solid rgba(216,113,73,.25);border-radius:8px;padding:.85rem;margin-bottom:.75rem;">
+      <div style="font-weight:900;color:var(--wp-terracotta);font-size:.86rem;margin-bottom:.55rem;">
+        <i class="bi bi-x-octagon"></i> Validation impossible avant correction
+      </div>
+      {% for a in vc.bloquantes %}
+      <div style="font-size:.82rem;color:var(--wp-ink);line-height:1.4;{% if not loop.last %}margin-bottom:.55rem;{% endif %}">
+        <strong>{{ a.code }} · {{ a.titre }}</strong><br>
+        <span style="color:var(--wp-muted);">{{ a.suggestion }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if vc.avertissements|default([]) %}
+    <div style="background:#fffaf0;border:1px solid rgba(197,151,58,.28);border-radius:8px;padding:.85rem;margin-bottom:.75rem;">
+      <div style="font-weight:900;color:var(--wp-ochre);font-size:.86rem;margin-bottom:.55rem;">
+        <i class="bi bi-exclamation-triangle"></i> Points à accepter consciemment
+      </div>
+      {% for a in vc.avertissements %}
+      <div style="font-size:.82rem;color:var(--wp-ink);line-height:1.4;{% if not loop.last %}margin-bottom:.55rem;{% endif %}">
+        <strong>{{ a.code }} · {{ a.titre }}</strong><br>
+        <span style="color:var(--wp-muted);">{{ a.suggestion }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% if peut_valider_chef %}
+    <form method="POST"
+          action="{{ url_for('saisie.valider_chef_equipe', equipe_id=poste.id) }}"
+          onsubmit="return confirm('Confirmer la validation chef de cette fiche ?')">
+      {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+      {% if vc.nb_avertissements|default(0) > 0 and vc.nb_bloquantes|default(0) == 0 %}
+      <div class="mb-3">
+        <label class="d-flex align-items-start gap-2" style="font-size:.84rem;color:var(--wp-ink);font-weight:700;">
+          <input type="checkbox" name="confirmer_avertissements" value="1" required style="margin-top:.2rem;">
+          Je confirme avoir lu les avertissements et je valide volontairement cette fiche.
+        </label>
+      </div>
+      <div class="mb-3">
+        <label for="motif_validation_avertissements" style="font-weight:800;color:var(--wp-ink);font-size:.84rem;">
+          Motif de validation malgré avertissement
+        </label>
+        <textarea id="motif_validation_avertissements"
+                  name="motif_validation_avertissements"
+                  class="form-control mt-2"
+                  minlength="10"
+                  rows="2"
+                  required
+                  placeholder="Exemple : arrêt connu et déjà traité par la maintenance."></textarea>
+      </div>
+      {% endif %}
+      <div class="d-flex justify-content-end gap-2 flex-wrap">
+        {% if vc.validation_bloquee|default(false) %}
+        <button type="button" class="btn btn-outline-secondary" disabled>
+          <i class="bi bi-lock"></i> Validation bloquée
+        </button>
+        {% else %}
+        <button type="submit" class="btn btn-success d-flex align-items-center gap-2">
+          <i class="bi bi-check2-circle"></i>
+          {% if vc.nb_avertissements|default(0) > 0 %}Valider avec motif{% else %}Valider chef{% endif %}
+        </button>
+        {% endif %}
+      </div>
+    </form>
+    {% elif poste.statut == 'valide_chef' or poste.statut == 'verrouille' %}
+    <div style="font-size:.84rem;color:var(--wp-leaf);font-weight:800;">
+      <i class="bi bi-check-circle"></i> Cette fiche est déjà intégrée aux analyses validées.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-clipboard-check" style="color:var(--wp-sky);"></i>
+    Traçabilité terrain
+  </div>
+  <div style="padding:1rem 1.25rem;">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <div style="font-size:.72rem;font-weight:800;color:var(--wp-muted);text-transform:uppercase;">Origine</div>
+        <div style="font-weight:800;color:var(--wp-ink);margin-top:3px;">
+          {% if poste.mode_saisie == 'papier' %}Ressaisie depuis fiche papier{% else %}Saisie directe dans l'application{% endif %}
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div style="font-size:.72rem;font-weight:800;color:var(--wp-muted);text-transform:uppercase;">Responsable terrain</div>
+        <div style="font-weight:800;color:var(--wp-ink);margin-top:3px;">
+          {{ poste.operateur_nom or poste.saisie_par.nom }}
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div style="font-size:.72rem;font-weight:800;color:var(--wp-muted);text-transform:uppercase;">Fiche remplie par</div>
+        <div style="font-weight:800;color:var(--wp-ink);margin-top:3px;">
+          {{ poste.rempli_par_nom or poste.saisie_par.nom }}
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div style="font-size:.72rem;font-weight:800;color:var(--wp-muted);text-transform:uppercase;">Fiche signée</div>
+        <div style="font-weight:800;color:var(--wp-ink);margin-top:3px;">
+          {% if poste.fiche_papier_signee %}Oui{% else %}Non{% endif %}
+        </div>
+      </div>
+      <div class="col-md-12">
+        <div style="font-size:.72rem;font-weight:800;color:var(--wp-muted);text-transform:uppercase;">Pièce jointe</div>
+        <div style="font-weight:800;color:var(--wp-ink);margin-top:3px;">
+          {% if poste.fiche_papier_fichier %}
+          <a href="{{ url_for('saisie.fiche_papier_jointe', poste_id=poste.id) }}" target="_blank">
+            {{ poste.fiche_papier_nom_original or 'Voir la fiche papier' }}
+          </a>
+          {% else %}
+          Aucune pièce jointe
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% set arrets_commentes = poste.arrets | selectattr('notes') | list %}
+{% if poste.notes or arrets_commentes %}
+<div class="wp-card mb-4"
+     style="border-left:4px solid var(--wp-sky);">
+  <div class="wp-card-header" style="color:var(--wp-ink);">
+    <i class="bi bi-chat-left-text" style="color:var(--wp-sky);"></i>
+    Commentaires opérateur
+    <span class="ms-auto" style="font-size:.75rem;color:var(--wp-muted);font-weight:500;">
+      Visible chef production / admin
+    </span>
+  </div>
+  <div style="padding:1rem 1.25rem;">
+    {% if poste.notes %}
+    <div style="padding:.85rem 0;{% if arrets_commentes %}border-bottom:1px dashed #e5e0d6;{% endif %}">
+      <div style="font-size:.72rem;font-weight:800;color:var(--wp-muted);text-transform:uppercase;margin-bottom:5px;">
+        Observation générale
+      </div>
+      <div style="font-size:.9rem;color:var(--wp-ink);line-height:1.5;">
+        {{ poste.notes }}
+      </div>
+    </div>
+    {% endif %}
+
+    {% if arrets_commentes %}
+    <div style="{% if poste.notes %}padding-top:.85rem;{% endif %}">
+      <div style="font-size:.72rem;font-weight:800;color:var(--wp-muted);text-transform:uppercase;margin-bottom:8px;">
+        Commentaires sur arrêts
+      </div>
+      {% for arret in arrets_commentes %}
+      <div class="d-flex gap-3 align-items-start"
+           style="padding:.7rem 0;{% if not loop.last %}border-bottom:1px dashed #e5e0d6;{% endif %}">
+        <span class="wp-pill wp-pill-neutral" style="flex:0 0 auto;">
+          {{ arret.machine }}
+        </span>
+        <div>
+          <div style="font-weight:800;color:var(--wp-ink);font-size:.86rem;">
+            {{ arret.heure_debut }} → {{ arret.heure_fin }} · {{ arret.cause }}
+          </div>
+          <div style="font-size:.82rem;color:var(--wp-muted);line-height:1.45;margin-top:3px;">
+            {{ arret.notes }}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if peut_demander_correction %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-ochre);">
+  <div class="wp-card-header" style="color:var(--wp-ochre);">
+    <i class="bi bi-reply"></i>
+    Renvoyer à corriger
+  </div>
+  <form method="POST"
+        action="{{ url_for('saisie.demander_correction', equipe_id=poste.id) }}"
+        style="padding:1rem 1.25rem;"
+        onsubmit="return confirm('Renvoyer cette fiche à corriger à l’opérateur ?')">
+    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+    <div class="mb-3">
+      <input type="hidden"
+             id="correction_cible"
+             name="correction_cible"
+             value="bloc-productions"
+             data-edit-base="{% if peut_modifier %}{{ url_for('saisie.modifier_equipe', equipe_id=poste.id) }}{% endif %}">
+      <div style="font-weight:800;color:var(--wp-ink);font-size:.9rem;margin-bottom:.65rem;">
+        1. Choisir ce que l'opérateur doit corriger
+      </div>
+      <div class="wp-correction-quick">
+        <button type="button"
+                class="active"
+                data-cible="bloc-productions"
+                data-label="Production"
+                data-message="Merci de corriger les volumes ou les essences de production.">
+          <i class="bi bi-boxes"></i>
+          Production
+        </button>
+        <button type="button"
+                data-cible="bloc-arrets"
+                data-label="Arrêts machine"
+                data-message="Merci de corriger les horaires, la machine ou la cause des arrêts.">
+          <i class="bi bi-tools"></i>
+          Arrêts
+        </button>
+        <button type="button"
+                data-cible="bloc-origine"
+                data-label="Fiche papier"
+                data-message="Merci de joindre la fiche papier signée ou de confirmer son origine.">
+          <i class="bi bi-paperclip"></i>
+          Papier
+        </button>
+        <button type="button"
+                data-cible="bloc-commentaires"
+                data-label="Commentaires"
+                data-message="Merci de compléter le commentaire terrain pour mieux expliquer la situation.">
+          <i class="bi bi-chat-left-text"></i>
+          Commentaire
+        </button>
+        <button type="button"
+                data-cible="field-date"
+                data-label="En-tête"
+                data-message="Merci de corriger la date, l'équipe, l'effectif ou le responsable du poste.">
+          <i class="bi bi-calendar3"></i>
+          En-tête
+        </button>
+      </div>
+      <div class="wp-correction-selected">
+        L'opérateur sera envoyé vers : <strong id="correction-cible-label">Production</strong>
+      </div>
+    </div>
+    <label for="motif_correction" style="font-weight:800;color:var(--wp-ink);font-size:.9rem;">
+      2. Message à afficher à l'opérateur
+    </label>
+    <textarea id="motif_correction"
+              name="motif_correction"
+              class="form-control mt-2"
+              rows="3"
+              minlength="5"
+              required
+              placeholder="Exemple : corriger l’heure de fin de l’arrêt Bicoupe, elle chevauche un autre arrêt.">Merci de corriger les volumes ou les essences de production.</textarea>
+    <div class="wp-correction-templates" aria-label="Messages rapides">
+      <button type="button" data-message="Merci de corriger les volumes saisis : le volume conforme + déclassé semble incohérent avec l'entrée.">
+        Volumes incohérents
+      </button>
+      <button type="button" data-message="Merci de corriger les horaires : certaines heures semblent manquantes, inversées ou chevauchées.">
+        Horaires à corriger
+      </button>
+      <button type="button" data-message="Merci de joindre la fiche papier signée avant de renvoyer la fiche.">
+        Fiche papier manquante
+      </button>
+      <button type="button" data-message="Merci d'ajouter un commentaire terrain pour expliquer ce qui s'est passé.">
+        Commentaire à ajouter
+      </button>
+    </div>
+    <div class="d-flex justify-content-end mt-3">
+      <button type="submit" class="btn btn-warning d-flex align-items-center gap-2">
+        <i class="bi bi-arrow-counterclockwise"></i>
+        Renvoyer à l'opérateur
+      </button>
+    </div>
+  </form>
+</div>
+{% endif %}
+
 {# ── P12 · Contrôles qualité de saisie (alertes non-bloquantes) ── #}
-{% if anomalies %}
+{% if anomalies and not vc.visible|default(false) %}
 <div class="wp-card mb-4"
      style="border-left:4px solid var(--wp-ochre);background:#fffaf0;">
   <div class="wp-card-header" style="color:var(--wp-ochre);">
@@ -123,6 +516,7 @@
 </div>
 {% endif %}
 
+{% if afficher_indicateurs %}
 {# ── KPI TRS ── #}
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
@@ -153,9 +547,10 @@
     </div>
   </div>
 </div>
+{% endif %}
 
 {# ── Encouragement opérateur — Bug 5 ── #}
-{% if current_user.role == 'operateur' and poste.statut in ('soumis', 'verrouille') %}
+{% if current_user.role == 'operateur' and poste.statut in ('a_verifier', 'valide_chef', 'verrouille') %}
 <div class="wp-card mb-4" style="border-left:4px solid var(--wp-leaf);">
   <div style="padding:16px 20px;display:flex;align-items:center;gap:14px;">
     <div style="font-size:1.6rem;flex-shrink:0;">
@@ -168,7 +563,7 @@
         {% if poste.trs_global and poste.trs_global >= 65 %}
           Excellent poste — TRS au-dessus de la moyenne de la chaîne !
         {% elif poste.trs_global and poste.trs_global >= 50 %}
-          Poste dans la norme — données bien enregistrées, merci.
+          Poste dans la norme — fiche bien remplie, merci.
         {% elif poste.trs_global %}
           TRS bas ce poste — chaque arrêt documenté aide à cibler les vraies causes.
         {% else %}
@@ -188,7 +583,7 @@
 <div class="row g-3 mb-3">
 
   {# Productions par essence #}
-  <div class="col-md-7">
+  <div class="{% if afficher_economie %}col-md-7{% else %}col-md-12{% endif %}">
     <div class="wp-card h-100">
       <div class="wp-card-header" style="justify-content:space-between;">
         <span>
@@ -204,12 +599,18 @@
           <thead>
             <tr>
               <th>Essence</th>
+              <th>Créneau</th>
               <th class="text-end">Entrée (m³)</th>
               <th class="text-end">Conforme</th>
               <th class="text-end">Déclassé</th>
               <th class="text-end">Déchets</th>
               <th class="text-end">Rendement</th>
+              {% if afficher_indicateurs %}
+              <th class="text-end">TRS essence</th>
+              {% endif %}
+              {% if afficher_economie %}
               <th class="text-end">Prix/m³</th>
+              {% endif %}
             </tr>
           </thead>
           <tbody>
@@ -218,6 +619,7 @@
               <td>
                 <span class="wp-pill wp-pill-info">{{ prod.essence }}</span>
               </td>
+              <td style="color:var(--wp-muted);font-size:.82rem;">{{ prod.creneau_traitement }}</td>
               <td class="text-end">{{ prod.volume_entree }}</td>
               <td class="text-end" style="color:var(--wp-leaf);font-weight:700;">
                 {{ prod.volume_conforme }}
@@ -225,22 +627,39 @@
               <td class="text-end" style="color:var(--wp-ochre);">{{ prod.volume_declass }}</td>
               <td class="text-end" style="color:var(--wp-terracotta);">{{ prod.volume_dechets }}</td>
               <td class="text-end" style="font-weight:600;">{{ prod.rendement_matiere }}%</td>
+              {% if afficher_indicateurs %}
+              <td class="text-end">
+                {% set trs_prod = trs_productions.get(prod.id) %}
+                {% if trs_prod %}
+                  {% set cp = 'var(--wp-leaf)' if trs_prod.trs_global >= 70 else ('var(--wp-ochre)' if trs_prod.trs_global >= 50 else 'var(--wp-terracotta)') %}
+                  <strong style="color:{{ cp }};">{{ trs_prod.trs_global }}%</strong>
+                  <div style="font-size:.68rem;color:var(--wp-muted);">
+                    {{ trs_prod.duree_arrets }} min arrêt
+                  </div>
+                {% else %}
+                  <span style="color:var(--wp-muted);">—</span>
+                {% endif %}
+              </td>
+              {% endif %}
+              {% if afficher_economie %}
               <td class="text-end" style="color:var(--wp-muted);font-size:.82rem;">
                 {% if prod.prix_snapshot %}
                 {{ "{:,.0f}".format(prod.prix_snapshot).replace(",", " ") }}
                 {% else %}—{% endif %}
               </td>
+              {% endif %}
             </tr>
             {% endfor %}
           </tbody>
           <tfoot>
             <tr style="background:var(--wp-cream-2);font-weight:700;">
               <td>Total</td>
+              <td></td>
               <td class="text-end">{{ poste.volume_entree }} m³</td>
               <td class="text-end" style="color:var(--wp-leaf);">{{ poste.volume_conforme }} m³</td>
               <td class="text-end" style="color:var(--wp-ochre);">{{ poste.volume_declass }} m³</td>
               <td class="text-end" style="color:var(--wp-terracotta);">{{ poste.volume_dechets }} m³</td>
-              <td colspan="2"></td>
+              <td colspan="{% if afficher_indicateurs and afficher_economie %}3{% elif afficher_indicateurs or afficher_economie %}2{% else %}1{% endif %}"></td>
             </tr>
           </tfoot>
         </table>
@@ -248,6 +667,7 @@
     </div>
   </div>
 
+  {% if afficher_economie %}
   {# Manque à gagner estimé (P11) #}
   <div class="col-md-5">
     <div class="wp-card h-100"
@@ -262,7 +682,8 @@
               <td style="padding:14px 18px;">
                 <div style="font-weight:600;color:var(--wp-muted);font-size:.85rem;">Valeur potentielle</div>
                 <div style="font-size:.72rem;color:var(--wp-muted);margin-top:2px;">
-                  {{ manque.objectif_m3 }} m³ × {{ "{:,.0f}".format(manque.prix_reference).replace(",", " ") }} FCFA/m³
+                  {{ manque.volume_cible_m3 }} m³ × {{ "{:,.0f}".format(manque.prix_reference).replace(",", " ") }} FCFA/m³
+                  · {{ 'capacités par essence' if manque.mode_potentiel == 'capacite_par_essence' else 'objectif poste' }}
                 </div>
               </td>
               <td class="text-end" style="padding:14px 18px;font-weight:700;color:var(--wp-ink);
@@ -275,6 +696,7 @@
                 <div style="font-weight:600;color:var(--wp-muted);font-size:.85rem;">Valeur réelle valorisée</div>
                 <div style="font-size:.72rem;color:var(--wp-muted);margin-top:2px;">
                   Conforme + déclassé revendu
+                  {% if manque.valeur_dechets_m3 == 0 %} · déchets = 0 FCFA{% endif %}
                 </div>
               </td>
               <td class="text-end" style="padding:14px 18px;font-weight:700;color:var(--wp-leaf);
@@ -320,6 +742,7 @@
       </div>
     </div>
   </div>
+  {% endif %}
 
 </div>
 
@@ -344,18 +767,20 @@
         <th>Machine</th>
         <th>Horaire</th>
         <th class="text-end">Durée</th>
+        <th class="text-end">Prévu</th>
+        <th class="text-end">Impact TRS</th>
         <th>Cause</th>
         <th>Catégorie</th>
       </tr>
     </thead>
     <tbody>
       {% for a in poste.arrets %}
-      {% if a.categorie == 'Mécanique' %}{% set pill = 'danger' %}
-      {% elif a.categorie == 'Organisationnelle' %}{% set pill = 'warning' %}
+      {% if a.categorie in ('Mécanique', 'Panne machine', 'Énergie / réseau') %}{% set pill = 'danger' %}
+      {% elif a.categorie in ('Organisationnelle', 'Réglage / outil', 'Qualité matière') %}{% set pill = 'warning' %}
       {% elif a.categorie == 'Approvisionnement' %}{% set pill = 'info' %}
       {% elif a.categorie == 'Maintenance planifiée' %}{% set pill = 'success' %}
       {% else %}{% set pill = 'neutral' %}{% endif %}
-      <tr>
+      <tr style="{% if a.duree_min and a.duree_min >= 45 %}background:#fffaf0;{% endif %}">
         <td style="font-weight:600;">{{ a.machine }}</td>
         <td style="color:var(--wp-muted);font-size:.84rem;">
           {{ a.heure_debut }} → {{ a.heure_fin }}
@@ -363,7 +788,27 @@
         <td class="text-end">
           <span class="wp-pill wp-pill-danger">{{ a.duree_min }} min</span>
         </td>
-        <td style="font-size:.865rem;">{{ a.cause }}</td>
+        <td class="text-end" style="color:var(--wp-muted);font-size:.82rem;">
+          {% if a.duree_prevue_min is not none %}{{ a.duree_prevue_min }} min{% else %}—{% endif %}
+        </td>
+        <td class="text-end" style="font-size:.82rem;">
+          {% if a.duree_impact_min > 0 %}
+          <span class="wp-pill wp-pill-warning">{{ a.duree_impact_min }} min</span>
+          {% else %}
+          <span style="color:var(--wp-muted);">—</span>
+          {% endif %}
+        </td>
+        <td style="font-size:.865rem;">
+          {{ a.cause }}
+          {% if a.duree_min and a.duree_min >= 45 %}
+          <span class="wp-pill wp-pill-warning" style="font-size:.66rem;margin-left:5px;">à regarder</span>
+          {% endif %}
+          {% if a.notes %}
+          <div style="font-size:.74rem;color:var(--wp-muted);margin-top:3px;line-height:1.35;">
+            {{ a.notes }}
+          </div>
+          {% endif %}
+        </td>
         <td><span class="wp-pill wp-pill-{{ pill }}">{{ a.categorie }}</span></td>
       </tr>
       {% endfor %}
@@ -372,9 +817,49 @@
   {% else %}
   <div style="padding:2rem;text-align:center;color:var(--wp-muted);">
     <i class="bi bi-check-circle" style="color:var(--wp-leaf);font-size:1.4rem;"></i>
-    <p style="margin:8px 0 0;font-size:.9rem;">Aucun arrêt enregistré pour cette équipe.</p>
+    <p style="margin:8px 0 0;font-size:.9rem;">
+      {% if poste.aucun_arret_confirme %}
+      Aucun arrêt confirmé par l'opérateur pour cette équipe.
+      {% else %}
+      Aucun arrêt enregistré pour cette équipe.
+      {% endif %}
+    </p>
   </div>
   {% endif %}
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const input = document.getElementById('correction_cible');
+  if (!input) return;
+
+  const label = document.getElementById('correction-cible-label');
+  const message = document.getElementById('motif_correction');
+  const zoneButtons = document.querySelectorAll('.wp-correction-quick button[data-cible]');
+  const templateButtons = document.querySelectorAll('.wp-correction-templates button[data-message]');
+
+  zoneButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      zoneButtons.forEach((btn) => btn.classList.remove('active'));
+      button.classList.add('active');
+      input.value = button.dataset.cible || 'bloc-productions';
+      if (label) label.textContent = button.dataset.label || button.textContent.trim();
+      if (message && button.dataset.message) message.value = button.dataset.message;
+      message?.focus();
+    });
+  });
+
+  templateButtons.forEach((button) => {
+    button.addEventListener('click', () => {
+      if (message && button.dataset.message) {
+        message.value = button.dataset.message;
+        message.focus();
+      }
+    });
+  });
+})();
+</script>
 {% endblock %}

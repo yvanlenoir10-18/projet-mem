@@ -9,13 +9,15 @@
     Configuration CUF — Chaîne 4
   </h1>
   <p style="color:var(--wp-muted);font-size:.82rem;margin:4px 0 0;">
-    Prix de vente par essence et paramètres de production
+    Paramètres de production{% if peut_modifier_finance %}, prix et valorisation{% endif %}
   </p>
 </div>
 
 <form method="POST">
+  {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
 <div class="row g-4">
 
+  {% if peut_modifier_finance %}
   {# ── Prix par essence ── #}
   <div class="col-md-6">
     <div class="wp-card h-100">
@@ -50,9 +52,10 @@
       </div>
     </div>
   </div>
+  {% endif %}
 
   {# ── Paramètres de production ── #}
-  <div class="col-md-6">
+  <div class="{% if peut_modifier_finance %}col-md-6{% else %}col-lg-8{% endif %}">
     <div class="wp-card h-100">
       <div class="wp-card-header">
         <i class="bi bi-sliders" style="color:var(--wp-emerald);"></i>
@@ -81,22 +84,48 @@
         </div>
 
         <div class="mb-4">
-          <label class="form-label">Capacité théorique de la ligne (m³/heure)</label>
+          <label class="form-label">Capacité théorique par défaut (m³/heure)</label>
           <input type="number" name="capacite_equipe_h" class="form-control"
                  value="{{ params.get('capacite_equipe_h').valeur
                            if params.get('capacite_equipe_h') else 1.5625 }}"
                  step="0.0001" min="0.1">
           <div class="form-text" style="color:var(--wp-muted);">
-            1,5625 m³/h = 12,5 m³ sur 8h — provient de la bicoupe goulot
+            Valeur utilisée si une capacité par essence n'est pas encore renseignée.
           </div>
         </div>
 
+        <div class="mb-4">
+          <label class="form-label">Capacités par essence (m³/heure)</label>
+          <div class="row g-2">
+            {% for essence in ['ayous', 'azobe', 'iroko', 'movingui'] %}
+            <div class="col-6">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text"
+                      style="min-width:86px;background:var(--wp-cream-2);color:var(--wp-muted);
+                             border-color:var(--wp-line);font-weight:600;">
+                  {{ essence | capitalize }}
+                </span>
+                <input type="number" name="capacite_{{ essence }}_h" class="form-control"
+                       value="{{ params.get('capacite_' + essence + '_h').valeur
+                                 if params.get('capacite_' + essence + '_h') else
+                                 (params.get('capacite_equipe_h').valeur if params.get('capacite_equipe_h') else 1.5625) }}"
+                       step="0.0001" min="0">
+              </div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="form-text" style="color:var(--wp-muted);">
+            Même valeur au départ. Quand les capacités réelles par essence seront connues, il suffira de les modifier ici.
+          </div>
+        </div>
+
+        {% if peut_modifier_finance %}
         <div class="mb-2">
-          <label class="form-label">Taux de revente locale du bois rebut</label>
+          <label class="form-label">Taux de revente locale du bois déclassé</label>
           <div class="input-group">
             <input type="number" name="taux_revente_rebut" class="form-control"
                    value="{{ params.get('taux_revente_rebut').valeur
-                             if params.get('taux_revente_rebut') else 0.30 }}"
+                             if params.get('taux_revente_rebut') else 0.70 }}"
                    step="0.01" min="0" max="1">
             <span class="input-group-text"
                   style="background:var(--wp-cream-2);color:var(--wp-muted);
@@ -105,9 +134,21 @@
             </span>
           </div>
           <div class="form-text" style="color:var(--wp-muted);">
-            Ex : 0,30 = 30 % de la valeur initiale récupérée sur le rebut
+            Hypothèse validée P2 : 0,70 = 70 % de la valeur normale récupérée sur le déclassé.
           </div>
         </div>
+
+        <div class="mb-2">
+          <label class="form-label">Valeur résiduelle des déchets (FCFA/m³)</label>
+          <input type="number" name="valeur_dechets_m3" class="form-control"
+                 value="{{ params.get('valeur_dechets_m3').valeur
+                           if params.get('valeur_dechets_m3') else 0 }}"
+                 min="0" step="1000">
+          <div class="form-text" style="color:var(--wp-muted);">
+            V1 : 0 FCFA/m³. Les déchets ne sont pas valorisés pour garder le modèle simple.
+          </div>
+        </div>
+        {% endif %}
 
       </div>
     </div>

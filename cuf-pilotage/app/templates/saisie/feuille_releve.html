@@ -189,10 +189,16 @@
       padding-top: 6px;
     }
 
-    /* ── Bouton impression (caché à l'impression) ────────────────────── */
-    .btn-imprimer {
-      display: block;
+    /* ── Actions (cachées à l'impression) ─────────────────────────────── */
+    .actions {
+      display: flex;
+      justify-content: center;
       margin: 0 auto 20px auto;
+    }
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       padding: 10px 28px;
       background: #1F5C3D;
       color: #fff;
@@ -202,11 +208,12 @@
       font-weight: bold;
       cursor: pointer;
       letter-spacing: 0.5px;
+      text-decoration: none;
     }
-    .btn-imprimer:hover { background: #174d33; }
+    .btn-action:hover { background: #174d33; color: #fff; }
 
     @media print {
-      .btn-imprimer { display: none !important; }
+      .actions { display: none !important; }
       body { padding: 0; }
       .section { page-break-inside: avoid; }
     }
@@ -214,9 +221,11 @@
 </head>
 <body>
 
-  <button class="btn-imprimer" onclick="window.print()">
-    🖨 Imprimer cette feuille
-  </button>
+  <div class="actions">
+    <button class="btn-action" onclick="window.print()">
+      Imprimer / enregistrer en PDF
+    </button>
+  </div>
 
   <!-- ── En-tête ──────────────────────────────────────────────────── -->
   <div class="entete">
@@ -224,7 +233,7 @@
       <h1>Feuille de relevé de production</h1>
       <p>Scierie industrielle CUF — Chaîne 4 — Ebolowa, Cameroun</p>
     </div>
-    <div class="entete-logo">CUF</div>
+    <div class="entete-logo">wood_pilot</div>
   </div>
 
   <!-- ── Identité du poste ─────────────────────────────────────────── -->
@@ -291,6 +300,8 @@
       <thead>
         <tr>
           <th>Essence</th>
+          <th>Début traitement</th>
+          <th>Fin traitement</th>
           <th>Vol. entré bicoupe (m³)</th>
           <th>Vol. scié conforme (m³)</th>
           <th>Vol. déclassé / chutes (m³)</th>
@@ -307,10 +318,14 @@
           <td></td>
           <td></td>
           <td></td>
+          <td></td>
+          <td></td>
         </tr>
         {% endfor %}
         <tr class="total-row">
           <td>TOTAL</td>
+          <td>—</td>
+          <td>—</td>
           <td></td>
           <td></td>
           <td></td>
@@ -331,8 +346,9 @@
           <th style="width:20%">Machine concernée</th>
           <th style="width:11%">Heure début</th>
           <th style="width:11%">Heure fin</th>
-          <th style="width:10%">Durée (min)</th>
-          <th style="width:18%">Catégorie</th>
+          <th style="width:9%">Durée réelle</th>
+          <th style="width:9%">Durée prévue</th>
+          <th style="width:17%">Catégorie</th>
           <th>Cause / Description</th>
         </tr>
       </thead>
@@ -346,14 +362,23 @@
           <td></td>
           <td></td>
           <td></td>
+          <td></td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
     <div style="font-size:7.5pt;color:#555;margin-top:4px;padding:3px 6px;border:1px solid #ddd;">
+      ☐ Aucun arrêt pendant le poste
+      &nbsp;|&nbsp;
       Catégories : {{ categories | join(' · ') }}
       &nbsp;|&nbsp;
       Machines : {{ machines | join(' · ') }}
+    </div>
+    <div style="font-size:7.5pt;color:#555;margin-top:4px;padding:3px 6px;border:1px solid #ddd;">
+      Causes simples :
+      {% for c in causes_arret %}
+      {{ c.cause }}{% if not loop.last %} · {% endif %}
+      {% endfor %}
     </div>
   </div>
 
@@ -418,7 +443,7 @@
 
   <!-- ── Pied de page ──────────────────────────────────────────────── -->
   <div class="pied">
-    Wood_Pilot_Ebolowa — Outil de pilotage Chaîne 4 — CUF Ebolowa &nbsp;|&nbsp;
+    wood_pilot &nbsp;|&nbsp;
     Feuille générée le {{ date_fmt }} &nbsp;|&nbsp;
     Conserver après saisie dans le tableau de bord
   </div>

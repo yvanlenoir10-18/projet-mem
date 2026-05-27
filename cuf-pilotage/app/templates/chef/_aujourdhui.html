@@ -1,0 +1,199 @@
+{% set k = kpi_jour|default({}) %}
+{% set objectif = k.objectif|default({}) %}
+{% set fiches = k.fiches|default({}) %}
+{% set arrets = k.arrets|default({}) %}
+{% set rendement = k.rendement|default({}) %}
+{% set declass = k.declass|default({}) %}
+{% set trs = k.trs|default({}) %}
+{% set actions = actions_immediates|default([]) %}
+{% set postes_jour = postes_du_jour|default([]) %}
+
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+  <div>
+    <div class="wp-section-title mb-1">
+      <i class="bi bi-speedometer2"></i> Aujourd'hui
+    </div>
+    <div style="font-size:.82rem;color:var(--wp-muted);">
+      Vue courte pour décider vite : actions, objectif, arrêts, rendement et postes du jour.
+    </div>
+  </div>
+  <a href="{{ url_for('dashboard.fiches_chef', statut='a_verifier') }}"
+     class="btn btn-sm btn-outline-primary">
+    <i class="bi bi-clipboard-check"></i> Fiches à traiter
+  </a>
+</div>
+
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-leaf);">
+  <div class="wp-card-header">
+    <i class="bi bi-lightning-charge"></i> Actions immédiates
+    <span class="ms-auto" style="font-size:.74rem;font-weight:500;color:var(--wp-muted);">
+      Priorisées pour le chef scierie
+    </span>
+  </div>
+  <div class="p-3">
+    {% if actions %}
+    <div class="d-grid gap-2">
+      {% for action in actions %}
+        {% set action_color = 'var(--wp-terracotta)' if action.niveau == 'danger' else ('var(--wp-ochre)' if action.niveau == 'warning' else 'var(--wp-sky)') %}
+        <a href="{{ action.href }}"
+           class="d-flex align-items-center justify-content-between gap-3 flex-wrap"
+           style="text-decoration:none;color:var(--wp-ink);border-left:3px solid {{ action_color }};background:#fff;padding:10px 12px;border-radius:8px;box-shadow:0 1px 0 rgba(0,0,0,.04);">
+          <span class="d-flex align-items-start gap-2" style="min-width:0;flex:1;">
+            <i class="bi {{ action.icon }}" style="color:{{ action_color }};font-size:1rem;margin-top:2px;"></i>
+            <span style="min-width:0;">
+              <span style="font-weight:800;font-size:.86rem;display:block;">{{ action.titre }}</span>
+              <span style="font-size:.76rem;color:var(--wp-muted);line-height:1.35;">{{ action.detail }}</span>
+            </span>
+          </span>
+          <span class="btn btn-sm btn-outline-secondary" style="pointer-events:none;">{{ action.cta }}</span>
+        </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="d-flex align-items-center gap-2" style="color:var(--wp-leaf);font-weight:700;">
+      <i class="bi bi-check-circle"></i>
+      Aucune action immédiate en attente.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-6 col-xl">
+    <div class="wp-card h-100 p-3">
+      <div class="wp-kpi-label">Objectif du jour</div>
+      <div class="d-flex align-items-end justify-content-between gap-2">
+        <div style="font-size:1.55rem;font-weight:900;color:var(--wp-ink);">
+          {{ objectif.realise|default(0) }} <span style="font-size:.85rem;">m³</span>
+        </div>
+        <span class="badge bg-{{ objectif.couleur|default('secondary') }}">
+          {{ objectif.pct|default(0) }}%
+        </span>
+      </div>
+      <div class="progress mt-2" style="height:8px;border-radius:999px;">
+        <div class="progress-bar bg-{{ objectif.couleur|default('secondary') }}"
+             style="width:{{ objectif.pct_barre|default(0) }}%;"></div>
+      </div>
+      <div class="wp-kpi-sub mt-2">
+        Objectif {{ objectif.objectif|default(0) }} m³ · écart {{ objectif.ecart_m3|default(0) }} m³
+      </div>
+      {% if objectif.volume_attente|default(0) > 0 %}
+      <div class="wp-kpi-sub">Inclut {{ objectif.volume_attente }} m³ en attente chef.</div>
+      {% endif %}
+      {% if objectif.projection|default(none) %}
+      <div class="wp-kpi-sub">Projection {{ objectif.projection.shift }} : ~{{ objectif.projection.volume }} m³.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6 col-xl">
+    <a href="{{ url_for('dashboard.fiches_chef', statut='a_verifier') }}"
+       class="wp-card h-100 p-3 d-block"
+       style="text-decoration:none;color:inherit;">
+      <div class="wp-kpi-label">Fiches à traiter</div>
+      <div style="font-size:1.55rem;font-weight:900;color:var(--wp-ink);">
+        {{ fiches.attente|default(0) }}
+      </div>
+      <div class="wp-kpi-sub">
+        {{ fiches.critiques|default(0) }} critique{{ 's' if fiches.critiques|default(0) > 1 else '' }}
+      </div>
+      <div class="mt-2">
+        <span class="badge bg-{{ fiches.couleur|default('secondary') }}">Contrôle chef</span>
+      </div>
+    </a>
+  </div>
+
+  <div class="col-12 col-md-6 col-xl">
+    <div class="wp-card h-100 p-3">
+      <div class="wp-kpi-label">Arrêts du jour</div>
+      <div style="font-size:1.55rem;font-weight:900;color:var(--wp-ink);">
+        {{ arrets.duree_fmt|default('0min') }}
+      </div>
+      <div class="wp-kpi-sub">
+        {% if arrets.machine_impact|default(none) %}
+          Plus impactée : {{ arrets.machine_impact.nom }} ({{ arrets.machine_impact.duree_fmt }})
+        {% else %}
+          Aucun arrêt déclaré sur les fiches du jour.
+        {% endif %}
+      </div>
+      <div class="mt-2">
+        <span class="badge bg-{{ arrets.couleur|default('secondary') }}">Disponibilité</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6 col-xl">
+    <div class="wp-card h-100 p-3">
+      <div class="wp-kpi-label">Rendement matière</div>
+      <div style="font-size:1.55rem;font-weight:900;color:var(--wp-ink);">
+        {{ rendement.valeur|default(0) }}%
+      </div>
+      <div class="wp-kpi-sub">
+        Seuil {{ rendement.seuil|default(65) }}%
+        {% if rendement.moyenne_7j|default(none) is not none %} · 7 j : {{ rendement.moyenne_7j }}%{% endif %}
+      </div>
+      <div class="mt-2">
+        <span class="badge bg-{{ rendement.couleur|default('secondary') }}">Matière</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6 col-xl">
+    <div class="wp-card h-100 p-3">
+      <div class="wp-kpi-label">Déclassement</div>
+      <div style="font-size:1.55rem;font-weight:900;color:var(--wp-ink);">
+        {{ declass.valeur|default(0) }}%
+      </div>
+      <div class="wp-kpi-sub">Seuil alerte {{ declass.seuil|default(30) }}%</div>
+      <div class="mt-2">
+        <span class="badge bg-{{ declass.couleur|default('secondary') }}">Qualité</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-calendar2-check"></i> Postes du jour
+    {% if trs.valeur|default(none) is not none %}
+    <span class="ms-auto badge bg-{{ trs.couleur|default('secondary') }}">TRS jour {{ trs.valeur }}%</span>
+    {% endif %}
+  </div>
+  <div class="p-3">
+    <div class="row g-2">
+      {% for poste in postes_jour %}
+      <div class="col-12 col-lg-6">
+        <a href="{{ poste.href }}"
+           style="display:block;text-decoration:none;color:inherit;border:1px solid #e6e0d5;border-radius:8px;padding:12px;background:#fff;">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div>
+              <div style="font-weight:900;color:var(--wp-ink);">{{ poste.shift }}</div>
+              <div style="font-size:.77rem;color:var(--wp-muted);">
+                {% if poste.existe %}
+                  {{ poste.operateur }} · {{ poste.essences }}
+                {% else %}
+                  Aucune fiche créée pour ce poste.
+                {% endif %}
+              </div>
+            </div>
+            <span class="badge bg-{{ poste.statut_couleur }}">{{ poste.statut_label }}</span>
+          </div>
+          {% if poste.existe %}
+          <div class="d-flex gap-3 flex-wrap mt-3" style="font-size:.78rem;color:var(--wp-muted);">
+            <span><strong style="color:var(--wp-ink);">{{ poste.volume }}</strong> m³ conformes</span>
+            <span><strong style="color:var(--wp-ink);">{{ poste.arrets }}</strong> arrêts</span>
+            <span><strong style="color:var(--wp-ink);">{{ poste.rendement }}%</strong> rendement</span>
+            {% if poste.trs is not none %}
+            <span><strong style="color:var(--wp-ink);">{{ poste.trs }}%</strong> TRS</span>
+            {% endif %}
+          </div>
+          {% if poste.nb_supplementaires > 0 %}
+          <div class="wp-kpi-sub mt-2">{{ poste.nb_supplementaires }} autre fiche existe pour ce poste.</div>
+          {% endif %}
+          {% endif %}
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>

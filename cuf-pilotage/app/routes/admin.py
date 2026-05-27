@@ -1,6 +1,7 @@
 """
-Routes d'administration — Wood_Pilot_Ebolowa.
-- Paramètres métier : prix essences, objectif, capacité (chef + admin)
+Routes d'administration — wood_pilot.
+- Paramètres opérationnels : objectifs, capacités, seuils (chef + admin)
+- Paramètres financiers : prix et valorisation (admin uniquement)
 - Gestion utilisateurs : CRUD complet (admin uniquement)
 """
 from flask import Blueprint, render_template, redirect, url_for, flash, request
@@ -12,6 +13,32 @@ admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
 ROLES_DISPONIBLES = ['operateur', 'chef', 'pdg', 'admin']
 
+PARAMS_CHEF = [
+    'objectif_m3',
+    'duree_poste',
+    'capacite_equipe_h',
+    'capacite_ayous_h',
+    'capacite_azobe_h',
+    'capacite_iroko_h',
+    'capacite_movingui_h',
+    'seuil_trs_anomalie',
+    'seuil_arret_long_minutes',
+    'seuil_arret_long_commentaire_min',
+    'seuil_declass_pct',
+    'seuil_trs_critique',
+    'seuil_trs_moyen',
+]
+
+PARAMS_ADMIN_ONLY = [
+    'prix_ayous',
+    'prix_azobe',
+    'prix_iroko',
+    'prix_movingui',
+    'taux_revente_rebut',
+    'valeur_dechets_m3',
+    'seuil_manque_eleve',
+]
+
 
 # ── Paramètres métier ─────────────────────────────────────────────────────────
 
@@ -20,10 +47,12 @@ ROLES_DISPONIBLES = ['operateur', 'chef', 'pdg', 'admin']
 @roles_required('chef', 'admin')
 def parametres():
     """Page de configuration des paramètres métier de CUF."""
+    cles_autorisees = list(PARAMS_CHEF)
+    if current_user.role == 'admin':
+        cles_autorisees += PARAMS_ADMIN_ONLY
+
     if request.method == 'POST':
-        cles = ['prix_ayous', 'prix_azobe', 'prix_iroko', 'prix_movingui',
-                'objectif_m3', 'duree_poste', 'capacite_equipe_h', 'taux_revente_rebut']
-        for cle in cles:
+        for cle in cles_autorisees:
             valeur = request.form.get(cle)
             if valeur:
                 p = Parametre.query.filter_by(cle=cle).first()
@@ -36,7 +65,11 @@ def parametres():
         return redirect(url_for('admin.parametres'))
 
     params = {p.cle: p for p in Parametre.query.all()}
-    return render_template('admin/parametres.html', params=params)
+    return render_template(
+        'admin/parametres.html',
+        params=params,
+        peut_modifier_finance=current_user.role == 'admin',
+    )
 
 
 # ── Gestion utilisateurs (admin uniquement) ───────────────────────────────────

@@ -4,6 +4,8 @@
 
 {% block content %}
 
+{% include 'chef/_aujourdhui.html' %}
+
 {# ── Barre d'actions ── #}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
   <div class="d-flex gap-2 align-items-center flex-wrap">
@@ -54,8 +56,6 @@
     </ul>
   </div>
 </div>
-
-{% include 'chef/_alertes.html' %}
 
 {% if not postes %}
 <div class="wp-card p-4 text-center">
@@ -139,10 +139,12 @@
       <div class="wp-kpi-label" style="margin-bottom:6px;">Répartition par règle</div>
       <div class="d-flex gap-2 flex-wrap" style="font-size:.78rem;">
         {% set libelle = {'R1': 'TRS bas sans arrêt', 'R2': 'Arrêt sans commentaire',
-                         'R3': 'Déclassé excessif', 'R4': 'Production absente'} %}
+                         'R3': 'Déclassé excessif', 'R4': 'Production absente',
+                         'R5': 'Horaire arrêt invalide', 'R6': 'Chevauchement machine',
+                         'R7': 'Créneau essence invalide', 'R8': 'Chevauchement essence'} %}
         {% for code, n in anomalies_periode.par_code.items() if n > 0 %}
         <span class="wp-pill" style="background:#fff4e0;color:var(--wp-ochre);">
-          <strong>{{ code }}</strong> · {{ libelle[code] }} : {{ n }}
+          <strong>{{ code }}</strong> · {{ libelle.get(code, code) }} : {{ n }}
         </span>
         {% endfor %}
       </div>
@@ -423,6 +425,10 @@
           </td>
           {% elif cell.state == 'brouillon' %}
           <td class="text-center"><span class="wp-pill wp-pill-warning">⏳</span></td>
+          {% elif cell.state == 'a_verifier' %}
+          <td class="text-center"><span class="wp-pill wp-pill-info">À vérif.</span></td>
+          {% elif cell.state == 'a_corriger' %}
+          <td class="text-center"><span class="wp-pill wp-pill-warning">Corr.</span></td>
           {% else %}
           <td class="text-center" style="color:var(--wp-muted);">—</td>
           {% endif %}
@@ -437,6 +443,8 @@
     <span><span class="wp-pill wp-pill-warning">55%</span> 50–69%</span>
     <span><span class="wp-pill wp-pill-danger">42%</span> &lt;50%</span>
     <span><span class="wp-pill wp-pill-warning">⏳</span> Brouillon</span>
+    <span><span class="wp-pill wp-pill-info">À vérif.</span> Non compté</span>
+    <span><span class="wp-pill wp-pill-warning">Corr.</span> À corriger</span>
   </div>
 </div>
 {% endif %}
@@ -480,15 +488,42 @@
         </a>
       </div>
       <table class="wp-table">
-        <thead><tr><th>Essence</th><th>Volume</th><th>TRS moy.</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Essence</th>
+            <th>Volume</th>
+            <th>Temps</th>
+            <th>Arrêts</th>
+            <th>TRS moy.</th>
+          </tr>
+        </thead>
         <tbody>
           {% for e in stats.essence_stats %}
           <tr>
             <td><span class="wp-essence"><span class="wp-essence-mark"><i class="bi bi-tree"></i></span>{{ e.essence }}</span></td>
             <td>{{ e.volume_total }} m³</td>
             <td>
+              {% if e.mode == 'temporalise' %}
+                {{ (e.temps_planifie // 60)|int }}h{{ '%02d'|format(e.temps_planifie % 60) }}
+              {% else %}
+                <span style="color:var(--wp-muted);">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if e.mode == 'temporalise' %}
+                {{ (e.duree_arrets // 60)|int }}h{{ '%02d'|format(e.duree_arrets % 60) }}
+              {% else %}
+                <span style="color:var(--wp-muted);">poste</span>
+              {% endif %}
+            </td>
+            <td>
               {% set ce = 'var(--wp-leaf)' if e.trs_moyen >= 70 else ('var(--wp-ochre)' if e.trs_moyen >= 50 else 'var(--wp-terracotta)') %}
               <strong style="color:{{ ce }};">{{ e.trs_moyen }}%</strong>
+              {% if e.mode == 'temporalise' %}
+                <div style="font-size:.68rem;color:var(--wp-muted);">D {{ e.disponibilite }} · P {{ e.performance }} · Q {{ e.qualite }}</div>
+              {% else %}
+                <div style="font-size:.68rem;color:var(--wp-muted);">ancien calcul</div>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}

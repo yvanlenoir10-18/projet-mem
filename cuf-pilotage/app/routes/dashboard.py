@@ -6,18 +6,22 @@ Routes des tableaux de bord.
 """
 from collections import defaultdict
 import statistics
-from flask import Blueprint, render_template, request, send_file, abort
-from flask_login import login_required, current_user
-from datetime import date, timedelta
+from flask import Blueprint, render_template, request, send_file, abort, url_for
+from flask_login import login_required
+from datetime import date, datetime, timedelta
 import io
-from ..models import db, Equipe, Parametre
+from ..models import (
+    db, User, Equipe, Parametre, STATUT_A_CORRIGER, STATUT_A_VERIFIER,
+    STATUT_BROUILLON, STATUT_VALIDE_CHEF, STATUT_VERROUILLE,
+    STATUTS_ANALYSES, STATUTS_NON_ANALYSES,
+)
 from ..services.trs import (
     pareto_arrets, couleur_trs,
     calcule_pertes_equipe, calcule_pertes_fcfa, decompose_dpq,
-    calcule_manque_gagner, manque_a_gagner_agrege,
+    calcule_manque_gagner, manque_a_gagner_agrege, calcule_trs_par_essence,
 )
 from ..services.export import generer_rapport_excel
-from ..services.controles_saisie import compte_anomalies_periode
+from ..services.controles_saisie import compte_anomalies_periode, detecte_anomalies
 from ..services.cumuls import vue_executive_pdg
 from ..services.recommandations import top_n_recommandations
 from ..utils import roles_required
@@ -40,6 +44,21 @@ def _format_duree(minutes):
     return f"{h}h{m:02d}"
 
 
+def _commentaires_validation(equipe):
+    commentaires = []
+    if equipe.notes and equipe.notes.strip():
+        commentaires.append(equipe.notes.strip())
+    for arret in equipe.arrets:
+        if arret.notes and arret.notes.strip():
+            commentaires.append(
+                f"{arret.machine} {arret.heure_debut}-{arret.heure_fin} : {arret.notes.strip()}"
+            )
+    return {
+        'nb': len(commentaires),
+        'extrait': commentaires[0][:120] if commentaires else '',
+    }
+
+
 def _mois_disponibles(n=12):
     aujourd_hui = date.today()
     result = []
@@ -54,9 +73,57 @@ def _mois_disponibles(n=12):
     return result
 
 
-_STATUTS_ANALYSES = ('soumis', 'verrouille')
+_STATUTS_ANALYSES = STATUTS_ANALYSES
 
 _LABELS_JOURS_FR = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
+_SHIFTS_JOUR = ('Matin', 'Apres-midi')
+
+
+def _safe_float_param(cle, defaut):
+    try:
+        return float(Parametre.get(cle, defaut))
+    except (TypeError, ValueError):
+        return float(defaut)
+
+
+def _couleur_objectif(pct):
+    if pct >= 100:
+        return 'success'
+    if pct >= 75:
+        return 'warning'
+    return 'danger'
+
+
+def _couleur_simple(valeur, seuil_warning, seuil_danger, inverse=False):
+    if inverse:
+        if valeur > seuil_danger:
+            return 'danger'
+        if valeur >= seuil_warning:
+            return 'warning'
+        return 'success'
+    if valeur >= seuil_danger:
+        return 'success'
+    if valeur >= seuil_warning:
+        return 'warning'
+    return 'danger'
+
+
+def _poste_actif_maintenant():
+    maintenant = datetime.now()
+    minute_jour = maintenant.hour * 60 + maintenant.minute
+    if 6 * 60 <= minute_jour < 14 * 60:
+        return 'Matin', max(1, minute_jour - 6 * 60)
+    if 14 * 60 <= minute_jour < 22 * 60:
+        return 'Apres-midi', max(1, minute_jour - 14 * 60)
+    return None, 0
+
+
+def _equipes_jour_pilotage(aujourd_hui):
+    statuts = tuple(dict.fromkeys((STATUT_A_VERIFIER, *STATUTS_ANALYSES)))
+    return Equipe.query.filter(
+        Equipe.date == aujourd_hui,
+        Equipe.statut.in_(statuts),
+    ).order_by(Equipe.numero_equipe.asc(), Equipe.cree_le.desc()).all()
 
 
 def _alertes_chef(aujourd_hui):
@@ -90,11 +157,10 @@ def _alertes_chef(aujourd_hui):
         if (d, s) not in postes_existants
     ]
 
-    # P7-A2 — Brouillons oubliés (créés il y a plus de 2 jours par l'utilisateur courant)
+    # P7-A2 — Brouillons oubliés (créés il y a plus de 2 jours, tous opérateurs)
     seuil_brouillon = aujourd_hui - timedelta(days=2)
     brouillons_oublies_q = Equipe.query.filter(
-        Equipe.user_id == current_user.id,
-        Equipe.statut == 'brouillon',
+        Equipe.statut == STATUT_BROUILLON,
         Equipe.date <= seuil_brouillon,
     ).order_by(Equipe.date.asc()).all()
 
@@ -108,9 +174,379 @@ def _alertes_chef(aujourd_hui):
         for e in brouillons_oublies_q
     ]
 
+    fiches_a_verifier = []
+    for e in Equipe.query.filter(
+        Equipe.statut == STATUT_A_VERIFIER
+    ).order_by(Equipe.date.desc(), Equipe.cree_le.desc()).limit(20).all():
+        anomalies = detecte_anomalies(e)
+        commentaires = _commentaires_validation(e)
+        fiches_a_verifier.append({
+            'id':       e.id,
+            'date_fmt': f"{_LABELS_JOURS_FR[e.date.weekday()]} {e.date.strftime('%d/%m')}",
+            'shift':    e.numero_equipe,
+            'operateur': e.operateur_nom or e.saisie_par.nom,
+            'nb_commentaires': commentaires['nb'],
+            'commentaire_extrait': commentaires['extrait'],
+            'nb_anomalies': len(anomalies),
+            'codes_anomalies': ', '.join(a.get('code', '?') for a in anomalies[:3]),
+            'priorite': len(anomalies) * 2 + commentaires['nb'],
+        })
+    fiches_a_verifier.sort(key=lambda f: f['priorite'], reverse=True)
+    fiches_a_verifier = fiches_a_verifier[:8]
+
     return {
         'saisies_manquantes': saisies_manquantes,
         'brouillons_oublies': brouillons_oublies,
+        'fiches_a_verifier': fiches_a_verifier,
+    }
+
+
+def _kpi_aujourdhui(aujourd_hui):
+    equipes_jour = _equipes_jour_pilotage(aujourd_hui)
+    objectif_poste = _safe_float_param('objectif_m3', 12.5)
+    objectif_jour = objectif_poste * 2
+
+    volume_conforme = sum(e.volume_conforme for e in equipes_jour)
+    volume_declass = sum(e.volume_declass for e in equipes_jour)
+    volume_entree = sum(e.volume_entree for e in equipes_jour)
+    volume_sorti = volume_conforme + volume_declass
+
+    pct_objectif = round((volume_conforme / objectif_jour) * 100, 1) if objectif_jour else 0
+    ecart_m3 = round(volume_conforme - objectif_jour, 2)
+    ecart_pct = round(((volume_conforme - objectif_jour) / objectif_jour) * 100, 1) if objectif_jour else 0
+
+    fiches_attente = Equipe.query.filter(Equipe.statut == STATUT_A_VERIFIER).all()
+    fiches_critiques = sum(
+        1 for fiche in fiches_attente
+        if any(a.get('niveau') == 'danger' for a in detecte_anomalies(fiche))
+    )
+
+    machine_stats = defaultdict(int)
+    for equipe in equipes_jour:
+        for arret in equipe.arrets:
+            machine_stats[arret.machine] += arret.duree_min or 0
+    machine_impact = None
+    if machine_stats:
+        machine, duree = max(machine_stats.items(), key=lambda item: item[1])
+        machine_impact = {'nom': machine, 'duree': duree, 'duree_fmt': _format_duree(duree)}
+
+    total_arrets = sum(e.duree_totale_arrets for e in equipes_jour)
+    rendement = round((volume_sorti / volume_entree) * 100, 1) if volume_entree else 0
+    seuil_rendement = _safe_float_param('seuil_rendement_min', 65)
+
+    depuis_7j = aujourd_hui - timedelta(days=7)
+    equipes_7j = Equipe.query.filter(
+        Equipe.date >= depuis_7j,
+        Equipe.date < aujourd_hui,
+        Equipe.statut.in_(STATUTS_ANALYSES),
+    ).all()
+    entree_7j = sum(e.volume_entree for e in equipes_7j)
+    sorti_7j = sum(e.volume_sorti for e in equipes_7j)
+    rendement_7j = round((sorti_7j / entree_7j) * 100, 1) if entree_7j else None
+
+    seuil_declass = _safe_float_param('seuil_declass_pct', 30)
+    declass_pct = round((volume_declass / volume_sorti) * 100, 1) if volume_sorti else 0
+    if declass_pct > seuil_declass:
+        couleur_declass = 'danger'
+    elif declass_pct >= seuil_declass * 0.8:
+        couleur_declass = 'warning'
+    else:
+        couleur_declass = 'success'
+
+    trs_vals = [e.trs_global for e in equipes_jour if e.trs_global is not None]
+    trs_jour = round(sum(trs_vals) / len(trs_vals), 1) if trs_vals else None
+
+    shift_actif, minutes_ecoulees = _poste_actif_maintenant()
+    projection = None
+    if shift_actif:
+        fiches_actives = Equipe.query.filter(
+            Equipe.date == aujourd_hui,
+            Equipe.numero_equipe == shift_actif,
+            Equipe.statut.in_((STATUT_BROUILLON, STATUT_A_VERIFIER)),
+        ).all()
+        volume_actif = sum(e.volume_conforme for e in fiches_actives)
+        if volume_actif > 0 and minutes_ecoulees > 0:
+            projection = {
+                'shift': shift_actif,
+                'volume': round(volume_actif * (480 / minutes_ecoulees), 1),
+                'minutes_ecoulees': minutes_ecoulees,
+            }
+
+    volume_attente = sum(e.volume_conforme for e in equipes_jour if e.statut == STATUT_A_VERIFIER)
+
+    return {
+        'objectif': {
+            'realise': round(volume_conforme, 2),
+            'objectif': round(objectif_jour, 2),
+            'pct': pct_objectif,
+            'pct_barre': min(100, pct_objectif),
+            'ecart_m3': ecart_m3,
+            'ecart_pct': ecart_pct,
+            'couleur': _couleur_objectif(pct_objectif),
+            'projection': projection,
+            'volume_attente': round(volume_attente, 2),
+        },
+        'fiches': {
+            'attente': len(fiches_attente),
+            'critiques': fiches_critiques,
+            'couleur': 'danger' if fiches_critiques else ('warning' if fiches_attente else 'success'),
+        },
+        'arrets': {
+            'minutes': total_arrets,
+            'duree_fmt': _format_duree(total_arrets),
+            'machine_impact': machine_impact,
+            'couleur': _couleur_simple(total_arrets, 60, 120, inverse=True),
+        },
+        'rendement': {
+            'valeur': rendement,
+            'seuil': seuil_rendement,
+            'moyenne_7j': rendement_7j,
+            'couleur': _couleur_simple(rendement, seuil_rendement * 0.9, seuil_rendement),
+        },
+        'declass': {
+            'valeur': declass_pct,
+            'seuil': seuil_declass,
+            'couleur': couleur_declass,
+        },
+        'trs': {
+            'valeur': trs_jour,
+            'couleur': couleur_trs(trs_jour or 0),
+        },
+    }
+
+
+def _postes_du_jour(aujourd_hui):
+    equipes = Equipe.query.filter(
+        Equipe.date == aujourd_hui
+    ).order_by(Equipe.cree_le.desc()).all()
+    par_shift = defaultdict(list)
+    for equipe in equipes:
+        par_shift[equipe.numero_equipe].append(equipe)
+
+    labels_statut = {
+        STATUT_BROUILLON: ('Brouillon', 'warning'),
+        STATUT_A_VERIFIER: ('Chez le chef', 'info'),
+        STATUT_A_CORRIGER: ('À corriger', 'warning'),
+        STATUT_VALIDE_CHEF: ('Validée chef', 'success'),
+        STATUT_VERROUILLE: ('Clôturée', 'secondary'),
+    }
+
+    postes = []
+    for shift in _SHIFTS_JOUR:
+        equipe = par_shift.get(shift, [None])[0]
+        if equipe is None:
+            postes.append({
+                'shift': shift,
+                'existe': False,
+                'statut_label': 'Non saisi',
+                'statut_couleur': 'secondary',
+                'href': url_for('saisie.historique'),
+            })
+            continue
+
+        statut_label, statut_couleur = labels_statut.get(equipe.statut, (equipe.statut, 'secondary'))
+        rendement = round((equipe.volume_sorti / equipe.volume_entree) * 100, 1) if equipe.volume_entree else 0
+        postes.append({
+            'shift': shift,
+            'existe': True,
+            'id': equipe.id,
+            'statut_label': statut_label,
+            'statut_couleur': statut_couleur,
+            'operateur': equipe.operateur_nom or (equipe.saisie_par.nom if equipe.saisie_par else 'Non renseigné'),
+            'essences': equipe.essences_label or 'Aucune essence',
+            'volume': round(equipe.volume_conforme, 2),
+            'arrets': _format_duree(equipe.duree_totale_arrets),
+            'rendement': rendement,
+            'trs': equipe.trs_global,
+            'href': url_for('saisie.detail_poste', poste_id=equipe.id),
+            'nb_supplementaires': max(0, len(par_shift.get(shift, [])) - 1),
+        })
+    return postes
+
+
+def _actions_immediates(aujourd_hui, alertes):
+    actions = []
+
+    fiches = list(alertes.get('fiches_a_verifier', [])) if alertes else []
+    for fiche in fiches[:5]:
+        niveau = 'danger' if fiche.get('nb_anomalies', 0) else 'warning'
+        detail = f"{fiche['date_fmt']} · {fiche['shift']} · {fiche['operateur']}"
+        if fiche.get('nb_anomalies', 0):
+            detail += f" · {fiche['nb_anomalies']} alerte(s)"
+        actions.append({
+            'niveau': niveau,
+            'icon': 'bi-shield-exclamation' if niveau == 'danger' else 'bi-clipboard-check',
+            'titre': 'Fiche à contrôler',
+            'detail': detail,
+            'href': url_for('saisie.detail_poste', poste_id=fiche['id']),
+            'cta': 'Ouvrir',
+            'priorite': 100 if niveau == 'danger' else 80,
+        })
+
+    corrections = Equipe.query.filter(Equipe.statut == STATUT_A_CORRIGER).count()
+    if corrections:
+        actions.append({
+            'niveau': 'info',
+            'icon': 'bi-arrow-return-left',
+            'titre': 'Fiches renvoyées en correction',
+            'detail': f"{corrections} fiche(s) attendent un retour opérateur.",
+            'href': url_for('dashboard.fiches_chef', statut=STATUT_A_CORRIGER),
+            'cta': 'Suivre',
+            'priorite': 50,
+        })
+
+    manquants = list(alertes.get('saisies_manquantes', [])) if alertes else []
+    if manquants:
+        actions.append({
+            'niveau': 'warning',
+            'icon': 'bi-calendar-x',
+            'titre': 'Postes non saisis',
+            'detail': f"{len(manquants)} poste(s) manquant(s) sur les 7 derniers jours.",
+            'href': url_for('dashboard.fiches_chef', statut='tous'),
+            'cta': 'Voir',
+            'priorite': 60,
+        })
+
+    brouillons = list(alertes.get('brouillons_oublies', [])) if alertes else []
+    if brouillons:
+        actions.append({
+            'niveau': 'info',
+            'icon': 'bi-hourglass-split',
+            'titre': 'Brouillons anciens',
+            'detail': f"{len(brouillons)} brouillon(s) ont plus de 2 jours.",
+            'href': url_for('dashboard.fiches_chef', statut=STATUT_BROUILLON),
+            'cta': 'Suivre',
+            'priorite': 40,
+        })
+
+    actions.sort(key=lambda item: item['priorite'], reverse=True)
+    return actions[:8]
+
+
+def _statut_fiche_chef(statut):
+    labels = {
+        STATUT_BROUILLON: ('Brouillon', 'warning'),
+        STATUT_A_VERIFIER: ('Chez le chef', 'info'),
+        STATUT_A_CORRIGER: ('À corriger', 'warning'),
+        STATUT_VALIDE_CHEF: ('Validée', 'success'),
+        STATUT_VERROUILLE: ('Clôturée', 'secondary'),
+    }
+    return labels.get(statut, (statut or 'Inconnu', 'secondary'))
+
+
+def _periode_fiches_chef(periode):
+    aujourd_hui = date.today()
+    if periode == 'aujourd_hui':
+        return aujourd_hui, aujourd_hui, "Aujourd'hui"
+    if periode == 'semaine':
+        return aujourd_hui - timedelta(days=aujourd_hui.weekday()), aujourd_hui, "Cette semaine"
+    if periode == 'mois':
+        return date(aujourd_hui.year, aujourd_hui.month, 1), aujourd_hui, "Ce mois"
+    if periode == 'tout':
+        return None, None, "Toutes les dates"
+    return aujourd_hui - timedelta(days=30), aujourd_hui, "30 derniers jours"
+
+
+def _action_fiche_chef(equipe):
+    if equipe.statut == STATUT_A_VERIFIER:
+        return {'label': 'Contrôler', 'couleur': 'primary'}
+    if equipe.statut == STATUT_A_CORRIGER:
+        return {'label': 'Suivre', 'couleur': 'warning'}
+    if equipe.statut == STATUT_BROUILLON:
+        return {'label': 'Voir brouillon', 'couleur': 'secondary'}
+    return {'label': 'Voir', 'couleur': 'outline-secondary'}
+
+
+def _fiches_chef_query(filtres):
+    query = Equipe.query
+
+    debut, fin, label = _periode_fiches_chef(filtres['periode'])
+    if debut:
+        query = query.filter(Equipe.date >= debut)
+    if fin:
+        query = query.filter(Equipe.date <= fin)
+
+    statut = filtres['statut']
+    if statut == 'validees':
+        query = query.filter(Equipe.statut.in_((STATUT_VALIDE_CHEF, STATUT_VERROUILLE)))
+    elif statut in (STATUT_BROUILLON, STATUT_A_VERIFIER, STATUT_A_CORRIGER, STATUT_VALIDE_CHEF, STATUT_VERROUILLE):
+        query = query.filter(Equipe.statut == statut)
+
+    if filtres['equipe'] in ('Matin', 'Apres-midi'):
+        query = query.filter(Equipe.numero_equipe == filtres['equipe'])
+
+    if filtres['operateur_id']:
+        query = query.filter(Equipe.user_id == filtres['operateur_id'])
+
+    return query.order_by(Equipe.date.desc(), Equipe.cree_le.desc()).all(), label
+
+
+def _ligne_fiche_chef(equipe):
+    anomalies = detecte_anomalies(equipe)
+    nb_bloquantes = sum(1 for a in anomalies if a.get('niveau') == 'danger')
+    nb_warnings = sum(1 for a in anomalies if a.get('niveau') == 'warning')
+    statut_label, statut_couleur = _statut_fiche_chef(equipe.statut)
+    action = _action_fiche_chef(equipe)
+
+    return {
+        'id': equipe.id,
+        'date': equipe.date,
+        'date_fmt': equipe.date.strftime('%d/%m/%Y') if equipe.date else '—',
+        'equipe': equipe.numero_equipe,
+        'operateur': equipe.operateur_nom or (equipe.saisie_par.nom if equipe.saisie_par else 'Non renseigné'),
+        'rempli_par': equipe.rempli_par_nom or (equipe.saisie_par.nom if equipe.saisie_par else 'Non renseigné'),
+        'essences': equipe.essences_label or '—',
+        'volume': round(equipe.volume_conforme, 2),
+        'volume_sorti': round(equipe.volume_sorti, 2),
+        'trs': equipe.trs_global,
+        'arrets_min': equipe.duree_totale_arrets,
+        'arrets_fmt': _format_duree(equipe.duree_totale_arrets),
+        'statut': equipe.statut,
+        'statut_label': statut_label,
+        'statut_couleur': statut_couleur,
+        'nb_anomalies': len(anomalies),
+        'nb_bloquantes': nb_bloquantes,
+        'nb_warnings': nb_warnings,
+        'premiere_anomalie': anomalies[0]['titre'] if anomalies else '',
+        'action': action,
+        'href': url_for('saisie.detail_poste', poste_id=equipe.id),
+        'search_blob': ' '.join([
+            str(equipe.id),
+            equipe.date.isoformat() if equipe.date else '',
+            equipe.numero_equipe or '',
+            equipe.operateur_nom or '',
+            equipe.rempli_par_nom or '',
+            equipe.essences_label or '',
+            ' '.join(a.machine for a in equipe.arrets),
+            ' '.join(a.cause for a in equipe.arrets),
+        ]).lower(),
+    }
+
+
+def _filtrer_lignes_fiches(lignes, filtres):
+    recherche = filtres['q'].lower()
+    niveau = filtres['anomalies']
+
+    if recherche:
+        lignes = [l for l in lignes if recherche in l['search_blob']]
+    if niveau == 'bloquantes':
+        lignes = [l for l in lignes if l['nb_bloquantes'] > 0]
+    elif niveau == 'avertissements':
+        lignes = [l for l in lignes if l['nb_warnings'] > 0 and l['nb_bloquantes'] == 0]
+    elif niveau == 'sans':
+        lignes = [l for l in lignes if l['nb_anomalies'] == 0]
+    return lignes
+
+
+def _compteurs_fiches_chef(lignes):
+    return {
+        'total': len(lignes),
+        'a_verifier': sum(1 for l in lignes if l['statut'] == STATUT_A_VERIFIER),
+        'a_corriger': sum(1 for l in lignes if l['statut'] == STATUT_A_CORRIGER),
+        'brouillons': sum(1 for l in lignes if l['statut'] == STATUT_BROUILLON),
+        'validees': sum(1 for l in lignes if l['statut'] in (STATUT_VALIDE_CHEF, STATUT_VERROUILLE)),
+        'bloquantes': sum(1 for l in lignes if l['nb_bloquantes'] > 0),
+        'warnings': sum(1 for l in lignes if l['nb_warnings'] > 0),
     }
 
 
@@ -128,6 +564,10 @@ def _get_equipes_periode(jours=30):
 def vue_chef():
     aujourd_hui = date.today()
     jours = int(request.args.get('jours', 30))
+    alertes = _alertes_chef(aujourd_hui)
+    kpi_jour = _kpi_aujourdhui(aujourd_hui)
+    postes_du_jour = _postes_du_jour(aujourd_hui)
+    actions_immediates = _actions_immediates(aujourd_hui, alertes)
 
     try:
         mois_sel  = int(request.args.get('mois',  0))
@@ -159,7 +599,10 @@ def vue_chef():
                                regularite=None, gain_potentiel=None,
                                mode_mois=mode_mois, label_periode=label_periode,
                                mois_options=_mois_disponibles(),
-                               alertes=_alertes_chef(aujourd_hui))
+                               kpi_jour=kpi_jour,
+                               postes_du_jour=postes_du_jour,
+                               actions_immediates=actions_immediates,
+                               alertes=alertes)
 
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen    = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
@@ -167,25 +610,7 @@ def vue_chef():
     total_declass = round(sum(e.volume_declass for e in equipes), 2)
     total_arrets  = sum(e.duree_totale_arrets for e in equipes)
 
-    # TRS par essence (agrège sur les lignes de production)
-    par_essence = {}
-    for e in equipes:
-        for p in e.productions:
-            if p.essence not in par_essence:
-                par_essence[p.essence] = {'volumes': [], 'trs': []}
-            par_essence[p.essence]['volumes'].append(p.volume_conforme + p.volume_declass)
-        if e.trs_global:
-            for p in e.productions:
-                par_essence[p.essence]['trs'].append(e.trs_global)
-
-    essence_stats = []
-    for essence, data in par_essence.items():
-        trs_e = data['trs']
-        essence_stats.append({
-            'essence': essence,
-            'volume_total': round(sum(data['volumes']), 2),
-            'trs_moyen': round(sum(trs_e) / len(trs_e), 1) if trs_e else 0,
-        })
+    essence_stats = calcule_trs_par_essence(equipes)
 
     matin      = [e for e in equipes if e.numero_equipe == 'Matin']
     apres_midi = [e for e in equipes if e.numero_equipe == 'Apres-midi']
@@ -321,8 +746,12 @@ def vue_chef():
             eq = index_eq.get((jour, shift))
             if eq is None:
                 cellules[shift] = {'state': 'absent', 'display': '—', 'couleur': 'secondary'}
-            elif eq.statut == 'brouillon':
+            elif eq.statut == STATUT_BROUILLON:
                 cellules[shift] = {'state': 'brouillon', 'display': '⏳', 'couleur': 'warning'}
+            elif eq.statut == STATUT_A_VERIFIER:
+                cellules[shift] = {'state': 'a_verifier', 'display': 'Chez le chef', 'couleur': 'info'}
+            elif eq.statut == STATUT_A_CORRIGER:
+                cellules[shift] = {'state': 'a_corriger', 'display': 'À corriger', 'couleur': 'warning'}
             else:
                 trs = eq.trs_global or 0
                 if trs >= 70:
@@ -379,8 +808,6 @@ def vue_chef():
                 'couleur': couleur_cell,
             }
 
-    alertes = _alertes_chef(aujourd_hui)
-
     # P11 — Manque à gagner estimé agrégé sur la période (CA potentiel − CA valorisé)
     manque_periode = manque_a_gagner_agrege(equipes)
 
@@ -409,7 +836,56 @@ def vue_chef():
                            manque_periode=manque_periode,
                            anomalies_periode=anomalies_periode,
                            top_recos=top_recos,
+                           kpi_jour=kpi_jour,
+                           postes_du_jour=postes_du_jour,
+                           actions_immediates=actions_immediates,
                            alertes=alertes)
+
+
+@dashboard_bp.route('/chef/fiches')
+@login_required
+@roles_required('chef', 'admin')
+def fiches_chef():
+    """Liste de contrôle des fiches côté chef scierie."""
+    filtres = {
+        'statut': request.args.get('statut', STATUT_A_VERIFIER).strip(),
+        'periode': request.args.get('periode', '30j').strip(),
+        'equipe': request.args.get('equipe', '').strip(),
+        'operateur_id': request.args.get('operateur_id', '').strip(),
+        'anomalies': request.args.get('anomalies', '').strip(),
+        'q': request.args.get('q', '').strip(),
+    }
+    try:
+        filtres['operateur_id'] = int(filtres['operateur_id']) if filtres['operateur_id'] else None
+    except ValueError:
+        filtres['operateur_id'] = None
+
+    equipes, label_periode_fiches = _fiches_chef_query(filtres)
+    lignes_base = [_ligne_fiche_chef(equipe) for equipe in equipes]
+    compteurs_base = _compteurs_fiches_chef(lignes_base)
+    lignes = _filtrer_lignes_fiches(lignes_base, filtres)
+    compteurs_resultats = _compteurs_fiches_chef(lignes)
+
+    utilisateurs = User.query.filter(
+        User.role.in_(('operateur', 'chef', 'admin'))
+    ).order_by(User.nom.asc()).all()
+
+    return render_template(
+        'chef/fiches.html',
+        fiches=lignes,
+        compteurs_base=compteurs_base,
+        compteurs_resultats=compteurs_resultats,
+        filtres=filtres,
+        label_periode=label_periode_fiches,
+        utilisateurs=utilisateurs,
+        statuts={
+            STATUT_A_VERIFIER: 'Chez le chef',
+            STATUT_A_CORRIGER: 'À corriger',
+            STATUT_BROUILLON: 'Brouillons',
+            'validees': 'Validées / clôturées',
+            'tous': 'Tous les statuts',
+        },
+    )
 
 
 @dashboard_bp.route('/pdg')
@@ -455,7 +931,7 @@ def vue_pdg():
 
     nb_brouillons = Equipe.query.filter(
         Equipe.date >= debut, Equipe.date < fin,
-        Equipe.statut == 'brouillon'
+        Equipe.statut.in_(STATUTS_NON_ANALYSES)
     ).count()
 
     prix_manquants = any(
@@ -596,7 +1072,8 @@ def pertes():
     par_shift     = {'Matin': {'perte_p': 0.0, 'nb': 0}, 'Apres-midi': {'perte_p': 0.0, 'nb': 0}}
 
     capacite_h   = float(Parametre.get('capacite_equipe_h', 1.5625))
-    taux_revente = float(Parametre.get('taux_revente_rebut', 0.30))
+    taux_revente = float(Parametre.get('taux_revente_rebut', 0.70))
+    valeur_dechets_m3 = float(Parametre.get('valeur_dechets_m3', 0))
 
     for e in equipes:
         pertes_e = calcule_pertes_equipe(e)
@@ -620,28 +1097,31 @@ def pertes():
             prix_moyen = 0.0
 
         for a in e.arrets:
-            if not a.duree_min or a.categorie == 'Maintenance planifiée':
+            duree_impact = a.duree_impact_min
+            if not duree_impact:
                 continue
-            perte_arret = (a.duree_min / 60) * capacite_h * prix_moyen
+            perte_arret = (duree_impact / 60) * capacite_h * prix_moyen
             m = a.machine
             if m not in par_machine:
                 par_machine[m] = {'perte': 0.0, 'duree': 0, 'count': 0, 'arrets': []}
             par_machine[m]['perte'] += perte_arret
-            par_machine[m]['duree'] += a.duree_min
+            par_machine[m]['duree'] += duree_impact
             par_machine[m]['count'] += 1
             par_machine[m]['arrets'].append({
                 'date':        e.date.strftime('%d/%m/%Y'),
                 'equipe':      e.numero_equipe,
                 'cause':       a.cause,
                 'categorie':   a.categorie,
-                'duree':       a.duree_min,
+                'duree':       duree_impact,
+                'duree_reelle': a.duree_min,
+                'duree_prevue': a.duree_prevue_min,
                 'perte':       int(perte_arret),
             })
 
         # Perte Q par essence (déclassé + déchets séparés)
         for pr in e.productions:
             pq_d  = pr.volume_declass  * _prix_production(pr) * (1 - taux_revente)
-            pq_ch = pr.volume_dechets  * _prix_production(pr)
+            pq_ch = pr.volume_dechets  * max(0, _prix_production(pr) - valeur_dechets_m3)
             ess   = pr.essence
             if ess not in par_essence_q:
                 par_essence_q[ess] = {
@@ -710,7 +1190,7 @@ def export_excel():
 
     nb_brouillons = Equipe.query.filter(
         Equipe.date >= debut, Equipe.date < fin,
-        Equipe.statut == 'brouillon'
+        Equipe.statut.in_(STATUTS_NON_ANALYSES)
     ).count()
 
     contenu = generer_rapport_excel(equipes, mois, annee, nb_brouillons)

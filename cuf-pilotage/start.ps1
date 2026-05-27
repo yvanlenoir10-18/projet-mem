@@ -1,8 +1,8 @@
-# Script de démarrage CUF Pilotage — Windows
+# wood_pilot
 # Usage : clic droit sur start.ps1 > "Exécuter avec PowerShell"
 # OU dans PowerShell : .\start.ps1
 
-Write-Host "=== CUF Pilotage - Démarrage ===" -ForegroundColor Green
+Write-Host "=== wood_pilot ===" -ForegroundColor Green
 Write-Host ""
 Write-Host " Pour activer le module IA (recommandations P14) :" -ForegroundColor Gray
 Write-Host "   1. Créez un fichier .env dans ce dossier" -ForegroundColor Gray

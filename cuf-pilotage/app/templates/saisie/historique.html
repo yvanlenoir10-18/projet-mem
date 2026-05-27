@@ -8,7 +8,7 @@
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
     <h1 style="font-size:1.35rem;font-weight:800;color:var(--wp-ink);margin:0;">
-      Équipes enregistrées
+      {% if current_user.role == 'operateur' %}Mes fiches de saisie{% else %}Équipes enregistrées{% endif %}
     </h1>
     <p style="color:var(--wp-muted);font-size:.82rem;margin:4px 0 0;">
       Chaîne 4 · Scierie CUF Ebolowa
@@ -29,6 +29,167 @@
     {% endif %}
   </div>
 </div>
+
+{% if current_user.role == 'operateur' %}
+<form method="GET" action="{{ url_for('saisie.historique') }}" class="wp-card mb-4">
+  <div class="wp-card-header" style="justify-content:space-between;">
+    <span style="display:flex;align-items:center;gap:8px;">
+      <i class="bi bi-funnel" style="color:var(--wp-sky);"></i>
+      Filtrer mes fiches
+    </span>
+    <a href="{{ url_for('saisie.historique') }}"
+       style="font-size:.78rem;font-weight:700;color:var(--wp-emerald);text-decoration:none;">
+      Réinitialiser
+    </a>
+  </div>
+  <div style="padding:16px 20px;">
+    <div class="wp-history-status-nav mb-3">
+      <a href="{{ url_for('saisie.historique') }}"
+         class="{% if not filtres or not filtres.statut %}active{% endif %}">
+        Toutes
+      </a>
+      <a href="{{ url_for('saisie.historique', statut='a_corriger') }}"
+         class="{% if filtres and filtres.statut == 'a_corriger' %}active{% endif %}">
+        À corriger
+      </a>
+      <a href="{{ url_for('saisie.historique', statut='brouillon') }}"
+         class="{% if filtres and filtres.statut == 'brouillon' %}active{% endif %}">
+        Brouillons
+      </a>
+      <a href="{{ url_for('saisie.historique', statut='a_verifier') }}"
+         class="{% if filtres and filtres.statut == 'a_verifier' %}active{% endif %}">
+        Chez le chef
+      </a>
+      <a href="{{ url_for('saisie.historique', statut='valide') }}"
+         class="{% if filtres and filtres.statut == 'valide' %}active{% endif %}">
+        Validées
+      </a>
+    </div>
+    <div class="row g-2 align-items-end">
+      <div class="col-12 col-md-4">
+        <label class="form-label">Jour</label>
+        <input type="date"
+               name="jour"
+               class="form-control"
+               value="{{ filtres.jour if filtres else '' }}">
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Statut</label>
+        <select name="statut" class="form-select">
+          <option value="">Tous</option>
+          <option value="a_corriger" {% if filtres and filtres.statut == 'a_corriger' %}selected{% endif %}>À corriger</option>
+          <option value="brouillon" {% if filtres and filtres.statut == 'brouillon' %}selected{% endif %}>Brouillon</option>
+          <option value="a_verifier" {% if filtres and filtres.statut == 'a_verifier' %}selected{% endif %}>Chez le chef</option>
+          <option value="valide" {% if filtres and filtres.statut == 'valide' %}selected{% endif %}>Validées</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-4">
+        <button type="submit" class="btn btn-primary w-100 d-inline-flex justify-content-center align-items-center gap-2">
+          <i class="bi bi-search"></i>
+          Appliquer
+        </button>
+      </div>
+    </div>
+  </div>
+</form>
+{% else %}
+<form method="GET" action="{{ url_for('saisie.historique') }}" class="wp-card mb-4">
+  <div class="wp-card-header" style="justify-content:space-between;">
+    <span style="display:flex;align-items:center;gap:8px;">
+      <i class="bi bi-funnel" style="color:var(--wp-sky);"></i>
+      Filtres
+    </span>
+    <a href="{{ url_for('saisie.historique') }}"
+       style="font-size:.78rem;font-weight:700;color:var(--wp-emerald);text-decoration:none;">
+      Réinitialiser
+    </a>
+  </div>
+  <div style="padding:16px 20px;">
+    <div class="row g-2 align-items-end">
+      <div class="col-6 col-lg-2">
+        <label class="form-label">Jour</label>
+        <input type="date"
+               name="jour"
+               class="form-control"
+               value="{{ filtres.jour if filtres else '' }}">
+      </div>
+
+      {% if peut_voir_toutes %}
+      <div class="col-6 col-lg-2">
+        <label class="form-label">Opérateur</label>
+        <select name="user_id" class="form-select">
+          <option value="">Tous</option>
+          {% for u in utilisateurs %}
+          <option value="{{ u.id }}" {% if filtres and filtres.user_id == u.id|string %}selected{% endif %}>
+            {{ u.nom }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+
+      <div class="col-6 col-lg-2">
+        <label class="form-label">Statut</label>
+        <select name="statut" class="form-select">
+          <option value="">Tous</option>
+          <option value="brouillon" {% if filtres and filtres.statut == 'brouillon' %}selected{% endif %}>Brouillon</option>
+          <option value="a_corriger" {% if filtres and filtres.statut == 'a_corriger' %}selected{% endif %}>À corriger</option>
+          <option value="a_verifier" {% if filtres and filtres.statut == 'a_verifier' %}selected{% endif %}>Chez le chef</option>
+          <option value="valide_chef" {% if filtres and filtres.statut == 'valide_chef' %}selected{% endif %}>Validée chef</option>
+          <option value="verrouille" {% if filtres and filtres.statut == 'verrouille' %}selected{% endif %}>Clôturée</option>
+        </select>
+      </div>
+
+      <div class="col-6 col-lg-2">
+        <label class="form-label">Essence</label>
+        <select name="essence" class="form-select">
+          <option value="">Toutes</option>
+          {% for essence in essences %}
+          <option value="{{ essence }}" {% if filtres and filtres.essence == essence %}selected{% endif %}>
+            {{ essence }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-6 col-lg-2">
+        <label class="form-label">Poste</label>
+        <select name="poste" class="form-select">
+          <option value="">Tous</option>
+          <option value="Matin" {% if filtres and filtres.poste == 'Matin' %}selected{% endif %}>Matin</option>
+          <option value="Apres-midi" {% if filtres and filtres.poste == 'Apres-midi' %}selected{% endif %}>Après-midi</option>
+        </select>
+      </div>
+
+      <div class="col-6 col-lg-2">
+        <label class="form-label">Saisie</label>
+        <select name="mode_saisie" class="form-select">
+          <option value="">Toutes</option>
+          <option value="directe" {% if filtres and filtres.mode_saisie == 'directe' %}selected{% endif %}>Application</option>
+          <option value="papier" {% if filtres and filtres.mode_saisie == 'papier' %}selected{% endif %}>Papier</option>
+        </select>
+      </div>
+
+      <div class="col-6 col-lg-2">
+        <label class="form-label">Commentaires</label>
+        <select name="commentaires" class="form-select">
+          <option value="">Tous</option>
+          <option value="1" {% if filtres and filtres.commentaires == '1' %}selected{% endif %}>
+            Avec commentaires
+          </option>
+        </select>
+      </div>
+
+      <div class="col-12">
+        <button type="submit" class="btn btn-primary d-inline-flex align-items-center gap-2">
+          <i class="bi bi-search"></i>
+          Appliquer
+        </button>
+      </div>
+    </div>
+  </div>
+</form>
+{% endif %}
 
 {% if current_user.role == 'operateur' and stats_operateur is not none %}
 {# ── Bloc motivant opérateur — Bug 5 ── #}
@@ -119,18 +280,30 @@
   </div>
   <div class="col-6 col-md-3">
     <div class="wp-kpi">
-      <div class="wp-kpi-label">Soumises</div>
+      <div class="wp-kpi-label">{% if current_user.role == 'operateur' %}Chez le chef{% else %}Validées{% endif %}</div>
       <div class="wp-kpi-value">
-        {{ postes | selectattr('statut','equalto','soumis') | list | length }}
+        {% if current_user.role == 'operateur' %}
+        {{ postes | selectattr('statut','equalto','a_verifier') | list | length }}
+        {% else %}
+        {{ (postes | selectattr('statut','equalto','valide_chef') | list | length)
+           + (postes | selectattr('statut','equalto','verrouille') | list | length) }}
+        {% endif %}
       </div>
     </div>
   </div>
   <div class="col-6 col-md-3">
     <div class="wp-kpi">
+      {% if current_user.role == 'operateur' %}
+      <div class="wp-kpi-label">À corriger</div>
+      <div class="wp-kpi-value" style="color:var(--wp-ochre);">
+        {{ postes | selectattr('statut','equalto','a_corriger') | list | length }}
+      </div>
+      {% else %}
       <div class="wp-kpi-label">Volume conforme</div>
       <div class="wp-kpi-value" style="font-size:1.55rem;">
         {{ (postes | sum(attribute='volume_conforme')) | round(1) }}<span class="unit"> m³</span>
       </div>
+      {% endif %}
     </div>
   </div>
   <div class="col-6 col-md-3">
@@ -143,6 +316,111 @@
   </div>
 </div>
 
+{% if current_user.role == 'operateur' %}
+<div class="wp-history-list">
+  {% for p in postes %}
+  {% set anos = anomalies_par_poste.get(p.id, []) %}
+  {% set arrets_commentes = p.arrets | selectattr('notes') | list %}
+  {% set nb_commentaires = (arrets_commentes | length) + (1 if p.notes else 0) %}
+  {% set peut_corriger = p.statut in ('brouillon', 'a_corriger') and p.user_id == current_user.id %}
+  {% if p.statut == 'a_corriger' %}
+    {% set statut_label = 'À corriger' %}
+    {% set statut_class = 'warning' %}
+    {% set action_url = url_for('saisie.modifier_equipe', equipe_id=p.id) ~ ('#' ~ p.correction_cible if p.correction_cible else '') %}
+    {% set action_label = 'Corriger' %}
+    {% set action_icon = 'bi-arrow-counterclockwise' %}
+  {% elif p.statut == 'brouillon' %}
+    {% set statut_label = 'Brouillon' %}
+    {% set statut_class = 'warning' %}
+    {% set action_url = url_for('saisie.modifier_equipe', equipe_id=p.id) %}
+    {% set action_label = 'Continuer' %}
+    {% set action_icon = 'bi-pencil' %}
+  {% elif p.statut == 'a_verifier' %}
+    {% set statut_label = 'Chez le chef' %}
+    {% set statut_class = 'info' %}
+    {% set action_url = url_for('saisie.detail_poste', poste_id=p.id) %}
+    {% set action_label = 'Voir' %}
+    {% set action_icon = 'bi-eye' %}
+  {% elif p.statut == 'valide_chef' %}
+    {% set statut_label = 'Validée' %}
+    {% set statut_class = 'success' %}
+    {% set action_url = url_for('saisie.detail_poste', poste_id=p.id) %}
+    {% set action_label = 'Voir' %}
+    {% set action_icon = 'bi-eye' %}
+  {% elif p.statut == 'soumis' %}
+    {% set statut_label = 'Ancienne fiche' %}
+    {% set statut_class = 'neutral' %}
+    {% set action_url = url_for('saisie.detail_poste', poste_id=p.id) %}
+    {% set action_label = 'Voir' %}
+    {% set action_icon = 'bi-eye' %}
+  {% elif p.statut == 'verrouille' or p.est_verrouille %}
+    {% set statut_label = 'Clôturée' %}
+    {% set statut_class = 'neutral' %}
+    {% set action_url = url_for('saisie.detail_poste', poste_id=p.id) %}
+    {% set action_label = 'Voir' %}
+    {% set action_icon = 'bi-eye' %}
+  {% else %}
+    {% set statut_label = 'Brouillon' %}
+    {% set statut_class = 'warning' %}
+    {% set action_url = url_for('saisie.detail_poste', poste_id=p.id) %}
+    {% set action_label = 'Voir' %}
+    {% set action_icon = 'bi-eye' %}
+  {% endif %}
+  <article class="wp-history-card wp-history-card-{{ statut_class }}">
+    <a href="{{ action_url }}" class="wp-history-main">
+      <div class="wp-history-date">
+        <strong>{{ p.date.strftime('%d/%m') }}</strong>
+        <small>{{ p.numero_equipe }}</small>
+      </div>
+      <div class="wp-history-body">
+        <div class="wp-history-title">
+          <strong>{{ p.operateur_nom or p.saisie_par.nom }}</strong>
+          <span class="wp-pill wp-pill-{{ statut_class }}">{{ statut_label }}</span>
+        </div>
+        <div class="wp-history-meta">
+          {{ p.productions | length }} essence{{ 's' if p.productions | length > 1 }}
+          · {{ p.volume_conforme }} m³ conforme
+          {% if p.duree_totale_arrets > 0 %}· {{ p.duree_totale_arrets }} min arrêt{% endif %}
+        </div>
+        {% if p.statut == 'a_corriger' and p.correction_motif %}
+        <div class="wp-history-note">
+          Message chef : {{ p.correction_motif | truncate(95) }}
+        </div>
+        {% elif nb_commentaires > 0 %}
+        <div class="wp-history-note">
+          {{ nb_commentaires }} commentaire{{ 's' if nb_commentaires > 1 }} transmis
+        </div>
+        {% elif anos %}
+        <div class="wp-history-note">
+          {{ anos | length }} point{{ 's' if anos | length > 1 }} à relire
+        </div>
+        {% endif %}
+      </div>
+    </a>
+    <div class="wp-history-actions">
+      <a href="{{ action_url }}" class="btn btn-sm btn-primary d-inline-flex align-items-center gap-2">
+        <i class="bi {{ action_icon }}"></i>
+        {{ action_label }}
+      </a>
+      {% if peut_corriger %}
+      <a href="{{ url_for('saisie.verification_equipe', equipe_id=p.id) }}"
+         class="btn btn-sm btn-outline-primary d-inline-flex align-items-center gap-2">
+        <i class="bi bi-shield-check"></i>
+        Vérifier
+      </a>
+      {% endif %}
+      <a href="{{ url_for('saisie.fiche_poste', poste_id=p.id) }}"
+         target="_blank"
+         class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-2">
+        <i class="bi bi-printer"></i>
+        Imprimer
+      </a>
+    </div>
+  </article>
+  {% endfor %}
+</div>
+{% else %}
+
 {# ── Table ── #}
 <div class="wp-card">
   <div class="table-responsive">
@@ -151,11 +429,14 @@
         <tr>
           <th>Date</th>
           <th>Équipe</th>
+          <th>Responsable</th>
           <th>Essences</th>
           <th>Conforme</th>
           <th>Déclassé</th>
           <th>Arrêts</th>
+          {% if afficher_indicateurs %}
           <th>TRS</th>
+          {% endif %}
           <th>Statut</th>
           <th></th>
         </tr>
@@ -163,6 +444,8 @@
       <tbody>
         {% for p in postes %}
         <tr>
+          {% set arrets_commentes = p.arrets | selectattr('notes') | list %}
+          {% set nb_commentaires = (arrets_commentes | length) + (1 if p.notes else 0) %}
           <td style="font-weight:600;">{{ p.date.strftime('%d/%m/%Y') }}</td>
           <td>
             <span class="wp-pill wp-pill-neutral">{{ p.numero_equipe }}</span>
@@ -174,6 +457,28 @@
                   title="{{ anos | length }} anomalie{{ 's' if anos | length > 1 }} à vérifier : {{ anos | map(attribute='code') | join(', ') }}">
               <i class="bi bi-shield-exclamation"></i> {{ anos | length }}
             </span>
+            {% endif %}
+          </td>
+          <td style="font-size:.84rem;color:var(--wp-muted);">
+            {{ p.operateur_nom or p.saisie_par.nom }}
+            <div style="font-size:.72rem;color:var(--wp-muted);margin-top:2px;">
+              Remplie par {{ p.rempli_par_nom or p.saisie_par.nom }}
+            </div>
+            {% if nb_commentaires > 0 %}
+            <div style="margin-top:5px;max-width:280px;line-height:1.35;">
+              <span class="wp-pill wp-pill-info" style="font-size:.68rem;">
+                <i class="bi bi-chat-left-text"></i>
+                {{ nb_commentaires }} commentaire{{ 's' if nb_commentaires > 1 }}
+              </span>
+              <div style="font-size:.74rem;color:var(--wp-muted);margin-top:4px;"
+                   title="{% if p.notes %}{{ p.notes }}{% else %}{{ arrets_commentes[0].notes }}{% endif %}">
+                {% if p.notes %}
+                {{ p.notes | truncate(78) }}
+                {% else %}
+                {{ arrets_commentes[0].notes | truncate(78) }}
+                {% endif %}
+              </div>
+            </div>
             {% endif %}
           </td>
           <td>
@@ -194,6 +499,7 @@
             </span>
             {% else %}<span style="color:var(--wp-muted);">—</span>{% endif %}
           </td>
+          {% if afficher_indicateurs %}
           <td>
             {% if p.trs_global %}
               {% if p.trs_global >= 70 %}
@@ -207,13 +513,34 @@
             <span style="color:var(--wp-muted);">—</span>
             {% endif %}
           </td>
+          {% endif %}
           <td>
             {% if p.statut == 'verrouille' or p.est_verrouille %}
             <span class="wp-pill wp-pill-neutral">
-              <i class="bi bi-lock"></i> Verrouillé
+              <i class="bi bi-lock"></i> Clôturée
+            </span>
+            {% elif p.statut == 'a_corriger' %}
+            <span class="wp-pill wp-pill-warning">
+              <i class="bi bi-arrow-counterclockwise"></i> À corriger
+            </span>
+            {% if p.correction_motif %}
+            <div style="font-size:.74rem;color:var(--wp-ochre);margin-top:5px;line-height:1.35;max-width:260px;"
+                 title="{{ p.correction_motif }}">
+              Message chef : {{ p.correction_motif | truncate(85) }}
+            </div>
+            {% endif %}
+            {% elif p.statut == 'a_verifier' %}
+            <span class="wp-pill wp-pill-info">
+              <i class="bi bi-hourglass-split"></i> Chez le chef
+            </span>
+            {% elif p.statut == 'valide_chef' %}
+            <span class="wp-pill wp-pill-success">
+              <i class="bi bi-check2-circle"></i> Validée chef
             </span>
             {% elif p.statut == 'soumis' %}
-            <span class="wp-pill wp-pill-success">Soumis</span>
+            <span class="wp-pill wp-pill-neutral">
+              <i class="bi bi-archive"></i> Ancienne fiche
+            </span>
             {% else %}
             <span class="wp-pill wp-pill-warning">
               <i class="bi bi-pencil"></i> Brouillon
@@ -221,30 +548,70 @@
             {% endif %}
           </td>
           <td class="text-nowrap">
+            {% set peut_modifier_ligne = (
+              (p.statut in ('brouillon', 'a_corriger') and p.user_id == current_user.id)
+              or (current_user.role in ('chef', 'admin') and p.statut in ('a_verifier', 'valide_chef'))
+            ) %}
             <a href="{{ url_for('saisie.detail_poste', poste_id=p.id) }}"
                class="wp-icon-btn" title="Voir le détail"
                style="text-decoration:none;display:inline-flex;">
               <i class="bi bi-eye"></i>
             </a>
-            {% if p.statut == 'brouillon' and p.user_id == current_user.id %}
+            <a href="{{ url_for('saisie.fiche_poste', poste_id=p.id) }}"
+               target="_blank"
+               class="wp-icon-btn"
+               title="Imprimer la fiche"
+               style="text-decoration:none;display:inline-flex;color:var(--wp-sky);">
+              <i class="bi bi-printer"></i>
+            </a>
+            {% if current_user.role in ('chef', 'admin') or p.user_id == current_user.id %}
             <form method="POST"
-                  action="{{ url_for('saisie.soumettre_equipe', equipe_id=p.id) }}"
+                  action="/saisie/poste/{{ p.id }}/dupliquer"
                   class="d-inline"
-                  onsubmit="return confirm('Soumettre cette équipe ? Les prix seront figés.')">
-              <button type="submit" class="wp-icon-btn border-0"
-                      title="Soumettre" style="color:var(--wp-leaf);">
-                <i class="bi bi-send-check"></i>
+                  onsubmit="return confirm('Créer un brouillon avec les mêmes essences et créneaux ? Les volumes, arrêts et commentaires ne seront pas copiés.')">
+              {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+              <button type="submit"
+                      class="wp-icon-btn border-0"
+                      title="Reprendre la structure"
+                      style="color:var(--wp-emerald);">
+                <i class="bi bi-files"></i>
               </button>
             </form>
+            {% endif %}
+            {% if p.fiche_papier_fichier %}
+            <a href="{{ url_for('saisie.fiche_papier_jointe', poste_id=p.id) }}"
+               target="_blank"
+               class="wp-icon-btn"
+               title="Voir la fiche papier jointe"
+               style="text-decoration:none;display:inline-flex;color:var(--wp-muted);">
+              <i class="bi bi-paperclip"></i>
+            </a>
+            {% endif %}
+            {% if peut_modifier_ligne %}
+            <a href="{{ url_for('saisie.modifier_equipe', equipe_id=p.id) }}{% if p.statut == 'a_corriger' and p.correction_cible %}#{{ p.correction_cible }}{% endif %}"
+               class="wp-icon-btn"
+               title="{% if p.statut == 'a_corriger' %}Corriger{% else %}Modifier{% endif %}"
+               style="text-decoration:none;display:inline-flex;color:var(--wp-ochre);">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{{ url_for('saisie.verification_equipe', equipe_id=p.id) }}"
+               class="wp-icon-btn"
+               title="{% if p.statut == 'a_corriger' %}Vérifier et renvoyer au chef{% else %}Vérifier avant envoi au chef{% endif %}"
+               style="text-decoration:none;display:inline-flex;color:var(--wp-leaf);">
+              <i class="bi bi-shield-check"></i>
+            </a>
+            {% if p.statut == 'brouillon' %}
             <form method="POST"
                   action="{{ url_for('saisie.supprimer_poste', poste_id=p.id) }}"
                   class="d-inline"
                   onsubmit="return confirm('Supprimer ce brouillon ?')">
+              {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
               <button type="submit" class="wp-icon-btn border-0"
                       title="Supprimer" style="color:var(--wp-terracotta);">
                 <i class="bi bi-trash"></i>
               </button>
             </form>
+            {% endif %}
             {% endif %}
           </td>
         </tr>
@@ -253,6 +620,7 @@
     </table>
   </div>
 </div>
+{% endif %}
 
 {% else %}
 
@@ -260,7 +628,7 @@
   <i class="bi bi-inbox"
      style="font-size:2.5rem;color:var(--wp-muted);display:block;margin-bottom:1rem;"></i>
   <p style="color:var(--wp-muted);margin:0 0 1.25rem;font-size:.95rem;">
-    Aucune équipe enregistrée pour l'instant.
+    Aucune fiche ne correspond aux filtres actuels.
   </p>
   {% if current_user.role in ('operateur','chef','admin') %}
   <a href="{{ url_for('saisie.nouveau_poste') }}" class="btn btn-primary">

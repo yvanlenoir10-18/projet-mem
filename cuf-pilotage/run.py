@@ -1,5 +1,5 @@
 """
-Point d'entrée de l'application Wood_Pilot_Ebolowa.
+Point d'entrée de l'application wood_pilot.
 Lance le serveur Flask en mode développement.
 
 Usage : python run.py

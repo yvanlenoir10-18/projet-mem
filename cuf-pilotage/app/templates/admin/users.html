@@ -93,6 +93,7 @@
               action="{{ url_for('admin.supprimer_utilisateur', user_id=u.id) }}"
               class="d-inline"
               onsubmit="return confirm('Supprimer le compte de {{ u.nom }} ? Cette action est irréversible.')">
+          {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
           <button type="submit" class="wp-icon-btn border-0"
                   title="Supprimer" style="color:var(--wp-terracotta);">
             <i class="bi bi-trash"></i>
@@ -136,6 +137,7 @@
     </div>
     <div style="padding:24px;">
       <form method="POST">
+        {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
         <div class="mb-3">
           <label class="form-label">
             Nom complet <span style="color:var(--wp-terracotta);">*</span>
@@ -218,6 +220,7 @@
     <div style="padding:24px;">
       <form method="POST"
             action="{{ url_for('admin.modifier_utilisateur', user_id=utilisateur.id) }}">
+        {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
         <div class="mb-3">
           <label class="form-label">Nom complet</label>
           <input type="text" name="nom" class="form-control"
@@ -264,6 +267,7 @@
     <div style="padding:24px;">
       <form method="POST"
             action="{{ url_for('admin.reset_mot_de_passe', user_id=utilisateur.id) }}">
+        {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
         <div class="mb-3">
           <label class="form-label">Nouveau mot de passe</label>
           <input type="password" name="nouveau_mdp" class="form-control"

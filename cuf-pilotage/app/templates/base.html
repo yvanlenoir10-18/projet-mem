@@ -3,10 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Wood_Pilot_Ebolowa{% endblock %} — CUF Chaîne 4</title>
+  <title>{% block title %}wood_pilot{% endblock %}</title>
   <link href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.css') }}" rel="stylesheet">
   <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+  {% if csrf_token is defined %}
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  {% endif %}
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -19,8 +22,7 @@
     <div class="wp-brand">
       <div class="wp-brand-mark"><i class="bi bi-tree"></i></div>
       <div>
-        <div class="wp-brand-name">Wood_<span style="color:var(--wp-leaf);">Pilot</span>_Ebolowa</div>
-        <div class="wp-brand-sub">CUF · Ebolowa</div>
+        <div class="wp-brand-name">wood_pilot</div>
       </div>
     </div>
 
@@ -30,6 +32,10 @@
       <a class="wp-nav-link {% if request.endpoint == 'dashboard.vue_chef' %}active{% endif %}"
          href="{{ url_for('dashboard.vue_chef') }}">
         <span class="wp-nav-ic"><i class="bi bi-speedometer2"></i></span>Tableau de bord
+      </a>
+      <a class="wp-nav-link {% if request.endpoint == 'dashboard.fiches_chef' %}active{% endif %}"
+         href="{{ url_for('dashboard.fiches_chef') }}">
+        <span class="wp-nav-ic"><i class="bi bi-clipboard-check"></i></span>Fiches chef
       </a>
       <a class="wp-nav-link {% if request.endpoint == 'dashboard.pertes' %}active{% endif %}"
          href="{{ url_for('dashboard.pertes') }}">
@@ -57,6 +63,12 @@
       {% endif %}
 
       <span class="wp-nav-section">Données</span>
+      {% if current_user.role == 'operateur' %}
+      <a class="wp-nav-link {% if request.endpoint == 'saisie.accueil_operateur' %}active{% endif %}"
+         href="{{ url_for('saisie.accueil_operateur') }}">
+        <span class="wp-nav-ic"><i class="bi bi-house-door"></i></span>Accueil
+      </a>
+      {% endif %}
       {% if current_user.role in ('operateur', 'chef', 'admin') %}
       <a class="wp-nav-link {% if request.endpoint == 'saisie.nouveau_poste' %}active{% endif %}"
          href="{{ url_for('saisie.nouveau_poste') }}">
@@ -107,7 +119,7 @@
   <div class="offcanvas offcanvas-start" tabindex="-1" id="sidebarMobile"
        style="width:260px;background:var(--wp-paper);">
     <div class="offcanvas-header" style="border-bottom:1px solid var(--wp-line);">
-      <div class="wp-brand-name">Wood<span style="color:var(--wp-leaf);">Pilot</span></div>
+      <div class="wp-brand-name">wood_pilot</div>
       <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Fermer"></button>
     </div>
     <div class="offcanvas-body p-0">
@@ -116,6 +128,8 @@
         <span class="wp-nav-section">Pilotage</span>
         <a class="wp-nav-link" href="{{ url_for('dashboard.vue_chef') }}">
           <span class="wp-nav-ic"><i class="bi bi-speedometer2"></i></span>Tableau de bord</a>
+        <a class="wp-nav-link" href="{{ url_for('dashboard.fiches_chef') }}">
+          <span class="wp-nav-ic"><i class="bi bi-clipboard-check"></i></span>Fiches chef</a>
         <a class="wp-nav-link" href="{{ url_for('dashboard.pertes') }}">
           <span class="wp-nav-ic"><i class="bi bi-cash-stack"></i></span>Pertes financières</a>
         <a class="wp-nav-link" href="{{ url_for('analyse.arrets') }}">
@@ -131,6 +145,10 @@
           <span class="wp-nav-ic"><i class="bi bi-lightbulb"></i></span>Recommandations</a>
         {% endif %}
         <span class="wp-nav-section">Données</span>
+        {% if current_user.role == 'operateur' %}
+        <a class="wp-nav-link" href="{{ url_for('saisie.accueil_operateur') }}">
+          <span class="wp-nav-ic"><i class="bi bi-house-door"></i></span>Accueil</a>
+        {% endif %}
         {% if current_user.role in ('operateur', 'chef', 'admin') %}
         <a class="wp-nav-link" href="{{ url_for('saisie.nouveau_poste') }}">
           <span class="wp-nav-ic"><i class="bi bi-plus-circle"></i></span>Nouvelle saisie</a>
@@ -160,7 +178,7 @@
       </button>
       <div class="wp-topbar-greeting">
         <div class="wp-topbar-name">Bonjour, {{ current_user.prenom }}</div>
-        <div class="wp-topbar-title">{% block page_title %}Wood_Pilot_Ebolowa{% endblock %}</div>
+        <div class="wp-topbar-title">{% block page_title %}wood_pilot{% endblock %}</div>
       </div>
     </header>
 

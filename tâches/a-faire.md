@@ -62,3 +62,595 @@ Commit : `5baf68b`
 | Internal Server Error | Ancien cuf.db avec schema incompatible (arret.poste_id) | Supprimer cuf.db avant restart |
 | Flask reload infini Windows | Watchdog détecte les fichiers Windows Store Python | `use_reloader=False` dans run.py |
 | 500 générique sans message | `except (ValueError, KeyError)` trop étroit | `except Exception as e` avec flash |
+
+---
+
+## ⏳ CORRECTION EN COURS — TRS par essence temporalise
+
+Objectif : rendre le TRS par essence cohérent quand plusieurs essences sont sciées dans un même poste.
+
+- [x] Identifier le biais actuel : chaque essence hérite du TRS global du poste.
+- [x] Ajouter les heures de traitement début/fin sur chaque ligne de production.
+- [x] Calculer le TRS par essence avec les arrêts qui chevauchent réellement la fenêtre de l'essence.
+- [x] Mettre à jour la saisie, le détail et le dashboard Chef.
+- [x] Vérifier la compatibilité avec les anciennes données et le lancement local.
+
+Revue finale :
+- Compilation Python OK.
+- Rendu `/login`, `/dashboard/chef` et `/saisie/nouveau` OK sur SQLite mémoire.
+- Test métier OK : un arrêt 10h-11h est imputé à Azobé 9h-14h, pas à Ayous 6h-9h.
+
+---
+
+## ⏳ P2 — Socle opérateur et pertes financières nettes
+
+Objectif : rendre wood_pilot défendable comme outil de pilotage et d'aide à la décision, en commençant par la saisie opérateur.
+
+Décisions métier validées :
+- [x] Objectif m³/poste = norme interne.
+- [x] Prix par essence = prix de vente réel.
+- [x] Bois déclassé = revendable à 70 % du prix normal.
+- [x] Déchets = valeur nulle en V1.
+- [x] Capacités par essence préparées dans Paramètres, même si elles restent identiques au départ.
+- [x] Arrêts planifiés = perte seulement sur dépassement de la durée prévue.
+- [x] Opérateur = saisie et historique opérationnel sans chiffres économiques.
+
+Étapes :
+- [x] Ajouter l'identité de l'opérateur terrain sur les fiches de saisie.
+- [x] Masquer les indicateurs économiques aux opérateurs.
+- [x] Aligner les calculs financiers sur CA potentiel − CA réel valorisé.
+- [x] Passer le taux de revente du déclassé à 70 % et garder les déchets à 0 FCFA.
+- [x] Préparer les capacités par essence dans Paramètres.
+- [x] Vérifier les parcours `/saisie/nouveau`, `/saisie/historique`, `/saisie/poste/<id>`, `/dashboard/pertes`.
+
+Revue finale :
+- Compilation Python OK.
+- Test métier OK : maintenance planifiée 50 min avec 30 min prévues = 20 min d'impact TRS.
+- Test rôle OK : opérateur sans manque à gagner ni prix/m³, chef avec indicateurs économiques.
+- Rendu OK : `/dashboard/chef`, `/dashboard/pertes`, `/admin/parametres`, `/dashboard/pdg`, `/dashboard/export/excel`, `/saisie/feuille-releve`.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 1 : accueil terrain
+
+Objectif : donner à l'opérateur un point d'entrée simple, orienté collecte terrain.
+
+- [x] Créer une route `/saisie/accueil`.
+- [x] Afficher les actions utiles : nouvelle fiche, continuer brouillon, feuille terrain, historique.
+- [x] Afficher les compteurs opérationnels sans indicateurs économiques.
+- [x] Rediriger le rôle opérateur vers cet accueil après connexion.
+- [x] Vérifier le rendu et les parcours opérateur.
+
+Revue finale :
+- Compilation Python OK.
+- Connexion opérateur redirige vers `/saisie/accueil`.
+- Rendu OK : `/saisie/accueil`, `/saisie/historique`, `/saisie/nouveau`, `/saisie/feuille-releve`.
+- Contrôle rôle OK : l'accueil opérateur n'affiche ni manque à gagner ni prix/m³.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 2 : fiches à corriger
+
+Objectif : permettre au chef production/admin de renvoyer une fiche soumise vers l'opérateur avec un motif de correction.
+
+- [x] Ajouter les champs de retour correction sur `Equipe`.
+- [x] Ajouter le statut `a_corriger`.
+- [x] Autoriser l'opérateur à modifier et resoumettre uniquement ses fiches `brouillon` ou `a_corriger`.
+- [x] Ajouter une action chef/admin "Renvoyer à corriger".
+- [x] Afficher les fiches à corriger dans l'accueil, l'historique et le détail.
+- [x] Vérifier le parcours complet : opérateur soumet → chef renvoie → opérateur corrige → opérateur resoumet.
+
+Revue finale :
+- Compilation Python OK.
+- Test workflow OK : chef renvoie une fiche soumise en `a_corriger`, motif enregistré.
+- Test opérateur OK : accueil + historique affichent `À corriger`, détail affiche le motif sans données économiques.
+- Test resoumission OK : l'opérateur peut resoumettre sa fiche corrigée, qui repasse en `soumis`.
+- Test chef OK : une fiche soumise affiche l'action "Renvoyer à corriger".
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 3 : journal d'audit des corrections
+
+Objectif : historiser les corrections pour savoir qui a demandé quoi, qui a modifié quoi, et quand.
+
+- [x] Ajouter un modèle dédié au journal d'audit.
+- [x] Enregistrer les événements : renvoi à corriger, modification, resoumission.
+- [x] Conserver un résumé Avant/Après des champs importants de la fiche.
+- [x] Afficher l'audit uniquement aux rôles chef/admin.
+- [x] Vérifier le parcours complet avec preuves.
+
+Revue finale :
+- Compilation Python OK.
+- Test audit OK : événements `renvoi_correction`, `modification`, `resoumission` créés dans l'ordre.
+- Test traçabilité OK : auteur, rôle, ancien statut, nouveau statut, motif et valeurs Avant/Après enregistrés.
+- Test accès OK : opérateur voit le motif courant, chef/admin voient le journal d'audit.
+
+Correction UX :
+- [x] Le message du chef est visible dans l'accueil opérateur, l'historique, le détail et le formulaire de correction.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 4 : contrôles horaires intelligents
+
+Objectif : détecter les incohérences horaires qui fragilisent les calculs et la lecture métier.
+
+- [x] Ajouter les règles d'alerte sur arrêts invalides, durées nulles et chevauchements par machine.
+- [x] Ajouter les règles d'alerte sur créneaux d'essence incomplets, invalides ou chevauchés.
+- [x] Vérifier l'affichage dans le détail et l'historique.
+- [x] Fournir des exemples de saisie pour tester chaque règle dans l'app.
+
+Revue finale :
+- Compilation Python OK.
+- Test R5 OK : arrêt à durée nulle détecté.
+- Test R6 OK : deux arrêts sur la même machine avec chevauchement détectés.
+- Test R7 OK : créneau d'essence incomplet détecté.
+- Test R8 OK : deux essences qui se chevauchent détectées sans bloquer la soumission.
+- Rendu OK : détail affiche les messages, historique affiche le drapeau d'anomalies.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 5 : saisie guidée des arrêts
+
+Objectif : réduire les erreurs de saisie des arrêts en guidant l'opérateur avec des choix simples.
+
+- [x] Ajouter la confirmation explicite `Aucun arrêt pendant le poste`.
+- [x] Ajouter une nomenclature simple de causes d'arrêt prédéfinies.
+- [x] Auto-remplir la catégorie à partir de la cause choisie.
+- [x] Afficher une aide courte pour expliquer chaque cause.
+- [x] Adapter les contrôles qualité et les écrans de détail.
+- [x] Fournir des cas d'utilisation testables après mise à jour.
+
+Revue finale :
+- Compilation Python OK.
+- Test `Aucun arrêt` OK : les lignes d'arrêt parasites sont ignorées et la fiche affiche la confirmation.
+- Test `Changement de lame` OK : cause enregistrée, catégorie `Réglage / outil`, commentaire conservé.
+- Test `Maintenance prévue` OK : 50 min réelles, 30 min prévues, 20 min impactent le TRS.
+- Rendu OK : formulaire de saisie et dashboard chef.
+
+Correction UX :
+- [x] Les causes d'arrêt sont visibles sous forme de boutons rapides avant les champs.
+- [x] Le bug JavaScript après suppression du dernier arrêt est corrigé.
+- [x] Test rendu OK : le formulaire affiche `Utilisation rapide`, `Changement de lame`, `Manque de bois`.
+- [x] `Autre` affiche un champ pour écrire la cause manuellement.
+- [x] `Changement de lame` affiche un champ pour préciser la lame ou le motif.
+- [x] Les champs horaires de production et d'arrêt sont agrandis pour mieux lire l'heure.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 6 : vérification avant soumission
+
+Objectif : faire relire une fiche à l'opérateur avant l'envoi final, avec résumé métier et alertes sans chiffres économiques.
+
+- [x] Ajouter une route `/saisie/equipe/<id>/verification`.
+- [x] Afficher le résumé de la fiche : date, poste, opérateur, essences, volumes, arrêts.
+- [x] Afficher les erreurs bloquantes avant soumission.
+- [x] Afficher les alertes horaires non bloquantes sur les brouillons.
+- [x] Afficher le message du chef pour les fiches `a_corriger`.
+- [x] Remplacer les soumissions directes depuis détail/historique par un passage par la vérification.
+- [x] Vérifier que l'opérateur ne voit ni TRS, ni FCFA, ni prix sur cet écran.
+
+Revue finale :
+- Compilation Python OK.
+- Test rendu OK : fiche correcte → page `Fiche prête à soumettre`.
+- Test blocage OK : conforme + déclassé > entrée → soumission bloquée.
+- Test alerte OK : deux arrêts qui se chevauchent sur la même machine affichent `R6` et restent soumettables.
+- Test correction OK : une fiche `a_corriger` affiche le message du chef avant resoumission.
+- Test workflow OK : détail et historique pointent vers la vérification, puis la soumission finale fige les prix.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 7 : fiches terrain imprimables et téléchargeables
+
+Objectif : permettre le travail papier/offline et l'archivage terrain sans bloquer la production.
+
+- [x] Améliorer la fiche terrain vierge avec action d'impression et téléchargement.
+- [x] Ajouter une fiche remplie par poste `/saisie/poste/<id>/fiche`.
+- [x] Ajouter le téléchargement HTML autonome des fiches vierges et remplies.
+- [x] Ajouter les boutons depuis l'accueil opérateur, le détail et l'historique.
+- [x] Garantir que la fiche opérateur ne contient ni TRS, ni FCFA, ni prix.
+- [x] Vérifier les droits : un opérateur ne peut pas ouvrir la fiche d'un autre opérateur.
+
+Revue finale :
+- Compilation Python OK.
+- Test fiche vierge OK : impression + téléchargement disponibles.
+- Test fiche remplie OK : essences, volumes, arrêts, notes et signatures affichés.
+- Test téléchargement OK : `Content-Disposition: attachment` sur fiche vierge et fiche remplie.
+- Test accès OK : opérateur propriétaire autorisé, autre opérateur refusé, chef autorisé.
+- Test confidentialité OK : aucun `FCFA` ni `TRS` dans la fiche imprimable opérateur.
+
+Correction :
+- [x] Supprimer les options de téléchargement HTML, car elles ne produisaient pas un vrai PDF.
+- [x] Garder uniquement `Imprimer / enregistrer en PDF` pour les fiches générées par l'application.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étapes 8 et 9 : workflow papier → numérique + pièce jointe
+
+Objectif : tracer clairement les fiches ressaisies depuis papier et conserver la preuve terrain signée.
+
+- [x] Ajouter le mode de saisie : directe dans l'application ou ressaisie depuis fiche papier.
+- [x] Ajouter l'information `fiche papier signée disponible`.
+- [x] Ajouter une pièce jointe PDF/photo pour la fiche terrain signée.
+- [x] Stocker les pièces jointes dans `instance/fiches_papier`.
+- [x] Protéger l'accès : opérateur propriétaire seulement, chef/admin autorisés.
+- [x] Afficher l'origine de la saisie dans le formulaire, le détail, la vérification et la fiche imprimable.
+- [x] Refuser les extensions non prévues.
+
+Revue finale :
+- Compilation Python OK.
+- Test création OK : fiche `papier`, case signée, PDF joint et stocké.
+- Test détail/vérification OK : origine papier + nom du fichier affichés.
+- Test fiche imprimable OK : origine papier et pièce jointe indiquées, sans `TRS` ni `FCFA`.
+- Test accès OK : opérateur propriétaire autorisé, autre opérateur refusé, chef autorisé.
+- Test sécurité OK : fichier `.exe` refusé avec message clair.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étapes 10 et 11 : statuts précis + validation chef
+
+Objectif : séparer clairement les fiches encore terrain des fiches réellement exploitables dans les tableaux de bord.
+
+- [x] Ajouter le statut `a_verifier` pour les fiches envoyées au chef mais pas encore validées.
+- [x] Ajouter le statut `valide_chef` pour les fiches validées et exploitables dans les analyses.
+- [x] Conserver `verrouille` pour les fiches définitives.
+- [x] Garder l'ancien statut `soumis` comme compatibilité historique.
+- [x] Faire passer la soumission opérateur de `brouillon/a_corriger` vers `a_verifier`.
+- [x] Ajouter l'action chef/admin `Valider chef`.
+- [x] Exclure les fiches `brouillon`, `a_verifier` et `a_corriger` des calculs de tableaux de bord.
+- [x] Afficher les fiches `a_verifier` comme alertes chef à traiter.
+- [x] Permettre au chef de renvoyer une fiche `a_verifier` ou `valide_chef` à corriger avec message visible par l'opérateur.
+- [x] Mettre à jour les badges, libellés, exports et tableaux de bord.
+
+Revue finale :
+- Compilation Python OK.
+- Test workflow OK : `brouillon` → `a_verifier` → `a_corriger` → `a_verifier` → `valide_chef` → `verrouille`.
+- Test dashboard chef OK : les fiches `a_verifier` apparaissent dans les alertes de validation.
+- Test calculs OK : une fiche `a_verifier` n'est pas comptée dans les indicateurs, une fiche `valide_chef` l'est.
+- Test audit OK : l'action `validation_chef` est enregistrée dans le journal.
+- Test opérateur OK : le message de correction du chef reste visible avant resoumission.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 12 : accueil plus pratique et cliquable
+
+Objectif : simplifier l'accueil opérateur pour que chaque bloc visible mène directement à une action utile.
+
+- [x] Remplacer les KPI passifs par des cartes d'action cliquables.
+- [x] Mettre en avant l'action prioritaire : corriger, continuer un brouillon ou créer une fiche.
+- [x] Garder un accès rapide à la fiche papier vierge.
+- [x] Rendre les fiches récentes cliquables selon leur statut.
+- [x] Réduire les textes et supprimer les blocs non nécessaires à l'action immédiate.
+- [x] Vérifier le rendu opérateur sans chiffres économiques.
+
+Revue finale :
+- Compilation Python OK.
+- Test rendu OK : `/saisie/accueil` affiche l'action prioritaire, les cartes cliquables et les dernières fiches.
+- Test action OK : `À corriger` et `Brouillons` ouvrent directement la fiche à traiter.
+- Test confidentialité OK : aucun `FCFA`, `TRS`, `prix/m³` ni manque à gagner sur l'accueil opérateur.
+- Contrôle interface OK : suppression des KPI passifs et du bloc de rappels non actionnable.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 13 : saisie production par essence plus agréable
+
+Objectif : rendre les passages d'essence faciles à créer, lire et compléter sur tablette/ordinateur.
+
+- [x] Transformer chaque ligne de production en carte lisible.
+- [x] Ajouter des boutons rapides pour créer un passage par essence.
+- [x] Ajouter les boutons `Début maintenant` et `Fin maintenant`.
+- [x] Afficher la durée calculée du passage.
+- [x] Afficher automatiquement les déchets estimés et alerter si les volumes sortis dépassent l'entrée.
+- [x] Garder la possibilité de saisir plusieurs passages de la même essence.
+- [x] Vérifier que la sauvegarde et la modification conservent les données existantes.
+
+Revue finale :
+- Compilation Python OK.
+- Test rendu OK : le formulaire affiche les cartes de passage, boutons essence, durée et déchets estimés.
+- Test confidentialité OK : aucun `FCFA`, `TRS`, `prix/m³` ni manque à gagner dans le formulaire opérateur.
+- Test sauvegarde OK : `Ayous 06:00-09:00`, `Azobé 09:00-14:00`, `Ayous 14:00-15:00` sont conservés comme trois passages distincts.
+- Contrôle diff OK : pas d'erreur `diff --check`, uniquement les avertissements Windows LF/CRLF.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 13B : confidentialité et filtres des fiches
+
+Objectif : garantir que l'opérateur ne voit que ses propres fiches, tout en donnant au chef/admin une vue globale filtrable.
+
+- [x] Confirmer le cloisonnement opérateur sur historique, détail, fiche imprimable et pièce jointe.
+- [x] Ajouter les filtres d'historique : jour, statut, essence, poste, mode de saisie.
+- [x] Ajouter le filtre opérateur pour chef/admin.
+- [x] Garder l'interface opérateur simple et sans indicateurs économiques.
+- [x] Vérifier par test qu'un opérateur ne peut pas voir les fiches d'un autre.
+
+Revue finale :
+- Compilation Python OK.
+- Test accès OK : un opérateur ne voit que ses fiches dans l'historique.
+- Test sécurité OK : un opérateur reçoit `403` s'il tente d'ouvrir la fiche d'un autre opérateur.
+- Test chef OK : le chef voit toutes les fiches.
+- Test filtres OK : opérateur, jour, statut, essence et mode de saisie filtrent correctement.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 14 : assistant de calcul des volumes
+
+Objectif : permettre à l'opérateur de calculer un volume à partir du nombre de pièces et des dimensions, sans calcul manuel.
+
+- [x] Ajouter un assistant repliable dans chaque passage d'essence.
+- [x] Calculer `nombre × longueur × largeur × épaisseur`.
+- [x] Gérer les unités simples : longueur en mètres, largeur/épaisseur en centimètres.
+- [x] Permettre d'appliquer le résultat à `entrée`, `conforme` ou `déclassé`.
+- [x] Proposer `remplacer` ou `ajouter` au champ cible.
+- [x] Vérifier que le formulaire reste utilisable en saisie directe m³.
+
+Revue finale :
+- Compilation Python OK.
+- Test rendu OK : le formulaire affiche `Calcul pièces`, pièces, longueur, largeur, épaisseur, résultat, `Remplacer` et `Ajouter`.
+- Test confidentialité OK : aucun `FCFA`, `TRS`, `prix/m³` ni manque à gagner dans le formulaire opérateur.
+- Test sauvegarde OK : les valeurs calculées et copiées dans les champs m³ existants sont bien enregistrées.
+- Contrôle diff OK : pas d'erreur `diff --check`, uniquement les avertissements Windows LF/CRLF.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 15 : commentaires opérateur transmis au chef
+
+Objectif : faire remonter les observations terrain utiles au chef production, sans surcharger la saisie opérateur.
+
+- [x] Renommer la zone générale en `Commentaires pour le chef`.
+- [x] Afficher les commentaires généraux et les commentaires d'arrêts sur la vérification avant envoi.
+- [x] Afficher un bloc `Commentaires opérateur` dans le détail d'une fiche.
+- [x] Ajouter un filtre historique `Avec commentaires`.
+- [x] Signaler les fiches commentées dans l'historique avec un extrait lisible.
+- [x] Vérifier le parcours opérateur → chef avec une fiche commentée.
+
+Revue finale :
+- Compilation Python OK.
+- Test workflow OK : l'opérateur crée une fiche avec commentaire général + commentaire d'arrêt.
+- Test vérification OK : l'écran avant envoi affiche `Commentaires transmis au chef` sans `FCFA`.
+- Test chef OK : le filtre historique `Avec commentaires` retrouve la fiche et le détail affiche `Commentaires opérateur`.
+
+Note pour le futur profil chef production :
+- [ ] Exploiter les commentaires opérateur comme matière de décision : filtre prioritaire, lecture dans les fiches à valider, repérage des arrêts longs sans explication, synthèse par machine/cause.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 16 : saisie des arrêts plus rapide
+
+Objectif : rendre la saisie des arrêts plus lisible et plus rapide, surtout sur tablette, sans ajouter de charge mentale.
+
+- [x] Transformer chaque arrêt en carte lisible.
+- [x] Ajouter les boutons `Début maintenant` et `Fin maintenant`.
+- [x] Afficher la durée réelle de l'arrêt en direct.
+- [x] Signaler immédiatement une heure de fin avant l'heure de début.
+- [x] Rappeler de commenter les arrêts longs.
+- [x] Vérifier que la sauvegarde des arrêts reste compatible avec l'existant.
+
+Revue finale :
+- Compilation Python OK.
+- Test rendu OK : le formulaire affiche les cartes d'arrêt, les actions d'heure rapide et les alertes d'arrêt long.
+- Test sauvegarde OK : un arrêt Bicoupe 07:00 → 08:10 est enregistré à 70 min avec son commentaire terrain.
+- Test confidentialité OK : le formulaire et le détail opérateur restent sans `FCFA`.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 17 : sauvegarder puis vérifier directement
+
+Objectif : réduire les clics après la saisie en envoyant l'opérateur directement vers l'écran de vérification quand la fiche est prête.
+
+- [x] Ajouter un bouton `Enregistrer et vérifier`.
+- [x] Conserver le bouton de sauvegarde simple pour les brouillons incomplets.
+- [x] Rediriger une nouvelle fiche vers `/verification` si l'opérateur choisit ce parcours.
+- [x] Rediriger une fiche corrigée vers `/verification` après modification.
+- [x] Vérifier que l'envoi au chef reste séparé de la sauvegarde.
+- [x] Vérifier la confidentialité opérateur.
+
+Revue finale :
+- Compilation Python OK.
+- Test création OK : `Enregistrer brouillon` redirige vers l'historique.
+- Test création OK : `Enregistrer et vérifier` redirige vers l'écran de vérification.
+- Test statut OK : la fiche reste en `brouillon` tant que l'opérateur n'a pas cliqué sur `Envoyer au chef`.
+- Test modification OK : une fiche modifiée avec `Enregistrer et vérifier` revient à la vérification.
+- Test confidentialité OK : le formulaire et la vérification opérateur restent sans `FCFA`.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 18 : reprendre la structure d'une fiche
+
+Objectif : réduire la ressaisie lorsque deux postes ont la même structure de production, sans copier les données terrain variables.
+
+- [x] Ajouter une action `Reprendre structure`.
+- [x] Créer une nouvelle fiche en `brouillon`.
+- [x] Copier seulement l'effectif, le poste, les essences et les créneaux.
+- [x] Ne pas copier volumes, arrêts, commentaires, pièce jointe ou statut.
+- [x] Protéger l'accès : opérateur propriétaire, chef/admin autorisés.
+- [x] Vérifier que la fiche copiée reste modifiable avant envoi.
+
+Revue finale :
+- Compilation Python OK.
+- Test duplication OK : deux passages Ayous/Azobé sont repris avec horaires, mais volumes remis à 0.
+- Test sécurité OK : un autre opérateur ne peut pas dupliquer une fiche qui ne lui appartient pas.
+- Test confidentialité OK : détail et formulaire opérateur restent sans `FCFA`.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 19 : brouillons incomplets mieux guidés
+
+Objectif : dire clairement à l'opérateur ce qui bloque ou fragilise l'envoi d'une fiche au chef.
+
+- [x] Détecter les volumes entrée manquants par essence.
+- [x] Détecter les créneaux d'essence incomplets.
+- [x] Conserver les incohérences métier bloquantes existantes.
+- [x] Afficher les points bloquants dans `À compléter avant envoi`.
+- [x] Afficher les points non bloquants dans `Points à relire`.
+- [x] Bloquer aussi la soumission directe si un point bloquant existe.
+
+Revue finale :
+- Compilation Python OK.
+- Test OK : une fiche Ayous avec volume entrée 0 affiche `Volume entrée manquant pour Ayous`.
+- Test OK : l'envoi direct d'une fiche incomplète revient vers l'écran de vérification.
+- Test confidentialité OK : aucun `FCFA` dans la vérification opérateur.
+
+---
+
+## ⏳ P2.1 — Profil opérateur, étape 20 : résumé opérateur avant envoi
+
+Objectif : montrer simplement ce qui a été saisi, ce qui reste à relire, et ce qui part au chef.
+
+- [x] Ajouter un bloc `Résumé opérateur` sur l'écran de vérification.
+- [x] Afficher `Ce que j'ai saisi`.
+- [x] Afficher `À relire`.
+- [x] Afficher `Ce qui part au chef`.
+- [x] Garder une vue sans TRS, sans prix et sans chiffres économiques.
+
+Revue finale :
+- Compilation Python OK.
+- Test OK : une fiche complète affiche le résumé, les données transmises au chef et les commentaires.
+- Test confidentialité OK : aucun `FCFA` dans le résumé opérateur.
+
+---
+
+## ⏳ P2.1 — Étape 22 : préparer la validation chef
+
+Objectif : préparer le futur profil chef production en rendant les fiches à valider plus exploitables.
+
+- [x] Enrichir les fiches `à vérifier chef` avec le nombre de commentaires.
+- [x] Enrichir les fiches `à vérifier chef` avec le nombre d'anomalies.
+- [x] Afficher un extrait de commentaire opérateur dans l'alerte chef.
+- [x] Prioriser visuellement les fiches avec commentaires/anomalies.
+- [x] Ne pas encore refondre tout le profil chef production.
+
+Revue finale :
+- Compilation Python OK.
+- Test OK : une fiche envoyée au chef avec commentaires apparaît dans le dashboard chef.
+- Test OK : une fiche avec anomalie horaire affiche un badge d'alerte côté chef.
+
+---
+
+## ✅ P2.2 — Corrections immédiates du profil opérateur
+
+Objectif : corriger les fragilités critiques détectées dans l'audit du profil opérateur, sans surcharger l'interface.
+
+- [x] Séparer clairement le responsable terrain de la personne qui remplit la fiche.
+- [x] Bloquer côté serveur les volumes, effectifs et durées négatifs.
+- [x] Rendre la preuve papier obligatoire avant envoi quand la fiche est une ressaisie papier.
+- [x] Verrouiller la catégorie d'arrêt : elle est déduite de la cause, pas choisie librement.
+- [x] Remplacer les libellés opérateur ambigus `À vérifier chef` par `Chez le chef`.
+- [x] Vérifier le workflow création → vérification → envoi avec ces nouvelles règles.
+
+Revue finale :
+- Compilation Python OK.
+- Test création OK : volume négatif refusé et aucune fiche parasite créée.
+- Test papier OK : une ressaisie papier sans pièce jointe/signature reste bloquée avant l'envoi au chef.
+- Test arrêt OK : une catégorie falsifiée côté formulaire est ignorée et recalculée depuis la cause.
+- Test statut OK : une fiche envoyée affiche `Chez le chef`.
+- Test traçabilité OK : `Responsable terrain` et `Fiche remplie par` sont conservés et affichés.
+
+---
+
+## ✅ P2.3 — Corrections opérateur ciblées : CSRF, upload, guidage
+
+Objectif : corriger uniquement les oublis 1, 2, 3 et 4 du profil opérateur.
+
+- [x] Activer CSRF globalement et ajouter les tokens aux formulaires/POST AJAX.
+- [x] Renforcer la sécurité des pièces jointes papier par vérification de signature fichier.
+- [x] Ajouter une cible de correction pour guider l'opérateur vers le bloc/champ concerné.
+- [x] Vérifier le rendu serveur du formulaire opérateur et l'affichage du guidage.
+- [x] Vérifier les parcours POST critiques avec CSRF et les refus sans CSRF.
+
+Revue finale :
+- Compilation Python OK.
+- Import application OK : `APP_IMPORT_OK`.
+- Test CSRF OK : POST sans jeton refusé sans création de fiche.
+- Test upload OK : faux PDF refusé par signature binaire.
+- Test correction ciblée OK : `bloc-arrets` stocké et lien `#bloc-arrets` visible côté opérateur.
+- Test lancement réel OK : serveur Flask temporaire, `/login` 200, connexion opérateur, `/saisie/nouveau` 200.
+- Correction anti-crash OK : les templates vérifient que `csrf_token` existe avant de l'appeler, utile si un ancien serveur recharge les templates sans redémarrage Python.
+
+---
+
+## ⏳ P2.4 — Profil opérateur terrain plus simple
+
+Objectif : rendre le profil opérateur plus sûr, plus guidé et plus facile à utiliser en atelier.
+
+- [x] Étape 1 — Alerte forte après duplication : forcer la vérification de la date et rappeler que les volumes/arrêts ne sont pas copiés.
+- [x] Étape 2 — Aide conforme / déclassé / déchets directement dans la saisie production.
+- [x] Étape 3 — Sécuriser le bouton `Aucun arrêt` pour éviter l'effacement accidentel.
+- [x] Étape 4 — Saisie guidée en étapes sans casser le formulaire existant.
+- [x] Étape 5 — Checklist de vérification plus visuelle.
+- [x] Étape 6 — Historique opérateur simplifié.
+
+Revue étape 1 :
+- Alerte flash renforcée après `Reprendre structure`.
+- Redirection vers le formulaire avec le marqueur `reprise=1`.
+- Bandeau visible en haut du formulaire pour rappeler de vérifier la date/poste.
+- Rappel clair : essences et créneaux repris, volumes, arrêts, commentaires et pièce jointe non copiés.
+- Test OK : la duplication crée une nouvelle fiche brouillon avec volumes à 0 et affiche l'alerte de reprise.
+
+Correction UX chef :
+- [x] Clarifier `Zone à corriger` côté chef : ce choix indique la zone à ouvrir pour l'opérateur, il ne corrige pas la fiche directement.
+- [x] Ajouter un aperçu de la zone choisie.
+- [x] Ajouter un lien `Voir cette zone dans le formulaire` pour prévisualiser l'ancre.
+- [x] Confirmer après envoi quelle zone a été indiquée à l'opérateur.
+- Test OK : chef choisit `Arrêts machine`, renvoie la fiche, `correction_cible = bloc-arrets`, puis l'opérateur voit le lien `#bloc-arrets`.
+
+Correction UX détail fiche :
+- [x] Masquer le `Journal d'audit des corrections` de l'écran normal de détail.
+- [x] Conserver les traces en base pour audit futur, sans les afficher au chef dans son flux de travail.
+- Test OK : une fiche avec `soumission_initiale` en base n'affiche plus `Journal d'audit`, `soumission_initiale` ni `Voir les valeurs tracées`.
+
+Revue finale P2.4 :
+- Aide production ajoutée : conforme, déclassé, déchets expliqués dans le bloc production.
+- `Aucun arrêt` sécurisé : confirmation forte si des arrêts existent déjà.
+- Formulaire guidé en 5 étapes : en-tête, production, arrêts, commentaires/papier, vérification.
+- Vérification enrichie par une checklist visuelle : vert complet, orange à relire, rouge bloquant.
+- Historique opérateur simplifié : filtres directs, cartes par fiche, action principale visible selon le statut.
+- Test OK : rendu formulaire, vérification, historique, filtre `Validées`, lien de correction ciblée.
+
+Correction UX chef :
+- [x] Simplifier le renvoi à corriger : remplacer la liste technique par des boutons `Production`, `Arrêts`, `Papier`, `Commentaire`, `En-tête`.
+- [x] Ajouter des messages rapides pour éviter au chef de tout retaper.
+- [x] Garder le stockage `correction_cible` pour envoyer l'opérateur vers le bon bloc.
+- Test OK : bouton `Arrêts` équivaut à `bloc-arrets` et la fiche passe bien en `a_corriger`.
+
+Recette finale opérateur :
+- [x] Parcours complet OK : création fiche → vérification → envoi chef → retour correction → correction opérateur → resoumission → validation chef.
+- [x] Confidentialité OK : les vues opérateur testées ne montrent pas `FCFA`, `prix/m³` ou manque à gagner.
+- [x] Workflow correction OK : le chef choisit une zone simple, l'opérateur revient directement au bon bloc.
+- [x] CSRF OK : login, création, vérification et envoi fonctionnent avec jeton CSRF actif.
+- [x] Rendu serveur OK : formulaire, historique, détail, vérification et accueil opérateur.
+
+---
+
+## ⏳ P3.1 — Profil Chef Scierie : accueil Aujourd'hui
+
+Objectif : donner au chef scierie une première vue courte, actionnable et orientée décision immédiate.
+
+- [x] Créer une zone `Aujourd'hui` en haut du dashboard Chef.
+- [x] Afficher les actions immédiates : fiches à contrôler, corrections en attente, postes non saisis, brouillons anciens.
+- [x] Ajouter 5 KPI du jour : objectif, fiches à traiter, arrêts, rendement matière, déclassement.
+- [x] Afficher les postes du jour Matin / Après-midi avec statut et accès direct.
+- [x] Vérifier le rendu `/dashboard/chef` et le lancement Flask avant clôture.
+
+---
+
+## ⏳ P3.2 — Profil Chef Scierie : validation fiche assistée
+
+Objectif : aider le chef à valider vite, sans laisser passer les incohérences fortes.
+
+- [x] Ajouter une synthèse `Validation chef` sur la page détail fiche.
+- [x] Distinguer les anomalies bloquantes et les avertissements métier.
+- [x] Bloquer côté serveur la validation si une anomalie rouge est présente.
+- [x] Demander une confirmation et un motif si le chef valide malgré avertissements orange.
+- [x] Mettre en évidence les arrêts longs dans la table des arrêts.
+- [x] Vérifier le rendu détail fiche et les parcours validation bloquée / validation avec avertissement.
+
+---
+
+## ⏳ P3.3 — Profil Chef Scierie : page Fiches chef
+
+Objectif : donner au chef une liste de contrôle dédiée aux fiches, au lieu de l'obliger à passer par l'historique opérateur.
+
+- [x] Créer la route `/dashboard/chef/fiches`.
+- [x] Ajouter les filtres : statut, période, équipe, utilisateur, anomalies, recherche rapide.
+- [x] Afficher une liste actionnable : fiche, date, équipe, opérateur, essences, volume, TRS, arrêts, anomalies, statut, action.
+- [x] Relier le dashboard Chef et la navigation à cette nouvelle page.
+- [x] Vérifier le rendu et les filtres avant commit.

@@ -682,3 +682,17 @@ Objectif : transformer les symptômes terrain en causes racines défendables pou
 - [x] Intégrer les liens depuis Machines & Arrêts, Pareto, Recommandations, détail fiche et dashboard chef.
 - [x] Vérifier les accès rôles, le workflow complet, l'anti-doublon, le CSRF AJAX et l'impression A3.
 - [ ] Commit et push GitHub.
+
+---
+
+## ⏳ P3.6 — Profil Chef Scierie : Production & Objectifs
+
+Objectif : permettre au chef de voir si la scierie atteint l'objectif, où se situent les écarts et quels postes/essences doivent être analysés.
+
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Ajouter la route `/dashboard/chef/production`.
+- [x] Calculer objectif vs réalisé, écarts par jour, comparaison Matin/Après-midi, production par essence et postes sous objectif.
+- [x] Créer l'écran chef avec filtres `officiel` / `temps réel`.
+- [x] Relier la navigation et le bloc `Aujourd'hui`.
+- [x] Vérifier le rendu, les filtres et les liens vers fiches/Résolution.
+- [ ] Commit et push GitHub.

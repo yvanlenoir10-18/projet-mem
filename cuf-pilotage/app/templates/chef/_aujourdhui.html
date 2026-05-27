@@ -83,6 +83,12 @@
       {% if objectif.projection|default(none) %}
       <div class="wp-kpi-sub">Projection {{ objectif.projection.shift }} : ~{{ objectif.projection.volume }} m³.</div>
       {% endif %}
+      <div class="mt-2">
+        <a href="{{ url_for('dashboard.production_chef', jours=7, mode='temps_reel') }}"
+           class="btn btn-sm btn-outline-primary">
+          Voir production
+        </a>
+      </div>
     </div>
   </div>
 

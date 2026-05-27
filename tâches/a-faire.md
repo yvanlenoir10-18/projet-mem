@@ -654,3 +654,16 @@ Objectif : donner au chef une liste de contrôle dédiée aux fiches, au lieu de
 - [x] Afficher une liste actionnable : fiche, date, équipe, opérateur, essences, volume, TRS, arrêts, anomalies, statut, action.
 - [x] Relier le dashboard Chef et la navigation à cette nouvelle page.
 - [x] Vérifier le rendu et les filtres avant commit.
+
+---
+
+## ⏳ P3.4 — Profil Chef Scierie : Machines & Arrêts
+
+Objectif : donner au chef une vue de diagnostic pour comprendre quelles machines et quelles causes bloquent réellement la production.
+
+- [x] Créer la route `/dashboard/chef/machines`.
+- [x] Ajouter une lecture officielle et une lecture temps réel.
+- [x] Classer les machines par durée d'arrêt, fréquence, cause dominante et statut.
+- [x] Afficher les arrêts longs et les récurrences simples.
+- [x] Relier le dashboard Chef et la navigation à cette page.
+- [x] Vérifier le rendu, les filtres et le lancement Flask avant commit.

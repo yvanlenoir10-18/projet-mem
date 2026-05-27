@@ -550,6 +550,193 @@ def _compteurs_fiches_chef(lignes):
     }
 
 
+def _periode_depuis_jours(jours):
+    try:
+        jours = int(jours)
+    except (TypeError, ValueError):
+        jours = 30
+    if jours not in (7, 30, 90, 0):
+        jours = 30
+    depuis = None if jours == 0 else date.today() - timedelta(days=jours)
+    label = 'Toutes les dates' if jours == 0 else f'{jours} derniers jours'
+    return jours, depuis, label
+
+
+def _equipes_machines(jours, mode):
+    jours, depuis, label = _periode_depuis_jours(jours)
+    statuts = list(STATUTS_ANALYSES)
+    if mode == 'temps_reel':
+        statuts.append(STATUT_A_VERIFIER)
+    query = Equipe.query.filter(Equipe.statut.in_(tuple(statuts)))
+    if depuis:
+        query = query.filter(Equipe.date >= depuis)
+    return query.order_by(Equipe.date.desc()).all(), jours, label
+
+
+def _ligne_arret_machine(equipe, arret):
+    return {
+        'poste_id': equipe.id,
+        'date': equipe.date,
+        'date_fmt': equipe.date.strftime('%d/%m/%Y') if equipe.date else '—',
+        'shift': equipe.numero_equipe,
+        'machine': arret.machine,
+        'heure_debut': arret.heure_debut,
+        'heure_fin': arret.heure_fin,
+        'duree': arret.duree_min or 0,
+        'duree_fmt': _format_duree(arret.duree_min or 0),
+        'impact': arret.duree_impact_min,
+        'impact_fmt': _format_duree(arret.duree_impact_min),
+        'cause': arret.cause,
+        'categorie': arret.categorie,
+        'notes': (arret.notes or '').strip(),
+        'essences': equipe.essences_label,
+        'operateur': equipe.operateur_nom or (equipe.saisie_par.nom if equipe.saisie_par else 'Non renseigné'),
+        'href': url_for('saisie.detail_poste', poste_id=equipe.id),
+    }
+
+
+def _analyse_machines(equipes, machine_filtre=None):
+    machine_stats = {
+        machine: {
+            'machine': machine,
+            'duree': 0,
+            'count': 0,
+            'impact': 0,
+            'causes': defaultdict(lambda: {'duree': 0, 'count': 0}),
+            'categories': defaultdict(lambda: {'duree': 0, 'count': 0}),
+            'shifts': defaultdict(lambda: {'duree': 0, 'count': 0}),
+            'postes': set(),
+        }
+        for machine in Config.MACHINES
+    }
+    arrets = []
+
+    for equipe in equipes:
+        for arret in equipe.arrets:
+            if machine_filtre and arret.machine != machine_filtre:
+                continue
+            duree = arret.duree_min or 0
+            machine = arret.machine or 'Autre'
+            if machine not in machine_stats:
+                machine_stats[machine] = {
+                    'machine': machine,
+                    'duree': 0,
+                    'count': 0,
+                    'impact': 0,
+                    'causes': defaultdict(lambda: {'duree': 0, 'count': 0}),
+                    'categories': defaultdict(lambda: {'duree': 0, 'count': 0}),
+                    'shifts': defaultdict(lambda: {'duree': 0, 'count': 0}),
+                    'postes': set(),
+                }
+            stats = machine_stats[machine]
+            stats['duree'] += duree
+            stats['count'] += 1
+            stats['impact'] += arret.duree_impact_min
+            stats['postes'].add(equipe.id)
+            stats['causes'][arret.cause]['duree'] += duree
+            stats['causes'][arret.cause]['count'] += 1
+            stats['categories'][arret.categorie]['duree'] += duree
+            stats['categories'][arret.categorie]['count'] += 1
+            stats['shifts'][equipe.numero_equipe]['duree'] += duree
+            stats['shifts'][equipe.numero_equipe]['count'] += 1
+            arrets.append(_ligne_arret_machine(equipe, arret))
+
+    machines = []
+    for stats in machine_stats.values():
+        causes = sorted(
+            [{'nom': nom, **data} for nom, data in stats['causes'].items()],
+            key=lambda item: (item['duree'], item['count']),
+            reverse=True,
+        )
+        categories = sorted(
+            [{'nom': nom, **data} for nom, data in stats['categories'].items()],
+            key=lambda item: (item['duree'], item['count']),
+            reverse=True,
+        )
+        duree = stats['duree']
+        count = stats['count']
+        if duree > 120 or count >= 5:
+            statut, couleur = 'Critique', 'danger'
+        elif duree >= 45 or count >= 2:
+            statut, couleur = 'Surveiller', 'warning'
+        else:
+            statut, couleur = 'Normal', 'success'
+        machines.append({
+            'machine': stats['machine'],
+            'duree': duree,
+            'duree_fmt': _format_duree(duree),
+            'count': count,
+            'moyenne': round(duree / count, 1) if count else 0,
+            'impact': stats['impact'],
+            'impact_fmt': _format_duree(stats['impact']),
+            'cause_principale': causes[0] if causes else None,
+            'categorie_principale': categories[0] if categories else None,
+            'matin': stats['shifts'].get('Matin', {'duree': 0, 'count': 0}),
+            'apres_midi': stats['shifts'].get('Apres-midi', {'duree': 0, 'count': 0}),
+            'nb_postes': len(stats['postes']),
+            'statut': statut,
+            'couleur': couleur,
+        })
+
+    machines.sort(key=lambda item: (item['duree'], item['count']), reverse=True)
+    arrets.sort(key=lambda item: (item['duree'], item['date']), reverse=True)
+    arrets_longs = [a for a in arrets if a['duree'] >= 45][:12]
+    return machines, arrets, arrets_longs
+
+
+def _recurrences_machines(arrets):
+    recurrences = []
+    par_machine = defaultdict(list)
+    par_cause = defaultdict(list)
+    par_combo = defaultdict(list)
+    for arret in arrets:
+        par_machine[arret['machine']].append(arret)
+        par_cause[arret['cause']].append(arret)
+        par_combo[(arret['machine'], arret['cause'])].append(arret)
+
+    for machine, items in par_machine.items():
+        if len(items) >= 3:
+            recurrences.append({
+                'niveau': 'warning' if len(items) < 5 else 'danger',
+                'titre': f'{machine} revient souvent',
+                'detail': f"{len(items)} arrêt(s), {sum(i['duree'] for i in items)} min cumulées.",
+                'href': url_for('dashboard.machines_chef', machine=machine),
+            })
+    for cause, items in par_cause.items():
+        if len(items) >= 3:
+            recurrences.append({
+                'niveau': 'warning',
+                'titre': f'Cause récurrente : {cause}',
+                'detail': f"{len(items)} occurrence(s), machines : {', '.join(sorted(set(i['machine'] for i in items)))}.",
+                'href': url_for('analyse.arrets', jours=30),
+            })
+    for (machine, cause), items in par_combo.items():
+        if len(items) >= 2 and sum(i['duree'] for i in items) >= 90:
+            recurrences.append({
+                'niveau': 'danger',
+                'titre': f'{machine} · {cause}',
+                'detail': f"{len(items)} occurrence(s), {sum(i['duree'] for i in items)} min. Priorité diagnostic.",
+                'href': url_for('dashboard.machines_chef', machine=machine),
+            })
+
+    recurrences.sort(key=lambda item: 0 if item['niveau'] == 'danger' else 1)
+    return recurrences[:8]
+
+
+def _synthese_machines(machines, arrets):
+    total_duree = sum(m['duree'] for m in machines)
+    total_count = sum(m['count'] for m in machines)
+    machine_top = next((m for m in machines if m['count'] > 0), None)
+    return {
+        'total_arrets': total_count,
+        'total_duree': total_duree,
+        'total_duree_fmt': _format_duree(total_duree),
+        'machine_top': machine_top,
+        'arrets_longs': sum(1 for a in arrets if a['duree'] >= 45),
+        'machines_touchees': sum(1 for m in machines if m['count'] > 0),
+    }
+
+
 def _get_equipes_periode(jours=30):
     depuis = date.today() - timedelta(days=jours)
     return Equipe.query.filter(
@@ -885,6 +1072,39 @@ def fiches_chef():
             'validees': 'Validées / clôturées',
             'tous': 'Tous les statuts',
         },
+    )
+
+
+@dashboard_bp.route('/chef/machines')
+@login_required
+@roles_required('chef', 'admin')
+def machines_chef():
+    """Diagnostic Machines & Arrêts pour le chef scierie."""
+    jours = request.args.get('jours', 30)
+    mode = request.args.get('mode', 'officiel').strip()
+    if mode not in ('officiel', 'temps_reel'):
+        mode = 'officiel'
+    machine = request.args.get('machine', '').strip()
+    if machine not in Config.MACHINES:
+        machine = ''
+
+    equipes, jours, label_periode = _equipes_machines(jours, mode)
+    machines, arrets, arrets_longs = _analyse_machines(equipes, machine or None)
+    recurrences = _recurrences_machines(arrets)
+    synthese = _synthese_machines(machines, arrets)
+
+    return render_template(
+        'chef/machines.html',
+        jours=jours,
+        mode=mode,
+        machine=machine,
+        label_periode=label_periode,
+        machines=machines,
+        arrets=arrets[:80],
+        arrets_longs=arrets_longs,
+        recurrences=recurrences,
+        synthese=synthese,
+        machines_options=Config.MACHINES,
     )
 
 

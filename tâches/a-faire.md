@@ -726,3 +726,21 @@ Objectif : transformer un problème vu par le chef en décision suivie avec resp
 - [x] Afficher les actions en retard dans les actions immédiates du chef.
 - [x] Vérifier création, retard, statuts, accès PDG interdit et classement sans action avec motif.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.9 — Profil Chef Scierie : recette complète
+
+Objectif : vérifier que le profil Chef fonctionne comme une console de pilotage opérationnel après l'ajout des modules Fiches, Machines, Production, Qualité, Résolution et Actions.
+
+- [x] Synchroniser la branche avec les changements de Claude Code.
+- [x] Vérifier la compilation Python.
+- [x] Vérifier le JavaScript du formulaire de saisie.
+- [x] Vérifier les accès : chef/admin autorisés, PDG/opérateur redirigés.
+- [x] Tester les pages Chef principales.
+- [x] Tester les liens internes des pages Chef.
+- [x] Tester une action en retard affichée dans le dashboard.
+- [x] Tester le changement de statut d'une action.
+- [x] Tester `Classé sans action` refusé sans motif puis accepté avec motif.
+- [x] Nettoyer les données temporaires de test.
+- [x] Commit et push GitHub.

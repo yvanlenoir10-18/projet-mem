@@ -1,11 +1,15 @@
 ---
 name: run-cuf-pilotage
-description: Run, start, launch, test, screenshot, smoke-test, verify the CUF Pilotage Flask web app (wood_pilot). Drive it with curl. Check that login, saisie, dashboard chef, PDG, admin, anti-chevauchement all work.
+description: Run, start, launch, test, screenshot, smoke-test, verify the CUF Pilotage Flask web app (wood_pilot). Drive it with curl or Playwright. Check that login, saisie, dashboard chef, PDG, admin, anti-chevauchement all work. Take real screenshots of every view.
 ---
 
 # run-cuf-pilotage
 
-Application Flask de pilotage de la production (wood_pilot) pour la scierie CUF Ebolowa. Serveur web local, 100 % hors ligne, base SQLite. Piloté par `curl` + cookies. Le driver principal est `smoke.sh` — il lance le serveur si nécessaire, teste 4 rôles et la validation métier anti-chevauchement, retourne exit 0/1.
+Application Flask de pilotage de la production (wood_pilot) pour la scierie CUF Ebolowa. Serveur web local, 100 % hors ligne, base SQLite.
+
+Deux drivers disponibles selon le besoin :
+- **`smoke.sh`** — curl + cookies : vérifie les routes serveur (16 checks, exit 0/1). Pas besoin de navigateur. Idéal pour valider une PR qui touche des routes Flask.
+- **`screenshot.py`** — Playwright headless : prend de vraies screenshots de l'UI pour chaque rôle. Idéal pour vérifier des changements de template ou de CSS.
 
 **Unit root :** `cuf-pilotage/` (tous les chemins ci-dessous sont relatifs à ce dossier).
 
@@ -17,11 +21,16 @@ Application Flask de pilotage de la production (wood_pilot) pour la scierie CUF 
 # Python 3.11+ requis (vérifié : Python 3.11.15)
 python --version
 
-# Dépendances (déjà installées dans ce container — relancer si clean slate)
+# Dépendances app (déjà installées dans ce container — relancer si clean slate)
 pip install -r requirements.txt
+
+# Pour screenshot.py uniquement — Playwright + Chromium
+pip install playwright
+# Chromium déjà présent dans ce container :
+# /opt/pw-browsers/chromium-1194/chrome-linux/chrome
 ```
 
-Pas de venv, pas de `apt-get` supplémentaire : toutes les dépendances sont des packages Python purs (Flask, SQLAlchemy, WTForms, openpyxl, anthropic, groq).
+Pas de venv, pas de `apt-get` supplémentaire : toutes les dépendances sont des packages Python purs.
 
 ---
 
@@ -87,6 +96,31 @@ curl -s -c "$COOKIE" -b "$COOKIE" \
   -o /dev/null -w "%{http_code}\n" http://127.0.0.1:5000/saisie/nouveau
 # → 302 (brouillon créé)
 ```
+
+---
+
+## Screenshots — driver Playwright
+
+```bash
+cd cuf-pilotage
+
+# Toutes les vues, tous les rôles (10 screenshots)
+python .claude/skills/run-cuf-pilotage/screenshot.py
+# → .claude/skills/run-cuf-pilotage/screenshots/*.png
+
+# Un seul rôle
+python .claude/skills/run-cuf-pilotage/screenshot.py operateur
+python .claude/skills/run-cuf-pilotage/screenshot.py chef
+
+# Vue ad-hoc (le rôle est déduit du chemin)
+python .claude/skills/run-cuf-pilotage/screenshot.py /saisie/historique
+# → /tmp/cuf-ss/saisie-historique.png
+```
+
+Chromium utilisé : `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` (déjà présent, pas de download).
+Chaque rôle utilise un contexte de navigateur isolé — pas de pollution de session entre les logins.
+
+**Gotcha Playwright** : ne pas réutiliser `async_playwright()` entre deux `login()` du même contexte. Flask-Login redirige vers l'accueil si déjà connecté — `input[name="email"]` n'existe pas → `TimeoutError`. Solution : créer un nouveau contexte (`browser.new_context()`) par rôle.
 
 ---
 
@@ -156,6 +190,8 @@ curl -s -b "$COOKIE" \
 - **`_repair_seed_roles()` s'exécute au démarrage** : si `saisie@cuf.cm` a le rôle `admin` en base, il sera automatiquement corrigé en `operateur` au prochain démarrage.
 - **SQLite en mode WAL** : pas de lock reader/writer sur Linux. Pas de problème de concurrence en dev mono-process.
 - **`use_reloader=False`** dans `run.py` : intentionnel — évite la boucle de rechargement Python Store sur Windows. Sur Linux n'a aucun effet.
+- **Playwright `playwright install`** échoue dans ce container (pas d'accès réseau aux CDN). Utiliser le Chromium déjà présent via `executable_path='/opt/pw-browsers/chromium-1194/chrome-linux/chrome'`.
+- **`TimeoutError: Page.fill — waiting for input[name="email"]`** dans Playwright : login appelé sur un contexte déjà authentifié. Flask-Login redirige vers l'accueil — le formulaire login n'existe pas. Fix : nouveau `browser.new_context()` par rôle.
 
 ---
 
@@ -169,3 +205,4 @@ curl -s -b "$COOKIE" \
 | Route → HTTP 403 | Mauvais rôle pour cette route | Vérifier le rôle du compte connecté |
 | Flash "Chevauchement horaire" | Deux créneaux qui se recouvrent | Corriger les horaires (bornes jointives OK) |
 | `instance/woodpilot.db` absent | Premier démarrage, base non créée | Lancer `python run.py` une première fois |
+| `playwright install` échoue | Pas d'accès réseau CDN dans ce container | Utiliser `executable_path='/opt/pw-browsers/chromium-1194/chrome-linux/chrome'` — déjà dans `screenshot.py` |

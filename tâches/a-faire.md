@@ -744,3 +744,17 @@ Objectif : vérifier que le profil Chef fonctionne comme une console de pilotage
 - [x] Tester `Classé sans action` refusé sans motif puis accepté avec motif.
 - [x] Nettoyer les données temporaires de test.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.10 — Profil Chef Scierie : priorités de décision
+
+Objectif : transformer les signaux déjà calculés en une courte liste de priorités actionnables pour aider le chef à décider quoi regarder maintenant.
+
+- [x] Synchroniser la branche avec les changements de Claude Code.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Ajouter un service léger de priorisation dans le dashboard Chef.
+- [x] Remonter les priorités principales : actions en retard, fiches à vérifier, problèmes ouverts, machine prioritaire, production sous objectif, déclassement élevé.
+- [x] Afficher un bloc compact `Priorités du chef` sur `/dashboard/chef`.
+- [x] Vérifier compilation, rendu dashboard et accès rôles.
+- [x] Commit et push GitHub.

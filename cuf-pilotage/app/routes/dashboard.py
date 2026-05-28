@@ -520,6 +520,165 @@ def _actions_immediates(aujourd_hui, alertes):
     return actions[:8]
 
 
+def _machine_prioritaire_recent(aujourd_hui, jours=7):
+    """Retourne la machine qui consomme le plus de temps d'arrêt récent."""
+    depuis = aujourd_hui - timedelta(days=jours)
+    statuts = tuple(dict.fromkeys((STATUT_A_VERIFIER, *STATUTS_ANALYSES)))
+    equipes = Equipe.query.filter(
+        Equipe.date >= depuis,
+        Equipe.date <= aujourd_hui,
+        Equipe.statut.in_(statuts),
+    ).all()
+
+    machines = defaultdict(lambda: {'duree': 0, 'count': 0, 'causes': defaultdict(int)})
+    for equipe in equipes:
+        for arret in equipe.arrets:
+            duree = arret.duree_min or 0
+            if duree <= 0:
+                continue
+            stats = machines[arret.machine]
+            stats['duree'] += duree
+            stats['count'] += 1
+            stats['causes'][arret.cause or arret.categorie or 'Cause non précisée'] += duree
+
+    if not machines:
+        return None
+
+    machine, stats = max(machines.items(), key=lambda item: item[1]['duree'])
+    cause = None
+    if stats['causes']:
+        cause, cause_duree = max(stats['causes'].items(), key=lambda item: item[1])
+    else:
+        cause_duree = 0
+
+    return {
+        'machine': machine,
+        'duree': stats['duree'],
+        'duree_fmt': _format_duree(stats['duree']),
+        'count': stats['count'],
+        'cause': cause,
+        'cause_duree': cause_duree,
+        'jours': jours,
+    }
+
+
+def _priorites_chef(aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_actions_chef):
+    """
+    P3.10 — Synthèse décisionnelle courte.
+    Elle ne remplace pas les KPI : elle traduit les signaux en choix d'action.
+    """
+    priorites = []
+
+    def add(niveau, icon, titre, signal, decision, href, cta, score):
+        priorites.append({
+            'niveau': niveau,
+            'icon': icon,
+            'titre': titre,
+            'signal': signal,
+            'decision': decision,
+            'href': href,
+            'cta': cta,
+            'score': score,
+        })
+
+    nb_retard = stats_actions_chef.get('retard', 0) if stats_actions_chef else 0
+    if nb_retard:
+        add(
+            'danger',
+            'bi-alarm',
+            'Lever les actions en retard',
+            f"{nb_retard} action(s) ont dépassé leur délai.",
+            "Commencer par les actions déjà décidées : elles bloquent souvent la résolution réelle.",
+            url_for('dashboard.actions_chef', statut='retard'),
+            'Traiter les retards',
+            120,
+        )
+
+    fiches = list(alertes.get('fiches_a_verifier', [])) if alertes else []
+    fiche_risque = next((f for f in fiches if f.get('nb_anomalies', 0) > 0), fiches[0] if fiches else None)
+    if fiche_risque:
+        nb_anomalies = fiche_risque.get('nb_anomalies', 0)
+        niveau = 'danger' if nb_anomalies else 'warning'
+        signal = (
+            f"Fiche {fiche_risque['date_fmt']} · {fiche_risque['shift']} · "
+            f"{fiche_risque['operateur']}"
+        )
+        if nb_anomalies:
+            signal += f" · {nb_anomalies} anomalie(s)"
+        add(
+            niveau,
+            'bi-shield-exclamation' if nb_anomalies else 'bi-clipboard-check',
+            'Contrôler la fiche la plus risquée',
+            signal,
+            "Valider seulement si les données sont cohérentes ; sinon renvoyer avec un message précis.",
+            url_for('saisie.detail_poste', poste_id=fiche_risque['id']),
+            'Ouvrir la fiche',
+            110 if nb_anomalies else 85,
+        )
+
+    machine_top = _machine_prioritaire_recent(aujourd_hui, jours=7)
+    if machine_top and machine_top['duree'] >= 60:
+        niveau = 'danger' if machine_top['duree'] >= 180 or machine_top['count'] >= 3 else 'warning'
+        cause_txt = f" Cause dominante : {machine_top['cause']}." if machine_top.get('cause') else ''
+        add(
+            niveau,
+            'bi-tools',
+            'Regarder la machine prioritaire',
+            f"{machine_top['machine']} cumule {machine_top['duree_fmt']} sur 7 jours.{cause_txt}",
+            "Décider si un diagnostic maintenance, matière ou méthode doit être lancé.",
+            url_for('dashboard.machines_chef', jours=7, mode='temps_reel', machine=machine_top['machine']),
+            'Voir machines',
+            95,
+        )
+
+    objectif = (kpi_jour or {}).get('objectif', {})
+    pct_objectif = objectif.get('pct', 0) or 0
+    objectif_jour = objectif.get('objectif', 0) or 0
+    if objectif_jour and pct_objectif < 100:
+        niveau = 'danger' if pct_objectif < 75 else 'warning'
+        add(
+            niveau,
+            'bi-bullseye',
+            "Suivre l'écart à l'objectif",
+            f"Objectif du jour à {pct_objectif}% · écart {objectif.get('ecart_m3', 0)} m³.",
+            "Comparer les postes et les essences avant de demander une action terrain.",
+            url_for('dashboard.production_chef', jours=7, mode='temps_reel'),
+            'Voir production',
+            75 if niveau == 'danger' else 55,
+        )
+
+    declass = (kpi_jour or {}).get('declass', {})
+    declass_val = declass.get('valeur', 0) or 0
+    declass_seuil = declass.get('seuil', 30) or 30
+    if declass_val >= declass_seuil * 0.8 and declass_val > 0:
+        niveau = 'danger' if declass_val > declass_seuil else 'warning'
+        add(
+            niveau,
+            'bi-gem',
+            'Comprendre le déclassement',
+            f"Taux du jour : {declass_val}% pour un seuil de {declass_seuil}%.",
+            "Vérifier si le problème vient de la matière, du sciage, des dimensions ou du classement.",
+            url_for('dashboard.qualite_chef', jours=7, mode='temps_reel'),
+            'Voir qualité',
+            70 if niveau == 'danger' else 50,
+        )
+
+    if nb_problemes_ouverts:
+        add(
+            'info',
+            'bi-diagram-3',
+            'Clore les analyses ouvertes',
+            f"{nb_problemes_ouverts} analyse(s) Ishikawa / 5 Pourquoi encore ouvertes.",
+            "Transformer les causes racines en actions ou clôturer les analyses terminées.",
+            url_for('problemes.liste'),
+            'Ouvrir résolution',
+            35,
+        )
+
+    priorites.sort(key=lambda item: item['score'], reverse=True)
+    return priorites[:5]
+
+
 def _statut_fiche_chef(statut):
     labels = {
         STATUT_BROUILLON: ('Brouillon', 'warning'),
@@ -1269,6 +1428,9 @@ def vue_chef():
         Probleme.statut.in_(('ouvert', 'en_analyse'))
     ).count()
     stats_actions_chef = _stats_actions_chef()
+    priorites_chef = _priorites_chef(
+        aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_actions_chef
+    )
 
     try:
         mois_sel  = int(request.args.get('mois',  0))
@@ -1305,7 +1467,8 @@ def vue_chef():
                                actions_immediates=actions_immediates,
                                alertes=alertes,
                                nb_problemes_ouverts=nb_problemes_ouverts,
-                               stats_actions_chef=stats_actions_chef)
+                               stats_actions_chef=stats_actions_chef,
+                               priorites_chef=priorites_chef)
 
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen    = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
@@ -1544,7 +1707,8 @@ def vue_chef():
                            actions_immediates=actions_immediates,
                            alertes=alertes,
                            nb_problemes_ouverts=nb_problemes_ouverts,
-                           stats_actions_chef=stats_actions_chef)
+                           stats_actions_chef=stats_actions_chef,
+                           priorites_chef=priorites_chef)
 
 
 @dashboard_bp.route('/chef/fiches')

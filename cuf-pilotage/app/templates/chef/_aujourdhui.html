@@ -6,6 +6,7 @@
 {% set declass = k.declass|default({}) %}
 {% set trs = k.trs|default({}) %}
 {% set actions = actions_immediates|default([]) %}
+{% set priorites = priorites_chef|default([]) %}
 {% set postes_jour = postes_du_jour|default([]) %}
 
 <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
@@ -21,6 +22,52 @@
      class="btn btn-sm btn-outline-primary">
     <i class="bi bi-clipboard-check"></i> Fiches à traiter
   </a>
+</div>
+
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-emerald);">
+  <div class="wp-card-header">
+    <i class="bi bi-compass"></i> Priorités du chef
+    <span class="ms-auto" style="font-size:.74rem;font-weight:500;color:var(--wp-muted);">
+      Décisions à prendre en premier
+    </span>
+  </div>
+  <div class="p-3">
+    {% if priorites %}
+    <div class="row g-2">
+      {% for p in priorites %}
+      {% set p_color = 'var(--wp-terracotta)' if p.niveau == 'danger' else ('var(--wp-ochre)' if p.niveau == 'warning' else 'var(--wp-sky)') %}
+      <div class="col-12 col-xl-6">
+        <a href="{{ p.href }}"
+           style="display:block;text-decoration:none;color:inherit;border:1px solid #e6e0d5;border-left:4px solid {{ p_color }};border-radius:8px;padding:12px;background:#fff;height:100%;">
+          <div class="d-flex justify-content-between align-items-start gap-2">
+            <div class="d-flex gap-2" style="min-width:0;">
+              <i class="bi {{ p.icon }}" style="color:{{ p_color }};font-size:1.05rem;margin-top:1px;"></i>
+              <div style="min-width:0;">
+                <div style="font-weight:900;color:var(--wp-ink);font-size:.88rem;">{{ p.titre }}</div>
+                <div style="font-size:.77rem;color:var(--wp-muted);line-height:1.35;margin-top:2px;">{{ p.signal }}</div>
+              </div>
+            </div>
+            <span class="badge {% if p.niveau == 'danger' %}bg-danger{% elif p.niveau == 'warning' %}bg-warning text-dark{% else %}bg-info text-dark{% endif %}">
+              {% if p.niveau == 'danger' %}Urgent{% elif p.niveau == 'warning' %}À décider{% else %}À suivre{% endif %}
+            </span>
+          </div>
+          <div style="font-size:.78rem;color:var(--wp-ink);line-height:1.35;margin-top:.65rem;">
+            {{ p.decision }}
+          </div>
+          <div class="mt-2">
+            <span class="btn btn-sm btn-outline-primary" style="pointer-events:none;">{{ p.cta }}</span>
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="d-flex align-items-center gap-2" style="color:var(--wp-leaf);font-weight:800;">
+      <i class="bi bi-check-circle"></i>
+      Rien de critique à prioriser pour le moment.
+    </div>
+    {% endif %}
+  </div>
 </div>
 
 <div class="wp-card mb-4" style="border-left:4px solid var(--wp-leaf);">

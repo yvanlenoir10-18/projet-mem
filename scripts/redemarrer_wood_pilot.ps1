@@ -47,16 +47,26 @@ $started = Start-Process -FilePath $pythonExe `
     -WindowStyle Hidden `
     -PassThru
 
-Start-Sleep -Seconds 3
+$ok = $false
+$lastError = ""
+for ($i = 1; $i -le 12; $i++) {
+    Start-Sleep -Seconds 2
+    try {
+        $response = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/login" -UseBasicParsing -TimeoutSec 10 -ErrorAction Stop
+        Write-Host "OK: wood_pilot est lance. HTTP $($response.StatusCode)"
+        Write-Host "Local: http://127.0.0.1:$Port/login"
+        Write-Host "Reseau: http://192.168.1.132:$Port/login"
+        Write-Host "PID parent: $($started.Id)"
+        $ok = $true
+        break
+    } catch {
+        $lastError = $_.Exception.Message
+        Write-Host "Attente du serveur... tentative $i/12"
+    }
+}
 
-try {
-    $response = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/login" -UseBasicParsing -TimeoutSec 10
-    Write-Host "OK: wood_pilot est lance. HTTP $($response.StatusCode)"
-    Write-Host "Local: http://127.0.0.1:$Port/login"
-    Write-Host "Reseau: http://192.168.1.132:$Port/login"
-    Write-Host "PID parent: $($started.Id)"
-} catch {
+if (-not $ok) {
     Write-Host "ATTENTION: serveur lance mais test HTTP non confirme."
-    Write-Host $_.Exception.Message
+    Write-Host $lastError
     exit 1
 }

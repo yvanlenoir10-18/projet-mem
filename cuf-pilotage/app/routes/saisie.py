@@ -627,6 +627,46 @@ def _extraire_productions_arrets(form):
             durees_prevues, notes_arrets)
 
 
+def _minutes_horaire(valeur):
+    """Convertit 'HH:MM' en minutes depuis minuit, ou None si invalide."""
+    try:
+        h, m = map(int, (valeur or '').split(':'))
+        return h * 60 + m
+    except (ValueError, AttributeError):
+        return None
+
+
+def _chevauchement_productions(essences, prod_debuts, prod_fins):
+    """Détecte un chevauchement horaire entre lignes de production.
+
+    La chaîne 4 est une machine unique (la bicoupe traite 100 % du bois) :
+    deux essences ne peuvent pas être traitées sur des créneaux qui se
+    recouvrent. Renvoie un message décrivant le premier conflit, ou None.
+    Les bornes jointives (fin de l'une = début de l'autre) sont autorisées.
+    """
+    intervalles = []
+    for i, essence in enumerate(essences):
+        if not essence:
+            continue
+        debut = _minutes_horaire(prod_debuts[i] if i < len(prod_debuts) else None)
+        fin = _minutes_horaire(prod_fins[i] if i < len(prod_fins) else None)
+        if debut is None or fin is None or fin <= debut:
+            continue
+        intervalles.append((debut, fin, essence,
+                            prod_debuts[i], prod_fins[i]))
+    intervalles.sort()
+    couvrant = None
+    for it in intervalles:
+        if couvrant is not None and it[0] < couvrant[1]:
+            return (f"Chevauchement horaire : « {couvrant[2]} » "
+                    f"({couvrant[3]}–{couvrant[4]}) et « {it[2]} » "
+                    f"({it[3]}–{it[4]}) se recouvrent. La chaîne ne traite "
+                    f"qu'une essence à la fois.")
+        if couvrant is None or it[1] > couvrant[1]:
+            couvrant = it
+    return None
+
+
 def _cause_arret_finale(cause_base, detail):
     """Construit la cause enregistrée à partir du choix rapide et du détail manuel."""
     cause_base = (cause_base or '').strip()
@@ -785,6 +825,12 @@ def nouveau_poste():
 
             if not essences:
                 flash("Au moins une ligne de production est requise.", 'danger')
+                db.session.rollback()
+                return _render_form()
+
+            conflit_horaire = _chevauchement_productions(essences, prod_debuts, prod_fins)
+            if conflit_horaire:
+                flash(conflit_horaire, 'danger')
                 db.session.rollback()
                 return _render_form()
 
@@ -1027,6 +1073,12 @@ def modifier_equipe(equipe_id):
 
             if not essences:
                 flash("Au moins une ligne de production est requise.", 'danger')
+                db.session.rollback()
+                return _render_form(equipe)
+
+            conflit_horaire = _chevauchement_productions(essences, prod_debuts, prod_fins)
+            if conflit_horaire:
+                flash(conflit_horaire, 'danger')
                 db.session.rollback()
                 return _render_form(equipe)
 

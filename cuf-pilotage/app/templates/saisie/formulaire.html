@@ -331,6 +331,8 @@
     </div>
   </div>
 
+  <div id="alerte-chevauchement" class="wp-overlap-alert" role="alert" hidden></div>
+
   <div class="d-flex gap-2 flex-wrap align-items-center" id="actions-verification">
     <span class="wp-step-chip">Étape 5</span>
     <button type="submit"
@@ -824,35 +826,97 @@ function majProduction(index) {
         message = 'Conforme + déclassé dépasse le volume entrée.';
     }
 
-    // F4 — Poka-yoke volume : deux niveaux non-bloquants (orange / rouge)
+    // F4 — Poka-yoke : le bois produit (conforme + déclassé) ne peut pas
+    // dépasser la capacité théorique du créneau. Deux niveaux non-bloquants.
     let rangeMessage = '';
     let rangeIsWarning = false;
     if (!message) {
         const capaciteH = essence ? (capacitesEssences[essence] ?? null) : null;
-        if (capaciteH && duree !== null && duree > 0 && entree > 0) {
+        if (capaciteH && duree !== null && duree > 0 && totalSorti > 0) {
             const capaciteCreneau = capaciteH * (duree / 60);
-            if (entree > capaciteCreneau * 1.3) {
-                rangeMessage = `Volume impossible pour ce créneau (max théorique : ${capaciteCreneau.toFixed(2)} m³) — vérifiez la saisie.`;
-            } else if (entree > capaciteCreneau) {
-                rangeMessage = `Volume inhabituellement élevé — dépasse la capacité théorique du créneau (${capaciteCreneau.toFixed(2)} m³).`;
+            if (totalSorti > capaciteCreneau * 1.3) {
+                rangeMessage = `Bois produit impossible pour ce créneau (max théorique : ${capaciteCreneau.toFixed(2)} m³ conforme + déclassé) — vérifiez la saisie.`;
+            } else if (totalSorti > capaciteCreneau) {
+                rangeMessage = `Production inhabituellement élevée — dépasse la capacité théorique du créneau (${capaciteCreneau.toFixed(2)} m³ conforme + déclassé).`;
                 rangeIsWarning = true;
             }
         }
     }
 
     const displayMessage = message || rangeMessage;
-    if (alerte) {
-        alerte.hidden = !displayMessage;
-        alerte.textContent = displayMessage;
-        alerte.classList.toggle('is-warning', Boolean(rangeIsWarning));
+    if (carte) {
+        carte.dataset.volMsg = displayMessage;
+        carte.dataset.volWarn = (rangeIsWarning && !message) ? '1' : '';
     }
-    if (carte) carte.classList.toggle('has-warning', Boolean(displayMessage));
 
     const complet = essence && debut && fin && entree > 0 && conforme >= 0 && declass >= 0 && !message;
     if (etat) {
         etat.textContent = complet ? 'Complet' : 'À compléter';
         etat.classList.toggle('is-complete', complet);
     }
+
+    rafraichirEtatProductions();
+}
+
+// Anti-chevauchement : la chaîne 4 est une machine unique, deux essences ne
+// peuvent pas être traitées sur des créneaux qui se recouvrent. Détection en
+// direct (alerte rouge) ; le serveur bloque définitivement la soumission.
+function intervallesProduction() {
+    const liste = [];
+    document.querySelectorAll('[id^="prod-"]').forEach(carte => {
+        const idx = carte.id.replace('prod-', '');
+        const debut = carte.querySelector(`.prod-debut-${idx}`)?.value || '';
+        const fin   = carte.querySelector(`.prod-fin-${idx}`)?.value || '';
+        const essence = carte.querySelector(`.prod-essence-${idx}`)?.value || 'Essence';
+        const d = minutesDepuisMinuit(debut);
+        const f = minutesDepuisMinuit(fin);
+        if (d !== null && f !== null && f > d) {
+            liste.push({ idx, d, f, essence, debut, fin });
+        }
+    });
+    return liste;
+}
+
+function rafraichirEtatProductions() {
+    const intervalles = intervallesProduction().sort((a, b) => a.d - b.d);
+    const enConflit = new Set();
+    let couvrant = null;
+    let messageConflit = '';
+    for (const it of intervalles) {
+        if (couvrant && it.d < couvrant.f) {           // chevauchement strict
+            enConflit.add(it.idx);
+            enConflit.add(couvrant.idx);
+            if (!messageConflit) {
+                messageConflit = `Chevauchement : « ${couvrant.essence} » (${couvrant.debut}–${couvrant.fin}) et « ${it.essence} » (${it.debut}–${it.fin}) se recouvrent. La chaîne ne traite qu'une essence à la fois.`;
+            }
+        }
+        if (!couvrant || it.f > couvrant.f) couvrant = it;
+    }
+
+    document.querySelectorAll('[id^="prod-"]').forEach(carte => {
+        const idx = carte.id.replace('prod-', '');
+        const alerte = carte.querySelector(`.prod-alert-${idx}`);
+        if (!alerte) return;
+        if (enConflit.has(idx)) {
+            alerte.hidden = false;
+            alerte.textContent = 'Chevauchement horaire avec une autre essence — corrigez les horaires.';
+            alerte.classList.remove('is-warning');
+            carte.classList.add('has-warning');
+        } else {
+            const volMsg = carte.dataset.volMsg || '';
+            alerte.hidden = !volMsg;
+            alerte.textContent = volMsg;
+            alerte.classList.toggle('is-warning', carte.dataset.volWarn === '1');
+            carte.classList.toggle('has-warning', Boolean(volMsg));
+        }
+    });
+
+    const banniere = document.getElementById('alerte-chevauchement');
+    if (banniere) {
+        banniere.hidden = !messageConflit;
+        banniere.textContent = messageConflit;
+    }
+    return enConflit.size > 0;
 }
 
 function majDechets(index) {
@@ -894,6 +958,7 @@ function ajouterProductionAvecDonnees(data) {
 function supprimerProduction(index) {
     const el = document.getElementById('prod-' + index);
     if (el) el.remove();
+    rafraichirEtatProductions();
 }
 
 function majArret(index) {
@@ -1070,5 +1135,18 @@ arretsDonnees.forEach(a => ajouterArretAvecDonnees(a));
 if (aucunArretInitial && arretsDonnees.length === 0) {
     confirmerAucunArret();
 }
+
+// Blocage soumission si chevauchement horaire (le serveur refuse aussi).
+const formEquipe = document.getElementById('formEquipe');
+if (formEquipe) {
+    formEquipe.addEventListener('submit', (e) => {
+        if (rafraichirEtatProductions()) {
+            e.preventDefault();
+            const banniere = document.getElementById('alerte-chevauchement');
+            if (banniere) banniere.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    });
+}
+rafraichirEtatProductions();
 </script>
 {% endblock %}

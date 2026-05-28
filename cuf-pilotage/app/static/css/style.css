@@ -296,6 +296,15 @@ body {
 .wp-production-alert.is-warning {
   color: var(--wp-ochre); background: rgba(188,140,56,.10);
 }
+.wp-overlap-alert {
+  margin: 14px 0 4px; color: #fff; background: var(--wp-terracotta);
+  border-radius: 12px; padding: 12px 14px; font-size: .86rem; font-weight: 700;
+  display: flex; align-items: center; gap: 8px;
+  box-shadow: 0 4px 14px rgba(216,113,73,.28);
+}
+.wp-overlap-alert::before {
+  content: "\F33A"; font-family: "bootstrap-icons"; font-size: 1.1rem; flex-shrink: 0;
+}
 .wp-volume-helper {
   margin-top: 12px; border: 1px dashed rgba(31,92,61,.24); border-radius: 12px;
   background: rgba(31,92,61,.035); padding: 12px;

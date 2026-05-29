@@ -827,3 +827,16 @@ Objectif : rendre chaque action plus lisible dans la liste en indiquant immédia
 - [x] Afficher ce signal dans chaque carte action.
 - [x] Vérifier compilation, rendu et filtres existants.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.16 — Profil Chef Scierie : actions rapides sur les actions Chef
+
+Objectif : réduire les clics pour changer le statut d'une action courante.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Ajouter des boutons rapides `Démarrer` et `Marquer fait`.
+- [x] Garder le changement avancé par liste déroulante.
+- [x] Vérifier compilation, rendu et changements de statut.
+- [x] Commit et push GitHub.

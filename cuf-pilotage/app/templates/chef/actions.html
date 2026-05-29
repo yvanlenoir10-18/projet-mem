@@ -181,9 +181,29 @@
             <i class="bi bi-box-arrow-up-right"></i> Ouvrir la source
           </a>
           {% endif %}
+          {% if action.statut in ['a_faire', 'en_cours'] %}
+          <div class="d-grid gap-2">
+            {% if action.statut == 'a_faire' %}
+            <form method="POST" action="{{ url_for('dashboard.changer_statut_action_chef', action_id=action.id) }}">
+              {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+              <input type="hidden" name="statut" value="en_cours">
+              <button class="btn btn-sm btn-outline-primary w-100">
+                <i class="bi bi-play-circle"></i> Démarrer
+              </button>
+            </form>
+            {% endif %}
+            <form method="POST" action="{{ url_for('dashboard.changer_statut_action_chef', action_id=action.id) }}">
+              {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+              <input type="hidden" name="statut" value="fait">
+              <button class="btn btn-sm btn-success w-100">
+                <i class="bi bi-check2-circle"></i> Marquer fait
+              </button>
+            </form>
+          </div>
+          {% endif %}
           <form method="POST" action="{{ url_for('dashboard.changer_statut_action_chef', action_id=action.id) }}">
             {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
-            <label class="form-label" style="font-size:.76rem;font-weight:800;">Changer le statut</label>
+            <label class="form-label" style="font-size:.76rem;font-weight:800;">Statut avancé</label>
             <select name="statut" class="form-select form-select-sm mb-2" onchange="this.form.querySelector('.motif-action').style.display = this.value === 'classe_sans_action' ? 'block' : 'none';">
               {% for code, meta in statuts.items() %}
               <option value="{{ code }}" {% if action.statut == code %}selected{% endif %}>{{ meta[0] }}</option>

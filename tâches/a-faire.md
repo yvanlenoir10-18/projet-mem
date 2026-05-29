@@ -786,3 +786,17 @@ Objectif : rendre la création d'une action plus compréhensible quand elle vien
 - [x] Clarifier les champs décision, responsable, délai et description.
 - [x] Vérifier compilation, rendu formulaire et accès rôles.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.13 — Profil Chef Scierie : anti-doublon actions/priorités
+
+Objectif : éviter que le chef crée plusieurs actions ou analyses ouvertes pour le même signal.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Détecter les actions ouvertes similaires pour les priorités machine et objectif.
+- [x] Détecter les analyses ouvertes similaires pour le déclassement.
+- [x] Afficher `Suivre action existante` ou `Suivre analyse ouverte` au lieu de recréer un doublon.
+- [x] Vérifier compilation, rendu dashboard et scénario anti-doublon.
+- [x] Commit et push GitHub.

@@ -8,6 +8,7 @@ from collections import defaultdict
 import statistics
 from flask import Blueprint, render_template, request, send_file, abort, url_for, redirect, flash
 from flask_login import login_required, current_user
+from sqlalchemy import or_
 from datetime import date, datetime, timedelta
 import io
 from ..models import (
@@ -562,6 +563,61 @@ def _machine_prioritaire_recent(aujourd_hui, jours=7):
     }
 
 
+def _action_ouverte_similaire(origine_type=None, origine_label=None, machine=None):
+    query = ActionChef.query.filter(ActionChef.statut.in_(ACTION_CHEF_STATUTS_OUVERTS))
+
+    if machine:
+        action = query.filter(ActionChef.machine == machine).order_by(
+            ActionChef.echeance.is_(None),
+            ActionChef.echeance.asc(),
+            ActionChef.cree_le.desc(),
+        ).first()
+        if action:
+            return action
+
+    if origine_label:
+        filtre = ActionChef.origine_label == origine_label
+        if origine_type:
+            filtre = (ActionChef.origine_type == origine_type) & filtre
+        return query.filter(filtre).order_by(
+            ActionChef.echeance.is_(None),
+            ActionChef.echeance.asc(),
+            ActionChef.cree_le.desc(),
+        ).first()
+
+    return None
+
+
+def _probleme_ouvert_similaire(origine_label=None, reco_code=None):
+    query = Probleme.query.filter(Probleme.statut.in_(('ouvert', 'en_analyse', 'cause_identifiee')))
+    if reco_code:
+        probleme = query.filter(Probleme.reco_code == reco_code).order_by(Probleme.cree_le.desc()).first()
+        if probleme:
+            return probleme
+    if origine_label:
+        return query.filter(Probleme.origine_label == origine_label).order_by(Probleme.cree_le.desc()).first()
+    return None
+
+
+def _action_secondaire_suivi(action):
+    recherche = action.machine or action.origine_label or action.titre
+    return {
+        'label': 'Suivre action existante',
+        'icon': 'bi-check2-square',
+        'href': url_for('dashboard.actions_chef', statut='ouvertes', q=recherche),
+        'couleur': 'outline-success',
+    }
+
+
+def _action_secondaire_suivi_probleme(probleme):
+    return {
+        'label': 'Suivre analyse ouverte',
+        'icon': 'bi-diagram-3',
+        'href': url_for('problemes.detail', probleme_id=probleme.id),
+        'couleur': 'outline-success',
+    }
+
+
 def _priorites_chef(aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_actions_chef):
     """
     P3.10 — Synthèse décisionnelle courte.
@@ -625,6 +681,11 @@ def _priorites_chef(aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_
         if machine_top.get('cause'):
             origine_label = f"{machine_top['machine']} - {machine_top['cause']}"
         machine_url = url_for('dashboard.machines_chef', jours=7, mode='temps_reel', machine=machine_top['machine'])
+        action_existante = _action_ouverte_similaire(
+            origine_type='machine',
+            origine_label=origine_label,
+            machine=machine_top['machine'],
+        )
         add(
             niveau,
             'bi-tools',
@@ -634,9 +695,10 @@ def _priorites_chef(aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_
             machine_url,
             'Voir machines',
             95,
-            action_secondaire={
+            action_secondaire=_action_secondaire_suivi(action_existante) if action_existante else {
                 'label': 'Créer action maintenance',
                 'icon': 'bi-plus-circle',
+                'couleur': 'primary',
                 'href': url_for(
                     'dashboard.nouvelle_action_chef',
                     origine_type='machine',
@@ -661,6 +723,11 @@ def _priorites_chef(aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_
     if objectif_jour and pct_objectif < 100:
         niveau = 'danger' if pct_objectif < 75 else 'warning'
         production_url = url_for('dashboard.production_chef', jours=7, mode='temps_reel')
+        origine_objectif = 'Objectif du jour non atteint'
+        action_existante = _action_ouverte_similaire(
+            origine_type='recommandation',
+            origine_label=origine_objectif,
+        )
         add(
             niveau,
             'bi-bullseye',
@@ -670,13 +737,14 @@ def _priorites_chef(aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_
             production_url,
             'Voir production',
             75 if niveau == 'danger' else 55,
-            action_secondaire={
+            action_secondaire=_action_secondaire_suivi(action_existante) if action_existante else {
                 'label': 'Créer action organisation',
                 'icon': 'bi-plus-circle',
+                'couleur': 'primary',
                 'href': url_for(
                     'dashboard.nouvelle_action_chef',
                     origine_type='recommandation',
-                    origine_label='Objectif du jour non atteint',
+                    origine_label=origine_objectif,
                     origine_url=production_url,
                     titre="Rattraper l'écart à l'objectif",
                     type_action='organisation',
@@ -695,6 +763,11 @@ def _priorites_chef(aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_
     if declass_val >= declass_seuil * 0.8 and declass_val > 0:
         niveau = 'danger' if declass_val > declass_seuil else 'warning'
         qualite_url = url_for('dashboard.qualite_chef', jours=7, mode='temps_reel')
+        origine_declass = 'Déclassement élevé'
+        probleme_existant = _probleme_ouvert_similaire(
+            origine_label=origine_declass,
+            reco_code='DECLASS_EXCESSIF',
+        )
         add(
             niveau,
             'bi-gem',
@@ -704,13 +777,14 @@ def _priorites_chef(aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_
             qualite_url,
             'Voir qualité',
             70 if niveau == 'danger' else 50,
-            action_secondaire={
+            action_secondaire=_action_secondaire_suivi_probleme(probleme_existant) if probleme_existant else {
                 'label': 'Lancer analyse',
                 'icon': 'bi-diagram-3',
+                'couleur': 'primary',
                 'href': url_for(
                     'problemes.nouveau',
                     origine_type='recommandation',
-                    origine_label='Déclassement élevé',
+                    origine_label=origine_declass,
                     origine_url=qualite_url,
                     reco_code='DECLASS_EXCESSIF',
                     titre='Analyser le déclassement élevé',

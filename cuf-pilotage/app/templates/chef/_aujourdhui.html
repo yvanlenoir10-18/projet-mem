@@ -56,7 +56,7 @@
           <div class="mt-2 d-flex gap-2 flex-wrap">
             <a href="{{ p.href }}" class="btn btn-sm btn-outline-primary">{{ p.cta }}</a>
             {% if p.action_secondaire %}
-            <a href="{{ p.action_secondaire.href }}" class="btn btn-sm btn-primary">
+            <a href="{{ p.action_secondaire.href }}" class="btn btn-sm btn-{{ p.action_secondaire.couleur|default('primary') }}">
               <i class="bi {{ p.action_secondaire.icon }}"></i> {{ p.action_secondaire.label }}
             </a>
             {% endif %}

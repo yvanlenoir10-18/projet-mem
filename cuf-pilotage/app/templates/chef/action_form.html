@@ -4,6 +4,50 @@
 
 {% block content %}
 
+{% set guides_action = {
+  'maintenance': {
+    'titre': 'Maintenance',
+    'objectif': 'Réduire les arrêts machine et éviter que la panne revienne.',
+    'exemple': 'Vérifier courroie, roulements, lame ou graissage, puis noter le résultat.'
+  },
+  'approvisionnement': {
+    'titre': 'Approvisionnement bois',
+    'objectif': 'Éviter que la ligne attende le bois ou travaille avec une matière mal préparée.',
+    'exemple': 'Coordonner parc et scierie avant le poste, confirmer les grumes disponibles.'
+  },
+  'qualite': {
+    'titre': 'Qualité / matière',
+    'objectif': 'Comprendre pourquoi le déclassement ou les déchets augmentent.',
+    'exemple': 'Vérifier qualité grumes, réglage coupe, dimensions demandées et tri final.'
+  },
+  'controle_fiche': {
+    'titre': 'Contrôle fiche',
+    'objectif': 'Corriger une donnée terrain avant qu’elle influence les KPI.',
+    'exemple': 'Faire préciser un arrêt long, un horaire incohérent ou un volume douteux.'
+  },
+  'organisation': {
+    'titre': 'Organisation poste',
+    'objectif': 'Réduire l’écart à l’objectif par une meilleure organisation du poste.',
+    'exemple': 'Réorganiser ordre des contrats, effectif, consignes ou passage des essences.'
+  },
+  'formation': {
+    'titre': 'Formation / consigne',
+    'objectif': 'Éviter qu’une erreur de méthode ou de saisie se répète.',
+    'exemple': 'Rappeler la règle de commentaire d’arrêt ou la méthode de classement.'
+  },
+  'surveillance': {
+    'titre': 'Surveillance',
+    'objectif': 'Suivre un signal faible avant de décider une action plus lourde.',
+    'exemple': 'Observer la machine ou l’essence pendant 2 postes et comparer les résultats.'
+  },
+  'autre': {
+    'titre': 'Autre',
+    'objectif': 'Formaliser une décision simple qui ne rentre pas dans les catégories précédentes.',
+    'exemple': 'Décrire clairement ce qui doit être fait, par qui, et à quelle date.'
+  }
+} %}
+{% set guide = guides_action.get(action.type_action, guides_action.get('autre')) %}
+
 <div class="d-flex align-items-center gap-3 mb-4">
   <a href="{{ url_for('dashboard.actions_chef') }}"
      class="wp-icon-btn" style="text-decoration:none;" aria-label="Retour">
@@ -35,26 +79,54 @@
       </div>
       <div class="p-3">
         {% if action.origine_label %}
-        <div class="mb-3" style="border-left:3px solid var(--wp-sky);background:#f7fbff;padding:.8rem;border-radius:8px;">
-          <div style="font-size:.75rem;color:var(--wp-muted);font-weight:800;text-transform:uppercase;">Source</div>
-          <div style="font-weight:800;color:var(--wp-ink);">{{ action.origine_label }}</div>
-          {% if action.origine_url %}
-          <a href="{{ action.origine_url }}" style="font-size:.78rem;">Ouvrir la source</a>
-          {% endif %}
+        <div class="mb-3" style="border-left:4px solid var(--wp-sky);background:#f7fbff;padding:.9rem;border-radius:8px;">
+          <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+            <div>
+              <div style="font-size:.72rem;color:var(--wp-muted);font-weight:900;text-transform:uppercase;">
+                Origine de l'action · {{ origines.get(action.origine_type, action.origine_type) }}
+              </div>
+              <div style="font-weight:900;color:var(--wp-ink);">{{ action.origine_label }}</div>
+              <div style="font-size:.78rem;color:var(--wp-muted);margin-top:.25rem;">
+                Cette action doit répondre à ce signal précis, pas à un problème général.
+              </div>
+            </div>
+            {% if action.origine_url %}
+            <a href="{{ action.origine_url }}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-box-arrow-up-right"></i> Ouvrir la source
+            </a>
+            {% endif %}
+          </div>
         </div>
         {% endif %}
 
+        <div class="mb-3" id="guideAction"
+             style="border:1px solid #e6e0d5;background:#fffaf0;padding:.9rem;border-radius:8px;">
+          <div style="font-size:.72rem;color:var(--wp-muted);font-weight:900;text-transform:uppercase;">
+            Aide décision
+          </div>
+          <div style="font-weight:900;color:var(--wp-ink);" data-guide-title>{{ guide.titre }}</div>
+          <div style="font-size:.82rem;color:var(--wp-muted);line-height:1.4;margin-top:.25rem;" data-guide-objectif>
+            {{ guide.objectif }}
+          </div>
+          <div style="font-size:.78rem;color:var(--wp-ink);line-height:1.4;margin-top:.45rem;" data-guide-exemple>
+            Exemple : {{ guide.exemple }}
+          </div>
+        </div>
+
         <div class="mb-3">
-          <label class="form-label">Titre de l'action</label>
+          <label class="form-label">Décision à suivre</label>
           <input type="text" name="titre" class="form-control" required
                  value="{{ action.titre }}"
                  placeholder="Exemple : Vérifier la Bicoupe après arrêts répétés">
+          <div class="form-text" style="font-size:.75rem;">
+            Formulez une décision courte : on doit comprendre l'action dès le titre.
+          </div>
         </div>
 
         <div class="row g-3">
           <div class="col-md-6">
-            <label class="form-label">Type d'action</label>
-            <select name="type_action" class="form-select">
+            <label class="form-label">Nature de l'action</label>
+            <select name="type_action" class="form-select" id="typeAction">
               {% for code, label in types_action %}
               <option value="{{ code }}" {% if action.type_action == code %}selected{% endif %}>{{ label }}</option>
               {% endfor %}
@@ -71,9 +143,12 @@
         </div>
 
         <div class="mt-3">
-          <label class="form-label">Action décidée</label>
+          <label class="form-label">Description concrète</label>
           <textarea name="description" class="form-control" rows="4" required
                     placeholder="Exemple : Appeler maintenance, contrôler courroie et roulements, puis noter le résultat avant le prochain poste.">{{ action.description }}</textarea>
+          <div class="form-text" style="font-size:.75rem;">
+            Décrivez ce qui doit être fait, le résultat attendu et ce qu'il faudra vérifier ensuite.
+          </div>
         </div>
 
         <div class="row g-3 mt-1">
@@ -83,6 +158,9 @@
                    value="{{ action.responsable }}"
                    list="responsables-suggeres"
                    placeholder="Maintenance, Chef parc, Chef équipe...">
+            <div class="form-text" style="font-size:.75rem;">
+              Texte libre pour rester réaliste terrain : personne, équipe ou service.
+            </div>
             <datalist id="responsables-suggeres">
               <option value="Maintenance">
               <option value="Chef parc">
@@ -93,7 +171,7 @@
             </datalist>
           </div>
           <div class="col-md-6">
-            <label class="form-label">Délai souhaité</label>
+            <label class="form-label">Délai / date de suivi</label>
             <input type="date" name="echeance" class="form-control"
                    value="{{ action.echeance }}">
             <div class="form-text" style="font-size:.75rem;">
@@ -153,6 +231,21 @@
 </div>
 
 <script>
+const guidesAction = {{ guides_action|tojson }};
+const typeAction = document.getElementById('typeAction');
+const guideAction = document.getElementById('guideAction');
+if (typeAction && guideAction) {
+  const title = guideAction.querySelector('[data-guide-title]');
+  const objectif = guideAction.querySelector('[data-guide-objectif]');
+  const exemple = guideAction.querySelector('[data-guide-exemple]');
+  typeAction.addEventListener('change', () => {
+    const guide = guidesAction[typeAction.value] || guidesAction.autre;
+    if (title) title.textContent = guide.titre;
+    if (objectif) objectif.textContent = guide.objectif;
+    if (exemple) exemple.textContent = `Exemple : ${guide.exemple}`;
+  });
+}
+
 const statutAction = document.getElementById('statutAction');
 const motifSansAction = document.getElementById('motifSansAction');
 if (statutAction && motifSansAction) {

@@ -772,3 +772,17 @@ Objectif : permettre au chef de passer plus vite du signal à l'action depuis le
 - [x] Afficher deux boutons quand une priorité a une action directe.
 - [x] Vérifier compilation, rendu dashboard et accès rôles.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.12 — Profil Chef Scierie : formulaire Action guidé
+
+Objectif : rendre la création d'une action plus compréhensible quand elle vient d'une priorité, d'une machine, d'une fiche ou d'une analyse.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Ajouter un bloc d'origine visible en haut du formulaire.
+- [x] Ajouter une aide courte selon le type d'action.
+- [x] Clarifier les champs décision, responsable, délai et description.
+- [x] Vérifier compilation, rendu formulaire et accès rôles.
+- [x] Commit et push GitHub.

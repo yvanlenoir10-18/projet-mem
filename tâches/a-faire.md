@@ -758,3 +758,17 @@ Objectif : transformer les signaux déjà calculés en une courte liste de prior
 - [x] Afficher un bloc compact `Priorités du chef` sur `/dashboard/chef`.
 - [x] Vérifier compilation, rendu dashboard et accès rôles.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.11 — Profil Chef Scierie : actions directes sur priorités
+
+Objectif : permettre au chef de passer plus vite du signal à l'action depuis le bloc `Priorités du chef`.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Ajouter une action secondaire optionnelle aux priorités décisionnelles.
+- [x] Préremplir `Action Chef` ou `Résolution` selon le type de priorité.
+- [x] Afficher deux boutons quand une priorité a une action directe.
+- [x] Vérifier compilation, rendu dashboard et accès rôles.
+- [x] Commit et push GitHub.

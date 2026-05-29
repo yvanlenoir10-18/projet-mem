@@ -37,8 +37,7 @@
       {% for p in priorites %}
       {% set p_color = 'var(--wp-terracotta)' if p.niveau == 'danger' else ('var(--wp-ochre)' if p.niveau == 'warning' else 'var(--wp-sky)') %}
       <div class="col-12 col-xl-6">
-        <a href="{{ p.href }}"
-           style="display:block;text-decoration:none;color:inherit;border:1px solid #e6e0d5;border-left:4px solid {{ p_color }};border-radius:8px;padding:12px;background:#fff;height:100%;">
+        <div style="border:1px solid #e6e0d5;border-left:4px solid {{ p_color }};border-radius:8px;padding:12px;background:#fff;height:100%;">
           <div class="d-flex justify-content-between align-items-start gap-2">
             <div class="d-flex gap-2" style="min-width:0;">
               <i class="bi {{ p.icon }}" style="color:{{ p_color }};font-size:1.05rem;margin-top:1px;"></i>
@@ -54,10 +53,15 @@
           <div style="font-size:.78rem;color:var(--wp-ink);line-height:1.35;margin-top:.65rem;">
             {{ p.decision }}
           </div>
-          <div class="mt-2">
-            <span class="btn btn-sm btn-outline-primary" style="pointer-events:none;">{{ p.cta }}</span>
+          <div class="mt-2 d-flex gap-2 flex-wrap">
+            <a href="{{ p.href }}" class="btn btn-sm btn-outline-primary">{{ p.cta }}</a>
+            {% if p.action_secondaire %}
+            <a href="{{ p.action_secondaire.href }}" class="btn btn-sm btn-primary">
+              <i class="bi {{ p.action_secondaire.icon }}"></i> {{ p.action_secondaire.label }}
+            </a>
+            {% endif %}
           </div>
-        </a>
+        </div>
       </div>
       {% endfor %}
     </div>

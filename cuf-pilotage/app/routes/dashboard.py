@@ -569,7 +569,7 @@ def _priorites_chef(aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_
     """
     priorites = []
 
-    def add(niveau, icon, titre, signal, decision, href, cta, score):
+    def add(niveau, icon, titre, signal, decision, href, cta, score, action_secondaire=None):
         priorites.append({
             'niveau': niveau,
             'icon': icon,
@@ -579,6 +579,7 @@ def _priorites_chef(aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_
             'href': href,
             'cta': cta,
             'score': score,
+            'action_secondaire': action_secondaire,
         })
 
     nb_retard = stats_actions_chef.get('retard', 0) if stats_actions_chef else 0
@@ -620,15 +621,38 @@ def _priorites_chef(aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_
     if machine_top and machine_top['duree'] >= 60:
         niveau = 'danger' if machine_top['duree'] >= 180 or machine_top['count'] >= 3 else 'warning'
         cause_txt = f" Cause dominante : {machine_top['cause']}." if machine_top.get('cause') else ''
+        origine_label = machine_top['machine']
+        if machine_top.get('cause'):
+            origine_label = f"{machine_top['machine']} - {machine_top['cause']}"
+        machine_url = url_for('dashboard.machines_chef', jours=7, mode='temps_reel', machine=machine_top['machine'])
         add(
             niveau,
             'bi-tools',
             'Regarder la machine prioritaire',
             f"{machine_top['machine']} cumule {machine_top['duree_fmt']} sur 7 jours.{cause_txt}",
             "Décider si un diagnostic maintenance, matière ou méthode doit être lancé.",
-            url_for('dashboard.machines_chef', jours=7, mode='temps_reel', machine=machine_top['machine']),
+            machine_url,
             'Voir machines',
             95,
+            action_secondaire={
+                'label': 'Créer action maintenance',
+                'icon': 'bi-plus-circle',
+                'href': url_for(
+                    'dashboard.nouvelle_action_chef',
+                    origine_type='machine',
+                    machine=machine_top['machine'],
+                    origine_label=origine_label,
+                    origine_url=machine_url,
+                    titre=f"Action sur {machine_top['machine']}",
+                    type_action='maintenance',
+                    responsable='Maintenance',
+                    description=(
+                        f"Vérifier {machine_top['machine']} : "
+                        f"{machine_top['duree_fmt']} d'arrêts sur 7 jours"
+                        + (f", cause dominante {machine_top['cause']}." if machine_top.get('cause') else ".")
+                    ),
+                ),
+            },
         )
 
     objectif = (kpi_jour or {}).get('objectif', {})
@@ -636,15 +660,33 @@ def _priorites_chef(aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_
     objectif_jour = objectif.get('objectif', 0) or 0
     if objectif_jour and pct_objectif < 100:
         niveau = 'danger' if pct_objectif < 75 else 'warning'
+        production_url = url_for('dashboard.production_chef', jours=7, mode='temps_reel')
         add(
             niveau,
             'bi-bullseye',
             "Suivre l'écart à l'objectif",
             f"Objectif du jour à {pct_objectif}% · écart {objectif.get('ecart_m3', 0)} m³.",
             "Comparer les postes et les essences avant de demander une action terrain.",
-            url_for('dashboard.production_chef', jours=7, mode='temps_reel'),
+            production_url,
             'Voir production',
             75 if niveau == 'danger' else 55,
+            action_secondaire={
+                'label': 'Créer action organisation',
+                'icon': 'bi-plus-circle',
+                'href': url_for(
+                    'dashboard.nouvelle_action_chef',
+                    origine_type='recommandation',
+                    origine_label='Objectif du jour non atteint',
+                    origine_url=production_url,
+                    titre="Rattraper l'écart à l'objectif",
+                    type_action='organisation',
+                    responsable='Chef scierie',
+                    description=(
+                        f"Analyser l'écart du jour : objectif à {pct_objectif}% "
+                        f"({objectif.get('ecart_m3', 0)} m³). Comparer postes, essences et arrêts."
+                    ),
+                ),
+            },
         )
 
     declass = (kpi_jour or {}).get('declass', {})
@@ -652,15 +694,32 @@ def _priorites_chef(aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_
     declass_seuil = declass.get('seuil', 30) or 30
     if declass_val >= declass_seuil * 0.8 and declass_val > 0:
         niveau = 'danger' if declass_val > declass_seuil else 'warning'
+        qualite_url = url_for('dashboard.qualite_chef', jours=7, mode='temps_reel')
         add(
             niveau,
             'bi-gem',
             'Comprendre le déclassement',
             f"Taux du jour : {declass_val}% pour un seuil de {declass_seuil}%.",
             "Vérifier si le problème vient de la matière, du sciage, des dimensions ou du classement.",
-            url_for('dashboard.qualite_chef', jours=7, mode='temps_reel'),
+            qualite_url,
             'Voir qualité',
             70 if niveau == 'danger' else 50,
+            action_secondaire={
+                'label': 'Lancer analyse',
+                'icon': 'bi-diagram-3',
+                'href': url_for(
+                    'problemes.nouveau',
+                    origine_type='recommandation',
+                    origine_label='Déclassement élevé',
+                    origine_url=qualite_url,
+                    reco_code='DECLASS_EXCESSIF',
+                    titre='Analyser le déclassement élevé',
+                    contexte_quoi='Déclassement élevé ou proche du seuil',
+                    contexte_quand=aujourd_hui.strftime('%d/%m/%Y'),
+                    contexte_ou='Chaîne 4',
+                    contexte_combien=f"{declass_val}% pour un seuil de {declass_seuil}%",
+                ),
+            },
         )
 
     if nb_problemes_ouverts:

@@ -156,6 +156,36 @@ def _ligne_action_chef(action):
     }
 
 
+def _actions_chef_urgentes(aujourd_hui, limite=3):
+    """Actions ouvertes à regarder en premier sur l'accueil chef."""
+    bientot = aujourd_hui + timedelta(days=3)
+    actions = ActionChef.query.filter(
+        ActionChef.statut.in_(ACTION_CHEF_STATUTS_OUVERTS),
+        ActionChef.echeance.isnot(None),
+        ActionChef.echeance <= bientot,
+    ).order_by(
+        ActionChef.echeance.asc(),
+        ActionChef.cree_le.desc(),
+    ).limit(limite).all()
+
+    lignes = []
+    for action in actions:
+        ligne = _ligne_action_chef(action)
+        if action.echeance and action.echeance < aujourd_hui:
+            statut_filtre = 'retard'
+        elif action.echeance == aujourd_hui:
+            statut_filtre = 'aujourd_hui'
+        else:
+            statut_filtre = 'bientot'
+        ligne['href'] = url_for(
+            'dashboard.actions_chef',
+            statut=statut_filtre,
+            q=action.titre,
+        )
+        lignes.append(ligne)
+    return lignes
+
+
 def _commentaires_validation(equipe):
     commentaires = []
     if equipe.notes and equipe.notes.strip():
@@ -1616,6 +1646,7 @@ def vue_chef():
         Probleme.statut.in_(('ouvert', 'en_analyse'))
     ).count()
     stats_actions_chef = _stats_actions_chef()
+    actions_chef_urgentes = _actions_chef_urgentes(aujourd_hui)
     priorites_chef = _priorites_chef(
         aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_actions_chef
     )
@@ -1656,6 +1687,7 @@ def vue_chef():
                                alertes=alertes,
                                nb_problemes_ouverts=nb_problemes_ouverts,
                                stats_actions_chef=stats_actions_chef,
+                               actions_chef_urgentes=actions_chef_urgentes,
                                priorites_chef=priorites_chef)
 
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
@@ -1896,6 +1928,7 @@ def vue_chef():
                            alertes=alertes,
                            nb_problemes_ouverts=nb_problemes_ouverts,
                            stats_actions_chef=stats_actions_chef,
+                           actions_chef_urgentes=actions_chef_urgentes,
                            priorites_chef=priorites_chef)
 
 

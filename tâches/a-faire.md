@@ -840,3 +840,16 @@ Objectif : réduire les clics pour changer le statut d'une action courante.
 - [x] Garder le changement avancé par liste déroulante.
 - [x] Vérifier compilation, rendu et changements de statut.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.17 — Profil Chef Scierie : actions urgentes sur l'accueil Chef
+
+Objectif : faire apparaître les actions en retard ou proches de l'échéance dès l'ouverture du dashboard Chef.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Calculer les 3 actions les plus urgentes.
+- [x] Afficher responsable, délai, statut et lien direct sur l'accueil Chef.
+- [x] Vérifier compilation et rendu dashboard.
+- [x] Commit et push GitHub.

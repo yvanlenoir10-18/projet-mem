@@ -170,7 +170,15 @@
           <div class="col-md-6">
             <label class="form-label">Délai / date de suivi</label>
             <input type="date" name="echeance" class="form-control"
+                   id="echeanceAction"
                    value="{{ action.echeance }}">
+            <div class="d-flex gap-2 flex-wrap mt-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-delai-jours="0">Aujourd'hui</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-delai-jours="1">Demain</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-delai-jours="3">Dans 3 jours</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-delai-jours="7">Dans 7 jours</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-delai-clear>Sans délai</button>
+            </div>
             <div class="form-text" style="font-size:.75rem;">
               Si le délai est dépassé, l'action apparaîtra dans les alertes du chef.
             </div>
@@ -248,6 +256,23 @@ const motifSansAction = document.getElementById('motifSansAction');
 if (statutAction && motifSansAction) {
   statutAction.addEventListener('change', () => {
     motifSansAction.style.display = statutAction.value === 'classe_sans_action' ? 'block' : 'none';
+  });
+}
+
+const echeanceAction = document.getElementById('echeanceAction');
+if (echeanceAction) {
+  document.querySelectorAll('[data-delai-jours]').forEach((bouton) => {
+    bouton.addEventListener('click', () => {
+      const jours = Number.parseInt(bouton.dataset.delaiJours, 10) || 0;
+      const cible = new Date();
+      cible.setDate(cible.getDate() + jours);
+      echeanceAction.value = cible.toISOString().slice(0, 10);
+    });
+  });
+  document.querySelectorAll('[data-delai-clear]').forEach((bouton) => {
+    bouton.addEventListener('click', () => {
+      echeanceAction.value = '';
+    });
   });
 }
 </script>

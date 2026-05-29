@@ -894,3 +894,16 @@ Objectif : faciliter la création d'action sans imposer encore une gestion compl
 - [x] Garder les responsables terrain par défaut.
 - [x] Vérifier compilation, rendu et création d'action.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.21 — Profil Chef Scierie : délais rapides dans les actions
+
+Objectif : accélérer la création d'une action avec des choix de délai simples.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Analyser le champ délai actuel.
+- [x] Ajouter les boutons `Aujourd'hui`, `Demain`, `Dans 3 jours`, `Dans 7 jours`, `Sans délai`.
+- [x] Vérifier compilation, rendu et création d'action.
+- [x] Commit et push GitHub.

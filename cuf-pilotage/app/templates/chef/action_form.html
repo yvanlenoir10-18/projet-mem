@@ -162,12 +162,9 @@
               Texte libre pour rester réaliste terrain : personne, équipe ou service.
             </div>
             <datalist id="responsables-suggeres">
-              <option value="Maintenance">
-              <option value="Chef parc">
-              <option value="Chef équipe matin">
-              <option value="Chef équipe après-midi">
-              <option value="Chef scierie">
-              <option value="Admin">
+              {% for responsable in responsables_suggeres|default([]) %}
+              <option value="{{ responsable }}">
+              {% endfor %}
             </datalist>
           </div>
           <div class="col-md-6">

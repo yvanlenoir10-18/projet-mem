@@ -164,6 +164,27 @@ def _responsables_actions_chef(limite=None):
     return lignes[:limite] if limite else lignes
 
 
+def _suggestions_responsables_action_chef(responsable_courant=None):
+    """Suggestions pour le champ responsable : défauts + valeurs déjà utilisées."""
+    suggestions = {}
+    for nom in RESPONSABLES_ACTION_CHEF_DEFAUT:
+        suggestions[nom.lower()] = nom
+
+    valeurs = ActionChef.query.with_entities(ActionChef.responsable).filter(
+        ActionChef.responsable.isnot(None)
+    ).distinct().all()
+    for (nom,) in valeurs:
+        nom = (nom or '').strip()
+        if nom:
+            suggestions[nom.lower()] = nom
+
+    responsable_courant = (responsable_courant or '').strip()
+    if responsable_courant:
+        suggestions[responsable_courant.lower()] = responsable_courant
+
+    return sorted(suggestions.values(), key=lambda item: item.lower())
+
+
 def _ligne_action_chef(action):
     statut = _action_statut_meta(action.statut)
     signal = _signal_temporel_action(action)
@@ -263,6 +284,15 @@ ACTION_CHEF_STATUTS = {
     'classe_sans_action': ('Classé sans action', 'secondary'),
 }
 ACTION_CHEF_STATUTS_OUVERTS = ('a_faire', 'en_cours')
+RESPONSABLES_ACTION_CHEF_DEFAUT = [
+    'Maintenance',
+    'Chef parc',
+    'Chef équipe matin',
+    'Chef équipe après-midi',
+    'Chef scierie',
+    'Qualité',
+    'Admin',
+]
 ACTION_CHEF_TYPES = [
     ('maintenance', 'Maintenance'),
     ('approvisionnement', 'Approvisionnement bois'),
@@ -2257,6 +2287,7 @@ def actions_chef():
 def nouvelle_action_chef():
     """Création d'une action légère de pilotage."""
     valeurs = _prefill_action_chef()
+    responsables_suggeres = _suggestions_responsables_action_chef(valeurs.get('responsable'))
 
     if request.method == 'POST':
         titre = request.form.get('titre', '').strip()
@@ -2307,6 +2338,7 @@ def nouvelle_action_chef():
                 types_action=ACTION_CHEF_TYPES,
                 statuts=ACTION_CHEF_STATUTS,
                 origines=ACTION_CHEF_ORIGINES,
+                responsables_suggeres=_suggestions_responsables_action_chef(responsable),
             )
 
         action = ActionChef(
@@ -2337,6 +2369,7 @@ def nouvelle_action_chef():
         types_action=ACTION_CHEF_TYPES,
         statuts=ACTION_CHEF_STATUTS,
         origines=ACTION_CHEF_ORIGINES,
+        responsables_suggeres=responsables_suggeres,
     )
 
 

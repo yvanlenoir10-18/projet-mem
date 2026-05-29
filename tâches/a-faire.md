@@ -880,3 +880,17 @@ Objectif : aider le chef à voir rapidement qui porte les actions ouvertes et qu
 - [x] Ajouter un filtre rapide par responsable.
 - [x] Vérifier compilation, rendu et filtrage.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.20 — Profil Chef Scierie : suggestions de responsables dynamiques
+
+Objectif : faciliter la création d'action sans imposer encore une gestion complexe des profils responsables.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Détecter que le formulaire avait déjà une base de suggestions.
+- [x] Ajouter les responsables déjà utilisés aux suggestions.
+- [x] Garder les responsables terrain par défaut.
+- [x] Vérifier compilation, rendu et création d'action.
+- [x] Commit et push GitHub.

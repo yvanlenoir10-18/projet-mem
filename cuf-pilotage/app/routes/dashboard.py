@@ -64,6 +64,52 @@ def _action_type_label(type_action):
     return dict(ACTION_CHEF_TYPES).get(type_action, type_action or 'Autre')
 
 
+def _signal_temporel_action(action):
+    today = date.today()
+    if action.est_terminee:
+        return {
+            'label': 'Terminée',
+            'detail': action.echeance.strftime('%d/%m/%Y') if action.echeance else 'Sans délai',
+            'couleur': 'success',
+            'icon': 'bi-check-circle',
+        }
+    if not action.echeance:
+        return {
+            'label': 'Sans délai',
+            'detail': 'À dater si cette action doit rester suivie',
+            'couleur': 'secondary',
+            'icon': 'bi-calendar-plus',
+        }
+    delta = (action.echeance - today).days
+    if delta < 0:
+        return {
+            'label': 'En retard',
+            'detail': f"{abs(delta)} jour(s) de retard",
+            'couleur': 'danger',
+            'icon': 'bi-alarm',
+        }
+    if delta == 0:
+        return {
+            'label': "Aujourd'hui",
+            'detail': 'À vérifier ce jour',
+            'couleur': 'warning',
+            'icon': 'bi-calendar-check',
+        }
+    if delta <= 3:
+        return {
+            'label': 'Sous 3 jours',
+            'detail': f"Échéance dans {delta} jour(s)",
+            'couleur': 'info',
+            'icon': 'bi-calendar-event',
+        }
+    return {
+        'label': 'Planifiée',
+        'detail': f"Échéance le {action.echeance.strftime('%d/%m/%Y')}",
+        'couleur': 'secondary',
+        'icon': 'bi-calendar3',
+    }
+
+
 def _stats_actions_chef():
     today = date.today()
     soon = today + timedelta(days=3)
@@ -85,6 +131,7 @@ def _stats_actions_chef():
 
 def _ligne_action_chef(action):
     statut = _action_statut_meta(action.statut)
+    signal = _signal_temporel_action(action)
     return {
         'id': action.id,
         'titre': action.titre,
@@ -98,6 +145,7 @@ def _ligne_action_chef(action):
         'statut_label': statut['label'],
         'statut_couleur': statut['couleur'],
         'retard': action.est_en_retard,
+        'signal_temporel': signal,
         'origine_type': action.origine_type,
         'origine_label': action.origine_label,
         'origine_url': action.origine_url,

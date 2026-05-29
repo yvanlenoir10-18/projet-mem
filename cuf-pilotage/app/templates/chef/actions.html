@@ -146,9 +146,9 @@
         <div style="min-width:0;flex:1;">
           <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
             <span class="badge bg-{{ action.statut_couleur }}">{{ action.statut_label }}</span>
-            {% if action.retard %}
-            <span class="badge bg-danger"><i class="bi bi-alarm"></i> En retard</span>
-            {% endif %}
+            <span class="badge bg-{{ action.signal_temporel.couleur }}">
+              <i class="bi {{ action.signal_temporel.icon }}"></i> {{ action.signal_temporel.label }}
+            </span>
             <span class="wp-pill wp-pill-neutral">{{ action.type_label }}</span>
             {% if action.origine_label %}
             <span style="font-size:.76rem;color:var(--wp-muted);">
@@ -170,6 +170,7 @@
           <div class="d-flex gap-3 flex-wrap mt-3" style="font-size:.78rem;color:var(--wp-muted);">
             <span><i class="bi bi-person"></i> Responsable : <strong style="color:var(--wp-ink);">{{ action.responsable }}</strong></span>
             <span><i class="bi bi-calendar-event"></i> Délai : <strong style="color:var(--wp-ink);">{{ action.echeance_fmt }}</strong></span>
+            <span><i class="bi {{ action.signal_temporel.icon }}"></i> <strong style="color:var(--wp-ink);">{{ action.signal_temporel.detail }}</strong></span>
             <span><i class="bi bi-person-check"></i> Créée par : {{ action.cree_par }}</span>
             {% if action.machine %}<span><i class="bi bi-tools"></i> {{ action.machine }}</span>{% endif %}
           </div>

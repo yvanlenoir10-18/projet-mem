@@ -814,3 +814,16 @@ Objectif : aider le chef à distinguer les actions en retard, à traiter aujourd
 - [x] Ajouter des cartes de suivi temporel dans l'écran Actions Chef.
 - [x] Vérifier compilation, rendu et filtres.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.15 — Profil Chef Scierie : signal temporel par action
+
+Objectif : rendre chaque action plus lisible dans la liste en indiquant immédiatement si elle est en retard, à traiter aujourd'hui, à venir, sans délai ou terminée.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Calculer un signal temporel par action.
+- [x] Afficher ce signal dans chaque carte action.
+- [x] Vérifier compilation, rendu et filtres existants.
+- [x] Commit et push GitHub.

@@ -853,3 +853,16 @@ Objectif : faire apparaître les actions en retard ou proches de l'échéance d�
 - [x] Afficher responsable, délai, statut et lien direct sur l'accueil Chef.
 - [x] Vérifier compilation et rendu dashboard.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.18 — Profil Chef Scierie : traitement direct des actions urgentes
+
+Objectif : permettre au chef de démarrer ou terminer une action urgente directement depuis l'accueil.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Ajouter `Démarrer` et `Marquer fait` dans les actions urgentes du dashboard.
+- [x] Garder le lien vers la page de suivi complet.
+- [x] Vérifier compilation, rendu et changement de statut avec CSRF.
+- [x] Commit et push GitHub.

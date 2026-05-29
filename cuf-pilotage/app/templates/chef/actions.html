@@ -49,6 +49,36 @@
   </div>
 </div>
 
+{% if responsables_actions %}
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-people"></i> Par responsable
+    <span class="ms-auto" style="font-size:.74rem;color:var(--wp-muted);font-weight:500;">
+      Qui porte les actions ouvertes ?
+    </span>
+  </div>
+  <div class="p-3">
+    <div class="row g-2">
+      {% for item in responsables_actions %}
+      <div class="col-12 col-md-6 col-xl-3">
+        <a href="{{ url_for('dashboard.actions_chef', statut='ouvertes', responsable=item.responsable) }}"
+           class="d-block"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid {% if item.retard %}var(--wp-terracotta){% elif item.aujourd_hui %}var(--wp-ochre){% else %}var(--wp-sky){% endif %};border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.86rem;font-weight:900;color:var(--wp-ink);">{{ item.responsable }}</div>
+          <div class="d-flex gap-2 flex-wrap mt-2" style="font-size:.75rem;color:var(--wp-muted);">
+            <span>{{ item.ouvertes }} ouverte{{ 's' if item.ouvertes > 1 }}</span>
+            {% if item.retard %}<span style="color:var(--wp-terracotta);font-weight:800;">{{ item.retard }} retard</span>{% endif %}
+            {% if item.aujourd_hui %}<span style="color:var(--wp-ochre);font-weight:800;">{{ item.aujourd_hui }} aujourd'hui</span>{% endif %}
+            {% if item.en_cours %}<span>{{ item.en_cours }} en cours</span>{% endif %}
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="wp-card mb-4">
   <div class="wp-card-header">
     <i class="bi bi-calendar-check"></i> À traiter par délai
@@ -101,7 +131,7 @@
 <form method="GET" action="{{ url_for('dashboard.actions_chef') }}" class="wp-card mb-4">
   <div class="p-3">
     <div class="row g-3 align-items-end">
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-lg-2">
         <label class="form-label" style="font-weight:800;font-size:.82rem;">Statut</label>
         <select name="statut" class="form-select">
           <option value="ouvertes" {% if filtres.statut == 'ouvertes' %}selected{% endif %}>Ouvertes</option>
@@ -115,7 +145,16 @@
           <option value="tous" {% if filtres.statut == 'tous' %}selected{% endif %}>Toutes</option>
         </select>
       </div>
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-lg-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Responsable</label>
+        <select name="responsable" class="form-select">
+          <option value="">Tous</option>
+          {% for responsable in responsables_connus %}
+          <option value="{{ responsable }}" {% if filtres.responsable == responsable %}selected{% endif %}>{{ responsable }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-lg-2">
         <label class="form-label" style="font-weight:800;font-size:.82rem;">Origine</label>
         <select name="origine_type" class="form-select">
           <option value="">Toutes</option>
@@ -124,12 +163,12 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-12 col-md-4">
+      <div class="col-12 col-lg-3">
         <label class="form-label" style="font-weight:800;font-size:.82rem;">Recherche</label>
         <input type="search" name="q" value="{{ filtres.q }}" class="form-control"
                placeholder="Machine, responsable, action...">
       </div>
-      <div class="col-12 col-md-2 d-flex gap-2">
+      <div class="col-12 col-lg-2 d-flex gap-2">
         <button class="btn btn-primary flex-fill"><i class="bi bi-funnel"></i> Filtrer</button>
         <a href="{{ url_for('dashboard.actions_chef') }}" class="btn btn-outline-secondary">Reset</a>
       </div>

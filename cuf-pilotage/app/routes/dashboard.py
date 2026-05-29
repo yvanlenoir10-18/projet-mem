@@ -129,6 +129,41 @@ def _stats_actions_chef():
     }
 
 
+def _responsables_actions_chef(limite=None):
+    """Synthèse simple des actions ouvertes par responsable texte."""
+    today = date.today()
+    responsables = defaultdict(lambda: {
+        'responsable': '',
+        'ouvertes': 0,
+        'retard': 0,
+        'aujourd_hui': 0,
+        'en_cours': 0,
+    })
+    actions = ActionChef.query.filter(
+        ActionChef.statut.in_(ACTION_CHEF_STATUTS_OUVERTS)
+    ).all()
+
+    for action in actions:
+        nom = (action.responsable or 'Non renseigné').strip() or 'Non renseigné'
+        cle = nom.lower()
+        stats = responsables[cle]
+        stats['responsable'] = nom
+        stats['ouvertes'] += 1
+        if action.statut == 'en_cours':
+            stats['en_cours'] += 1
+        if action.echeance and action.echeance < today:
+            stats['retard'] += 1
+        elif action.echeance == today:
+            stats['aujourd_hui'] += 1
+
+    lignes = sorted(
+        responsables.values(),
+        key=lambda item: (item['retard'], item['aujourd_hui'], item['ouvertes']),
+        reverse=True,
+    )
+    return lignes[:limite] if limite else lignes
+
+
 def _ligne_action_chef(action):
     statut = _action_statut_meta(action.statut)
     signal = _signal_temporel_action(action)
@@ -2139,6 +2174,7 @@ def actions_chef():
     """Liste des décisions et actions suivies par le chef scierie."""
     statut = request.args.get('statut', 'ouvertes').strip()
     origine_type = request.args.get('origine_type', '').strip()
+    responsable = request.args.get('responsable', '').strip()
     q = request.args.get('q', '').strip()
 
     query = ActionChef.query
@@ -2173,6 +2209,14 @@ def actions_chef():
     if origine_type in ACTION_CHEF_ORIGINES:
         query = query.filter(ActionChef.origine_type == origine_type)
 
+    responsables_tous = _responsables_actions_chef()
+    responsables_actions = responsables_tous[:8]
+    responsables_connus = [item['responsable'] for item in responsables_tous]
+    if responsable:
+        query = query.filter(ActionChef.responsable.ilike(responsable))
+        if responsable not in responsables_connus:
+            responsables_connus.append(responsable)
+
     if q:
         like = f"%{q}%"
         query = query.filter(or_(
@@ -2193,7 +2237,14 @@ def actions_chef():
         'chef/actions.html',
         actions=[_ligne_action_chef(a) for a in actions],
         stats=_stats_actions_chef(),
-        filtres={'statut': statut, 'origine_type': origine_type, 'q': q},
+        responsables_actions=responsables_actions,
+        responsables_connus=sorted(responsables_connus, key=lambda item: item.lower()),
+        filtres={
+            'statut': statut,
+            'origine_type': origine_type,
+            'responsable': responsable,
+            'q': q,
+        },
         statuts=ACTION_CHEF_STATUTS,
         origines=ACTION_CHEF_ORIGINES,
         types_action=ACTION_CHEF_TYPES,

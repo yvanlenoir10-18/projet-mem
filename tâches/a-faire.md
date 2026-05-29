@@ -866,3 +866,17 @@ Objectif : permettre au chef de démarrer ou terminer une action urgente directe
 - [x] Garder le lien vers la page de suivi complet.
 - [x] Vérifier compilation, rendu et changement de statut avec CSRF.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.19 — Profil Chef Scierie : pilotage des actions par responsable
+
+Objectif : aider le chef à voir rapidement qui porte les actions ouvertes et qui a des retards.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Calculer une synthèse des actions ouvertes par responsable.
+- [x] Ajouter un bloc `Par responsable` dans Actions Chef.
+- [x] Ajouter un filtre rapide par responsable.
+- [x] Vérifier compilation, rendu et filtrage.
+- [x] Commit et push GitHub.

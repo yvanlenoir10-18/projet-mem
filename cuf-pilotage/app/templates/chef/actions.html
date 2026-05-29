@@ -49,6 +49,55 @@
   </div>
 </div>
 
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-calendar-check"></i> À traiter par délai
+    <span class="ms-auto" style="font-size:.74rem;color:var(--wp-muted);font-weight:500;">
+      Lecture rapide du suivi
+    </span>
+  </div>
+  <div class="p-3">
+    <div class="row g-2">
+      <div class="col-6 col-lg-3">
+        <a href="{{ url_for('dashboard.actions_chef', statut='retard') }}"
+           class="d-block"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-terracotta);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">En retard</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-terracotta);">{{ stats.retard }}</div>
+          <div style="font-size:.75rem;color:var(--wp-muted);">à traiter en premier</div>
+        </a>
+      </div>
+      <div class="col-6 col-lg-3">
+        <a href="{{ url_for('dashboard.actions_chef', statut='aujourd_hui') }}"
+           class="d-block"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-ochre);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">Aujourd'hui</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-ochre);">{{ stats.aujourd_hui }}</div>
+          <div style="font-size:.75rem;color:var(--wp-muted);">à vérifier ce jour</div>
+        </a>
+      </div>
+      <div class="col-6 col-lg-3">
+        <a href="{{ url_for('dashboard.actions_chef', statut='bientot') }}"
+           class="d-block"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-sky);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">Sous 3 jours</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-sky);">{{ stats.bientot }}</div>
+          <div style="font-size:.75rem;color:var(--wp-muted);">à anticiper</div>
+        </a>
+      </div>
+      <div class="col-6 col-lg-3">
+        <a href="{{ url_for('dashboard.actions_chef', statut='sans_delai') }}"
+           class="d-block"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-muted);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">Sans délai</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-ink);">{{ stats.sans_delai }}</div>
+          <div style="font-size:.75rem;color:var(--wp-muted);">à dater si possible</div>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
 <form method="GET" action="{{ url_for('dashboard.actions_chef') }}" class="wp-card mb-4">
   <div class="p-3">
     <div class="row g-3 align-items-end">
@@ -57,6 +106,9 @@
         <select name="statut" class="form-select">
           <option value="ouvertes" {% if filtres.statut == 'ouvertes' %}selected{% endif %}>Ouvertes</option>
           <option value="retard" {% if filtres.statut == 'retard' %}selected{% endif %}>En retard</option>
+          <option value="aujourd_hui" {% if filtres.statut == 'aujourd_hui' %}selected{% endif %}>Aujourd'hui</option>
+          <option value="bientot" {% if filtres.statut == 'bientot' %}selected{% endif %}>Sous 3 jours</option>
+          <option value="sans_delai" {% if filtres.statut == 'sans_delai' %}selected{% endif %}>Sans délai</option>
           {% for code, meta in statuts.items() %}
           <option value="{{ code }}" {% if filtres.statut == code %}selected{% endif %}>{{ meta[0] }}</option>
           {% endfor %}

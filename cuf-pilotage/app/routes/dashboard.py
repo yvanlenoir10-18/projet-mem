@@ -66,10 +66,17 @@ def _action_type_label(type_action):
 
 def _stats_actions_chef():
     today = date.today()
+    soon = today + timedelta(days=3)
     ouvertes_query = ActionChef.query.filter(ActionChef.statut.in_(ACTION_CHEF_STATUTS_OUVERTS))
     return {
         'ouvertes': ouvertes_query.count(),
         'retard': ouvertes_query.filter(ActionChef.echeance < today).count(),
+        'aujourd_hui': ouvertes_query.filter(ActionChef.echeance == today).count(),
+        'bientot': ouvertes_query.filter(
+            ActionChef.echeance > today,
+            ActionChef.echeance <= soon,
+        ).count(),
+        'sans_delai': ouvertes_query.filter(ActionChef.echeance.is_(None)).count(),
         'a_faire': ActionChef.query.filter_by(statut='a_faire').count(),
         'en_cours': ActionChef.query.filter_by(statut='en_cours').count(),
         'fait': ActionChef.query.filter_by(statut='fait').count(),
@@ -2055,12 +2062,29 @@ def actions_chef():
 
     query = ActionChef.query
     today = date.today()
+    soon = today + timedelta(days=3)
     if statut == 'ouvertes':
         query = query.filter(ActionChef.statut.in_(ACTION_CHEF_STATUTS_OUVERTS))
     elif statut == 'retard':
         query = query.filter(
             ActionChef.statut.in_(ACTION_CHEF_STATUTS_OUVERTS),
             ActionChef.echeance < today,
+        )
+    elif statut == 'aujourd_hui':
+        query = query.filter(
+            ActionChef.statut.in_(ACTION_CHEF_STATUTS_OUVERTS),
+            ActionChef.echeance == today,
+        )
+    elif statut == 'bientot':
+        query = query.filter(
+            ActionChef.statut.in_(ACTION_CHEF_STATUTS_OUVERTS),
+            ActionChef.echeance > today,
+            ActionChef.echeance <= soon,
+        )
+    elif statut == 'sans_delai':
+        query = query.filter(
+            ActionChef.statut.in_(ACTION_CHEF_STATUTS_OUVERTS),
+            ActionChef.echeance.is_(None),
         )
     elif statut in ACTION_CHEF_STATUTS:
         query = query.filter(ActionChef.statut == statut)

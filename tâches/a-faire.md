@@ -800,3 +800,17 @@ Objectif : éviter que le chef crée plusieurs actions ou analyses ouvertes pour
 - [x] Afficher `Suivre action existante` ou `Suivre analyse ouverte` au lieu de recréer un doublon.
 - [x] Vérifier compilation, rendu dashboard et scénario anti-doublon.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.14 — Profil Chef Scierie : suivi temporel des actions
+
+Objectif : aider le chef à distinguer les actions en retard, à traiter aujourd'hui, à suivre bientôt et sans délai.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Ajouter les statistiques `aujourd_hui`, `bientot`, `sans_delai`.
+- [x] Ajouter les filtres correspondants dans `/dashboard/chef/actions`.
+- [x] Ajouter des cartes de suivi temporel dans l'écran Actions Chef.
+- [x] Vérifier compilation, rendu et filtres.
+- [x] Commit et push GitHub.

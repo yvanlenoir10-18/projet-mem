@@ -920,3 +920,18 @@ Objectif : éviter qu'une action disparaisse du suivi après un clic involontair
 - [x] Ajouter une confirmation légère avant clôture.
 - [x] Vérifier compilation, rendu et changement de statut avec CSRF.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.23 — Profil Chef Scierie : résultat obligatoire à la clôture
+
+Objectif : conserver la preuve terrain d'une action réellement terminée.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Vérifier le mécanisme de migration SQLite légère.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Ajouter `note_resultat` au modèle et aux bases existantes.
+- [x] Exiger une note courte quand une action passe à `Fait`.
+- [x] Adapter les clôtures rapides et avancées.
+- [x] Vérifier migration, rendu, validation serveur et CSRF.
+- [x] Commit et push GitHub.

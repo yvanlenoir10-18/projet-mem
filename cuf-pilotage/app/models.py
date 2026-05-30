@@ -424,6 +424,7 @@ class ActionChef(db.Model):
     echeance = db.Column(db.Date)
     statut = db.Column(db.String(30), nullable=False, default='a_faire')
     motif_classe_sans_action = db.Column(db.Text)
+    note_resultat = db.Column(db.Text)
 
     origine_type = db.Column(db.String(30), nullable=False, default='libre')
     origine_label = db.Column(db.String(200))

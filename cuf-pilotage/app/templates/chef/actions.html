@@ -206,6 +206,11 @@
             <strong>Motif sans action :</strong> {{ action.motif_classe_sans_action }}
           </div>
           {% endif %}
+          {% if action.note_resultat %}
+          <div style="font-size:.8rem;color:var(--wp-muted);margin-top:.5rem;">
+            <strong>Résultat obtenu :</strong> {{ action.note_resultat }}
+          </div>
+          {% endif %}
           <div class="d-flex gap-3 flex-wrap mt-3" style="font-size:.78rem;color:var(--wp-muted);">
             <span><i class="bi bi-person"></i> Responsable : <strong style="color:var(--wp-ink);">{{ action.responsable }}</strong></span>
             <span><i class="bi bi-calendar-event"></i> Délai : <strong style="color:var(--wp-ink);">{{ action.echeance_fmt }}</strong></span>
@@ -233,9 +238,10 @@
             {% endif %}
             <form method="POST"
                   action="{{ url_for('dashboard.changer_statut_action_chef', action_id=action.id) }}"
-                  onsubmit="return confirm('Marquer cette action comme faite ?');">
+                  onsubmit="return demanderResultatAction(this);">
               {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
               <input type="hidden" name="statut" value="fait">
+              <input type="hidden" name="note_resultat" value="">
               <button class="btn btn-sm btn-success w-100">
                 <i class="bi bi-check2-circle"></i> Marquer fait
               </button>
@@ -245,7 +251,7 @@
           <form method="POST" action="{{ url_for('dashboard.changer_statut_action_chef', action_id=action.id) }}">
             {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
             <label class="form-label" style="font-size:.76rem;font-weight:800;">Statut avancé</label>
-            <select name="statut" class="form-select form-select-sm mb-2" onchange="this.form.querySelector('.motif-action').style.display = this.value === 'classe_sans_action' ? 'block' : 'none';">
+            <select name="statut" class="form-select form-select-sm mb-2" onchange="afficherDetailsStatutAction(this.form, this.value);">
               {% for code, meta in statuts.items() %}
               <option value="{{ code }}" {% if action.statut == code %}selected{% endif %}>{{ meta[0] }}</option>
               {% endfor %}
@@ -255,6 +261,11 @@
                       rows="2"
                       style="display:{% if action.statut == 'classe_sans_action' %}block{% else %}none{% endif %};"
                       placeholder="Motif obligatoire si classé sans action">{{ action.motif_classe_sans_action or '' }}</textarea>
+            <textarea name="note_resultat"
+                      class="form-control form-control-sm resultat-action mb-2"
+                      rows="2"
+                      style="display:{% if action.statut == 'fait' %}block{% else %}none{% endif %};"
+                      placeholder="Résultat obtenu obligatoire si fait">{{ action.note_resultat or '' }}</textarea>
             <button class="btn btn-sm btn-primary w-100">Mettre à jour</button>
           </form>
         </div>
@@ -276,4 +287,23 @@
 </div>
 {% endif %}
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+function demanderResultatAction(formulaire) {
+  const resultat = window.prompt('Résultat obtenu (minimum 5 caractères) :');
+  if (!resultat || resultat.trim().length < 5) {
+    window.alert('Ajoutez une courte note de résultat avant de clôturer cette action.');
+    return false;
+  }
+  formulaire.querySelector('[name="note_resultat"]').value = resultat.trim();
+  return true;
+}
+
+function afficherDetailsStatutAction(formulaire, statut) {
+  formulaire.querySelector('.motif-action').style.display = statut === 'classe_sans_action' ? 'block' : 'none';
+  formulaire.querySelector('.resultat-action').style.display = statut === 'fait' ? 'block' : 'none';
+}
+</script>
 {% endblock %}

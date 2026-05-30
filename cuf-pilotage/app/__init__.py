@@ -241,6 +241,11 @@ def _ensure_schema():
         if 'duree_prevue_min' not in colonnes_arret:
             ajouts.append("ALTER TABLE arret ADD COLUMN duree_prevue_min INTEGER")
 
+    if 'action_chef' in tables:
+        colonnes_action_chef = {col['name'] for col in inspector.get_columns('action_chef')}
+        if 'note_resultat' not in colonnes_action_chef:
+            ajouts.append("ALTER TABLE action_chef ADD COLUMN note_resultat TEXT")
+
     if not ajouts:
         return
 

@@ -207,6 +207,7 @@ def _ligne_action_chef(action):
         'origine_url': action.origine_url,
         'machine': action.machine,
         'motif_classe_sans_action': action.motif_classe_sans_action,
+        'note_resultat': action.note_resultat,
         'cree_par': action.cree_par.nom if action.cree_par else '—',
         'cree_le': action.cree_le,
     }
@@ -2194,6 +2195,7 @@ def _prefill_action_chef():
         'machine': machine,
         'statut': 'a_faire',
         'motif_classe_sans_action': '',
+        'note_resultat': '',
     }
 
 
@@ -2297,6 +2299,7 @@ def nouvelle_action_chef():
         echeance = _parse_date_action(request.form.get('echeance'))
         statut = request.form.get('statut', 'a_faire').strip()
         motif = request.form.get('motif_classe_sans_action', '').strip()
+        note_resultat = request.form.get('note_resultat', '').strip()
         origine_type = request.form.get('origine_type', 'libre').strip()
 
         if type_action not in dict(ACTION_CHEF_TYPES):
@@ -2315,6 +2318,8 @@ def nouvelle_action_chef():
             erreurs.append("Indiquez un responsable, même sous forme simple : Maintenance, Chef parc, Chef équipe.")
         if statut == 'classe_sans_action' and len(motif) < 10:
             erreurs.append("Le motif est obligatoire pour classer sans action.")
+        if statut == 'fait' and len(note_resultat) < 5:
+            erreurs.append("Notez brièvement le résultat obtenu avant de marquer l'action comme faite.")
 
         try:
             equipe_id = int(request.form.get('equipe_id') or 0) or None
@@ -2349,6 +2354,7 @@ def nouvelle_action_chef():
             echeance=echeance,
             statut=statut,
             motif_classe_sans_action=motif if statut == 'classe_sans_action' else None,
+            note_resultat=note_resultat if statut == 'fait' else None,
             origine_type=origine_type,
             origine_label=request.form.get('origine_label', '').strip() or None,
             origine_url=request.form.get('origine_url', '').strip() or None,
@@ -2381,6 +2387,7 @@ def changer_statut_action_chef(action_id):
     action = ActionChef.query.get_or_404(action_id)
     statut = request.form.get('statut', '').strip()
     motif = request.form.get('motif_classe_sans_action', '').strip()
+    note_resultat = request.form.get('note_resultat', '').strip()
 
     if statut not in ACTION_CHEF_STATUTS:
         flash("Statut d'action invalide.", 'danger')
@@ -2388,9 +2395,14 @@ def changer_statut_action_chef(action_id):
     if statut == 'classe_sans_action' and len(motif) < 10:
         flash("Motif obligatoire pour classer une action sans suite.", 'danger')
         return redirect(url_for('dashboard.actions_chef'))
+    if statut == 'fait' and len(note_resultat) < 5:
+        flash("Notez brièvement le résultat obtenu avant de marquer l'action comme faite.", 'danger')
+        return redirect(request.referrer or url_for('dashboard.actions_chef'))
 
     action.statut = statut
     action.motif_classe_sans_action = motif if statut == 'classe_sans_action' else None
+    if statut == 'fait':
+        action.note_resultat = note_resultat
     action.termine_le = datetime.utcnow() if statut in ('fait', 'abandonne', 'classe_sans_action') else None
     db.session.commit()
     flash("Statut de l'action mis à jour.", 'success')

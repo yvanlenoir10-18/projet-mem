@@ -907,3 +907,16 @@ Objectif : accélérer la création d'une action avec des choix de délai simple
 - [x] Ajouter les boutons `Aujourd'hui`, `Demain`, `Dans 3 jours`, `Dans 7 jours`, `Sans délai`.
 - [x] Vérifier compilation, rendu et création d'action.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.22 — Profil Chef Scierie : confirmation avant clôture rapide
+
+Objectif : éviter qu'une action disparaisse du suivi après un clic involontaire sur `Fait`.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Repérer les boutons rapides `Fait` sur le dashboard et la liste Actions Chef.
+- [x] Ajouter une confirmation légère avant clôture.
+- [x] Vérifier compilation, rendu et changement de statut avec CSRF.
+- [x] Commit et push GitHub.

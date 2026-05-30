@@ -126,7 +126,9 @@
           </form>
           {% endif %}
           {% if action.statut in ['a_faire', 'en_cours'] %}
-          <form method="POST" action="{{ url_for('dashboard.changer_statut_action_chef', action_id=action.id) }}">
+          <form method="POST"
+                action="{{ url_for('dashboard.changer_statut_action_chef', action_id=action.id) }}"
+                onsubmit="return confirm('Marquer cette action comme faite ?');">
             {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
             <input type="hidden" name="statut" value="fait">
             <button class="btn btn-sm btn-success">

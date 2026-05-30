@@ -935,3 +935,18 @@ Objectif : conserver la preuve terrain d'une action réellement terminée.
 - [x] Adapter les clôtures rapides et avancées.
 - [x] Vérifier migration, rendu, validation serveur et CSRF.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.24 — Profil Chef Scierie : historique métier des actions
+
+Objectif : reconstituer simplement qui a créé, démarré, clôturé ou rouvert une action.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Analyser les modèles et routes Actions Chef.
+- [x] Ajouter une table légère d'événements métier.
+- [x] Tracer la création et les changements de statut.
+- [x] Afficher une timeline repliable dans Actions Chef.
+- [x] Vérifier création, transitions, affichage et compilation.
+- [x] Commit et push GitHub.

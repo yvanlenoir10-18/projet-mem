@@ -452,3 +452,30 @@ class ActionChef(db.Model):
 
     def __repr__(self):
         return f'<ActionChef {self.id} {self.statut} {self.titre}>'
+
+
+class ActionChefEvenement(db.Model):
+    """Historique métier léger des transitions d'une action chef."""
+    __tablename__ = 'action_chef_evenement'
+
+    id = db.Column(db.Integer, primary_key=True)
+    action_id = db.Column(db.Integer, db.ForeignKey('action_chef.id'), nullable=False)
+    ancien_statut = db.Column(db.String(30))
+    nouveau_statut = db.Column(db.String(30), nullable=False)
+    note = db.Column(db.Text)
+    auteur_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    cree_le = db.Column(db.DateTime, default=datetime.utcnow)
+
+    action = db.relationship(
+        'ActionChef',
+        backref=db.backref(
+            'evenements',
+            lazy=True,
+            cascade='all, delete-orphan',
+            order_by='ActionChefEvenement.cree_le.desc()',
+        ),
+    )
+    auteur = db.relationship('User', lazy=True)
+
+    def __repr__(self):
+        return f'<ActionChefEvenement {self.action_id} {self.nouveau_statut}>'

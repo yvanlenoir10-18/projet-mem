@@ -14,7 +14,7 @@ import io
 from ..models import (
     db, User, Equipe, Parametre, STATUT_A_CORRIGER, STATUT_A_VERIFIER,
     STATUT_BROUILLON, STATUT_VALIDE_CHEF, STATUT_VERROUILLE,
-    STATUTS_ANALYSES, STATUTS_NON_ANALYSES, Probleme, ActionChef,
+    STATUTS_ANALYSES, STATUTS_NON_ANALYSES, Probleme, ActionChef, ActionChefEvenement,
 )
 from ..services.trs import (
     pareto_arrets, couleur_trs,
@@ -185,10 +185,38 @@ def _suggestions_responsables_action_chef(responsable_courant=None):
     return sorted(suggestions.values(), key=lambda item: item.lower())
 
 
-def _ligne_action_chef(action):
+def _tracer_transition_action_chef(action, nouveau_statut, note=None, ancien_statut=None):
+    """Ajoute un événement métier lisible après une création ou un changement de statut."""
+    if not action.id:
+        db.session.flush()
+    db.session.add(ActionChefEvenement(
+        action_id=action.id,
+        ancien_statut=ancien_statut,
+        nouveau_statut=nouveau_statut,
+        note=(note or '').strip() or None,
+        auteur_id=current_user.id,
+    ))
+
+
+def _evenements_action_chef(action, limite=6):
+    evenements = []
+    for evenement in action.evenements[:limite]:
+        ancien = _action_statut_meta(evenement.ancien_statut)['label'] if evenement.ancien_statut else None
+        nouveau = _action_statut_meta(evenement.nouveau_statut)['label']
+        evenements.append({
+            'id': evenement.id,
+            'titre': f"{ancien} → {nouveau}" if ancien else f"Créée · {nouveau}",
+            'note': evenement.note,
+            'auteur': evenement.auteur.nom if evenement.auteur else '—',
+            'date_fmt': evenement.cree_le.strftime('%d/%m/%Y à %H:%M') if evenement.cree_le else '—',
+        })
+    return evenements
+
+
+def _ligne_action_chef(action, inclure_evenements=False):
     statut = _action_statut_meta(action.statut)
     signal = _signal_temporel_action(action)
-    return {
+    ligne = {
         'id': action.id,
         'titre': action.titre,
         'type_action': action.type_action,
@@ -211,6 +239,9 @@ def _ligne_action_chef(action):
         'cree_par': action.cree_par.nom if action.cree_par else '—',
         'cree_le': action.cree_le,
     }
+    if inclure_evenements:
+        ligne['evenements'] = _evenements_action_chef(action)
+    return ligne
 
 
 def _actions_chef_urgentes(aujourd_hui, limite=3):
@@ -2267,7 +2298,7 @@ def actions_chef():
 
     return render_template(
         'chef/actions.html',
-        actions=[_ligne_action_chef(a) for a in actions],
+        actions=[_ligne_action_chef(a, inclure_evenements=True) for a in actions],
         stats=_stats_actions_chef(),
         responsables_actions=responsables_actions,
         responsables_connus=sorted(responsables_connus, key=lambda item: item.lower()),
@@ -2365,6 +2396,10 @@ def nouvelle_action_chef():
             termine_le=datetime.utcnow() if statut in ('fait', 'abandonne', 'classe_sans_action') else None,
         )
         db.session.add(action)
+        note_evenement = note_resultat if statut == 'fait' else (
+            motif if statut == 'classe_sans_action' else "Action créée."
+        )
+        _tracer_transition_action_chef(action, statut, note=note_evenement)
         db.session.commit()
         flash("Action chef créée. Elle restera visible jusqu'à son traitement.", 'success')
         return redirect(url_for('dashboard.actions_chef'))
@@ -2399,11 +2434,24 @@ def changer_statut_action_chef(action_id):
         flash("Notez brièvement le résultat obtenu avant de marquer l'action comme faite.", 'danger')
         return redirect(request.referrer or url_for('dashboard.actions_chef'))
 
+    ancien_statut = action.statut
     action.statut = statut
     action.motif_classe_sans_action = motif if statut == 'classe_sans_action' else None
     if statut == 'fait':
         action.note_resultat = note_resultat
+    elif ancien_statut == 'fait':
+        action.note_resultat = None
     action.termine_le = datetime.utcnow() if statut in ('fait', 'abandonne', 'classe_sans_action') else None
+    note_evenement = note_resultat if statut == 'fait' else (
+        motif if statut == 'classe_sans_action' else None
+    )
+    if ancien_statut != statut or note_evenement:
+        _tracer_transition_action_chef(
+            action,
+            statut,
+            note=note_evenement,
+            ancien_statut=ancien_statut,
+        )
     db.session.commit()
     flash("Statut de l'action mis à jour.", 'success')
     return redirect(request.referrer or url_for('dashboard.actions_chef'))

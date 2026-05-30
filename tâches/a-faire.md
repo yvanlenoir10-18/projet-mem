@@ -950,3 +950,18 @@ Objectif : reconstituer simplement qui a créé, démarré, clôturé ou rouvert
 - [x] Afficher une timeline repliable dans Actions Chef.
 - [x] Vérifier création, transitions, affichage et compilation.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.25 — Profil Chef Scierie : pilotage des actions par machine
+
+Objectif : aider le chef à retrouver rapidement les décisions ouvertes liées à une machine précise.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Analyser les filtres existants de la page Actions Chef.
+- [x] Calculer une synthèse des actions ouvertes par machine.
+- [x] Ajouter un bloc `Par machine` cliquable dans Actions Chef.
+- [x] Ajouter un filtre exact par machine.
+- [x] Vérifier compilation, rendu et filtrage.
+- [x] Commit et push GitHub.

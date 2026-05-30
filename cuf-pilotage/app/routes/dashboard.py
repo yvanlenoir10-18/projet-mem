@@ -164,6 +164,44 @@ def _responsables_actions_chef(limite=None):
     return lignes[:limite] if limite else lignes
 
 
+def _machines_actions_chef(limite=None):
+    """Synthèse simple des actions ouvertes rattachées à une machine."""
+    today = date.today()
+    machines = defaultdict(lambda: {
+        'machine': '',
+        'ouvertes': 0,
+        'retard': 0,
+        'aujourd_hui': 0,
+        'en_cours': 0,
+    })
+    actions = ActionChef.query.filter(
+        ActionChef.statut.in_(ACTION_CHEF_STATUTS_OUVERTS),
+        ActionChef.machine.isnot(None),
+    ).all()
+
+    for action in actions:
+        nom = (action.machine or '').strip()
+        if not nom:
+            continue
+        cle = nom.lower()
+        stats = machines[cle]
+        stats['machine'] = nom
+        stats['ouvertes'] += 1
+        if action.statut == 'en_cours':
+            stats['en_cours'] += 1
+        if action.echeance and action.echeance < today:
+            stats['retard'] += 1
+        elif action.echeance == today:
+            stats['aujourd_hui'] += 1
+
+    lignes = sorted(
+        machines.values(),
+        key=lambda item: (item['retard'], item['aujourd_hui'], item['ouvertes']),
+        reverse=True,
+    )
+    return lignes[:limite] if limite else lignes
+
+
 def _suggestions_responsables_action_chef(responsable_courant=None):
     """Suggestions pour le champ responsable : défauts + valeurs déjà utilisées."""
     suggestions = {}
@@ -2238,6 +2276,7 @@ def actions_chef():
     statut = request.args.get('statut', 'ouvertes').strip()
     origine_type = request.args.get('origine_type', '').strip()
     responsable = request.args.get('responsable', '').strip()
+    machine = request.args.get('machine', '').strip()
     q = request.args.get('q', '').strip()
 
     query = ActionChef.query
@@ -2280,6 +2319,14 @@ def actions_chef():
         if responsable not in responsables_connus:
             responsables_connus.append(responsable)
 
+    machines_toutes = _machines_actions_chef()
+    machines_actions = machines_toutes[:8]
+    machines_connues = [item['machine'] for item in machines_toutes]
+    if machine:
+        query = query.filter(ActionChef.machine.ilike(machine))
+        if machine not in machines_connues:
+            machines_connues.append(machine)
+
     if q:
         like = f"%{q}%"
         query = query.filter(or_(
@@ -2302,10 +2349,13 @@ def actions_chef():
         stats=_stats_actions_chef(),
         responsables_actions=responsables_actions,
         responsables_connus=sorted(responsables_connus, key=lambda item: item.lower()),
+        machines_actions=machines_actions,
+        machines_connues=sorted(machines_connues, key=lambda item: item.lower()),
         filtres={
             'statut': statut,
             'origine_type': origine_type,
             'responsable': responsable,
+            'machine': machine,
             'q': q,
         },
         statuts=ACTION_CHEF_STATUTS,

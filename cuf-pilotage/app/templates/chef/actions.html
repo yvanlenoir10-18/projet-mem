@@ -79,6 +79,36 @@
 </div>
 {% endif %}
 
+{% if machines_actions %}
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-gear-wide-connected"></i> Par machine
+    <span class="ms-auto" style="font-size:.74rem;color:var(--wp-muted);font-weight:500;">
+      Où faut-il concentrer le suivi ?
+    </span>
+  </div>
+  <div class="p-3">
+    <div class="row g-2">
+      {% for item in machines_actions %}
+      <div class="col-12 col-md-6 col-xl-3">
+        <a href="{{ url_for('dashboard.actions_chef', statut='ouvertes', machine=item.machine) }}"
+           class="d-block"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid {% if item.retard %}var(--wp-terracotta){% elif item.aujourd_hui %}var(--wp-ochre){% else %}var(--wp-sky){% endif %};border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.86rem;font-weight:900;color:var(--wp-ink);">{{ item.machine }}</div>
+          <div class="d-flex gap-2 flex-wrap mt-2" style="font-size:.75rem;color:var(--wp-muted);">
+            <span>{{ item.ouvertes }} ouverte{{ 's' if item.ouvertes > 1 }}</span>
+            {% if item.retard %}<span style="color:var(--wp-terracotta);font-weight:800;">{{ item.retard }} retard</span>{% endif %}
+            {% if item.aujourd_hui %}<span style="color:var(--wp-ochre);font-weight:800;">{{ item.aujourd_hui }} aujourd'hui</span>{% endif %}
+            {% if item.en_cours %}<span>{{ item.en_cours }} en cours</span>{% endif %}
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 <div class="wp-card mb-4">
   <div class="wp-card-header">
     <i class="bi bi-calendar-check"></i> À traiter par délai
@@ -151,6 +181,15 @@
           <option value="">Tous</option>
           {% for responsable in responsables_connus %}
           <option value="{{ responsable }}" {% if filtres.responsable == responsable %}selected{% endif %}>{{ responsable }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-lg-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Machine</label>
+        <select name="machine" class="form-select">
+          <option value="">Toutes</option>
+          {% for machine in machines_connues %}
+          <option value="{{ machine }}" {% if filtres.machine == machine %}selected{% endif %}>{{ machine }}</option>
           {% endfor %}
         </select>
       </div>

@@ -329,6 +329,39 @@ def _bilan_efficacite_action_chef(action, aujourd_hui=None):
     }
 
 
+def _stats_boucle_amelioration_actions_chef(aujourd_hui=None, depuis_jours=30):
+    """Synthèse des résultats observés après les actions machine terminées."""
+    aujourd_hui = aujourd_hui or date.today()
+    depuis = datetime.combine(
+        aujourd_hui - timedelta(days=depuis_jours),
+        datetime.min.time(),
+    )
+    actions = ActionChef.query.filter(
+        ActionChef.statut == 'fait',
+        ActionChef.machine.isnot(None),
+        ActionChef.termine_le.isnot(None),
+        ActionChef.termine_le >= depuis,
+    ).all()
+    stats = {
+        'ouvertes': ActionChef.query.filter(
+            ActionChef.statut.in_(ACTION_CHEF_STATUTS_OUVERTS)
+        ).count(),
+        'terminees_machine': len(actions),
+        'efficaces': 0,
+        'observation': 0,
+        'a_surveiller': 0,
+        'a_revoir': 0,
+    }
+    for action in actions:
+        bilan = _bilan_efficacite_action_chef(action, aujourd_hui=aujourd_hui)
+        niveau = bilan.get('niveau') if bilan else None
+        if niveau in ('amelioration', 'stable'):
+            stats['efficaces'] += 1
+        elif niveau in ('observation', 'a_surveiller', 'a_revoir'):
+            stats[niveau] += 1
+    return stats
+
+
 def _ligne_action_chef(action, inclure_evenements=False):
     statut = _action_statut_meta(action.statut)
     signal = _signal_temporel_action(action)
@@ -2417,6 +2450,7 @@ def actions_chef():
     origine_type = request.args.get('origine_type', '').strip()
     responsable = request.args.get('responsable', '').strip()
     machine = request.args.get('machine', '').strip()
+    efficacite = request.args.get('efficacite', '').strip()
     q = request.args.get('q', '').strip()
 
     query = ActionChef.query
@@ -2482,11 +2516,25 @@ def actions_chef():
         ActionChef.echeance.asc(),
         ActionChef.cree_le.desc(),
     ).all()
+    lignes_actions = [_ligne_action_chef(a, inclure_evenements=True) for a in actions]
+    niveaux_efficacite = ('efficaces', 'observation', 'a_surveiller', 'a_revoir')
+    if efficacite in niveaux_efficacite:
+        def correspond_efficacite(ligne):
+            bilan = ligne.get('bilan_efficacite') or {}
+            niveau = bilan.get('niveau')
+            if efficacite == 'efficaces':
+                return niveau in ('amelioration', 'stable')
+            return niveau == efficacite
+
+        lignes_actions = [ligne for ligne in lignes_actions if correspond_efficacite(ligne)]
+    else:
+        efficacite = ''
 
     return render_template(
         'chef/actions.html',
-        actions=[_ligne_action_chef(a, inclure_evenements=True) for a in actions],
+        actions=lignes_actions,
         stats=_stats_actions_chef(),
+        stats_boucle=_stats_boucle_amelioration_actions_chef(),
         responsables_actions=responsables_actions,
         responsables_connus=sorted(responsables_connus, key=lambda item: item.lower()),
         machines_actions=machines_actions,
@@ -2496,6 +2544,7 @@ def actions_chef():
             'origine_type': origine_type,
             'responsable': responsable,
             'machine': machine,
+            'efficacite': efficacite,
             'q': q,
         },
         statuts=ACTION_CHEF_STATUTS,

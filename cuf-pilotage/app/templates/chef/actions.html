@@ -49,6 +49,68 @@
   </div>
 </div>
 
+{% set boucle = stats_boucle|default({}) %}
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-arrow-repeat"></i> Boucle d'amélioration
+    <span class="ms-auto" style="font-size:.74rem;color:var(--wp-muted);font-weight:500;">
+      Effets observés sur les actions machine terminées depuis 30 jours
+    </span>
+  </div>
+  <div class="p-3">
+    <div class="row row-cols-2 row-cols-lg-5 g-2">
+      <div class="col">
+        <a href="{{ url_for('dashboard.actions_chef', statut='ouvertes') }}"
+           class="d-block h-100"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-sky);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">Ouvertes</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-sky);">{{ boucle.ouvertes|default(0) }}</div>
+          <div style="font-size:.72rem;color:var(--wp-muted);">à mener</div>
+        </a>
+      </div>
+      <div class="col">
+        <a href="{{ url_for('dashboard.actions_chef', statut='fait', efficacite='efficaces') }}"
+           class="d-block h-100"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-leaf);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">Efficaces</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-leaf);">{{ boucle.efficaces|default(0) }}</div>
+          <div style="font-size:.72rem;color:var(--wp-muted);">effet visible</div>
+        </a>
+      </div>
+      <div class="col">
+        <a href="{{ url_for('dashboard.actions_chef', statut='fait', efficacite='observation') }}"
+           class="d-block h-100"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-sky);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">À observer</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-sky);">{{ boucle.observation|default(0) }}</div>
+          <div style="font-size:.72rem;color:var(--wp-muted);">recul insuffisant</div>
+        </a>
+      </div>
+      <div class="col">
+        <a href="{{ url_for('dashboard.actions_chef', statut='fait', efficacite='a_surveiller') }}"
+           class="d-block h-100"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-ochre);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">À surveiller</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-ochre);">{{ boucle.a_surveiller|default(0) }}</div>
+          <div style="font-size:.72rem;color:var(--wp-muted);">effet encore faible</div>
+        </a>
+      </div>
+      <div class="col">
+        <a href="{{ url_for('dashboard.actions_chef', statut='fait', efficacite='a_revoir') }}"
+           class="d-block h-100"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-terracotta);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">À revoir</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-terracotta);">{{ boucle.a_revoir|default(0) }}</div>
+          <div style="font-size:.72rem;color:var(--wp-muted);">action insuffisante</div>
+        </a>
+      </div>
+    </div>
+    <div style="font-size:.72rem;color:var(--wp-muted);margin-top:.65rem;">
+      {{ boucle.terminees_machine|default(0) }} action{{ 's' if boucle.terminees_machine|default(0) > 1 }} machine terminée{{ 's' if boucle.terminees_machine|default(0) > 1 }} analysée{{ 's' if boucle.terminees_machine|default(0) > 1 }}.
+    </div>
+  </div>
+</div>
+
 {% if responsables_actions %}
 <div class="wp-card mb-4">
   <div class="wp-card-header">
@@ -200,6 +262,16 @@
           {% for code, label in origines.items() %}
           <option value="{{ code }}" {% if filtres.origine_type == code %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-lg-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Efficacité</label>
+        <select name="efficacite" class="form-select">
+          <option value="">Toutes</option>
+          <option value="efficaces" {% if filtres.efficacite == 'efficaces' %}selected{% endif %}>Efficaces</option>
+          <option value="observation" {% if filtres.efficacite == 'observation' %}selected{% endif %}>À observer</option>
+          <option value="a_surveiller" {% if filtres.efficacite == 'a_surveiller' %}selected{% endif %}>À surveiller</option>
+          <option value="a_revoir" {% if filtres.efficacite == 'a_revoir' %}selected{% endif %}>À revoir</option>
         </select>
       </div>
       <div class="col-12 col-lg-3">

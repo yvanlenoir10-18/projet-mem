@@ -1007,3 +1007,18 @@ Objectif : transformer un rappel rouge en décision praticable sans ressaisie in
 - [x] Ajouter `Analyser les causes` avec le contexte Ishikawa prérempli.
 - [x] Vérifier liens, rendu dashboard et compilation.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.29 — Profil Chef Scierie : synthèse de la boucle d'amélioration
+
+Objectif : permettre au chef de distinguer rapidement les actions ouvertes, efficaces, à observer, à surveiller et à revoir.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Analyser la page Actions Chef et les bilans existants.
+- [x] Calculer la synthèse des actions machine terminées sur 30 jours.
+- [x] Ajouter une bande `Boucle d'amélioration` avec compteurs cliquables.
+- [x] Ajouter un filtre manuel par efficacité.
+- [x] Vérifier calcul, filtrage, rendu et compilation.
+- [x] Commit et push GitHub.

@@ -1036,3 +1036,21 @@ Objectif : montrer quelles machines concentrent les actions efficaces, incertain
 - [x] Afficher une carte cliquable par machine, triée par gravité.
 - [x] Vérifier calcul, filtrage, rendu et compilation.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.31 — Profil Chef Scierie : recette complète avant nouvelles fonctions
+
+Objectif : vérifier de bout en bout que le profil Chef est fiable, compréhensible et exploitable avant d'ajouter de nouvelles briques.
+
+- [x] Synchroniser GitHub et inventorier les routes Chef.
+- [x] Créer une branche de sauvegarde avant recette.
+- [x] Tester accès, navigation et permissions.
+- [x] Tester réception, renvoi et validation des fiches terrain.
+- [x] Tester dashboard quotidien, alertes et priorités.
+- [x] Tester Machines & Arrêts, Production & Objectifs et Qualité / Matière.
+- [x] Tester Résolution guidée : Ishikawa, 5 Pourquoi, cause racine et rapport.
+- [x] Tester Actions Chef : création, suivi, résultat, historique, efficacité et relance.
+- [x] Corriger les bugs visibles si nécessaire. Aucun bug applicatif détecté pendant la recette P3.31.
+- [x] Produire un rapport de recette explicite.
+- [x] Commit et push GitHub.

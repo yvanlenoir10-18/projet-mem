@@ -1022,3 +1022,17 @@ Objectif : permettre au chef de distinguer rapidement les actions ouvertes, effi
 - [x] Ajouter un filtre manuel par efficacité.
 - [x] Vérifier calcul, filtrage, rendu et compilation.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.30 — Profil Chef Scierie : efficacité des actions par machine
+
+Objectif : montrer quelles machines concentrent les actions efficaces, incertaines ou à revoir.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Analyser la boucle d'amélioration et les regroupements machine existants.
+- [x] Calculer une synthèse des actions terminées par machine sur 30 jours.
+- [x] Afficher une carte cliquable par machine, triée par gravité.
+- [x] Vérifier calcul, filtrage, rendu et compilation.
+- [x] Commit et push GitHub.

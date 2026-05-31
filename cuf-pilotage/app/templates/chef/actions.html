@@ -111,6 +111,40 @@
   </div>
 </div>
 
+{% set effets_machines = efficacite_par_machine|default([]) %}
+{% if effets_machines %}
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-tools"></i> Effets par machine
+    <span class="ms-auto" style="font-size:.74rem;color:var(--wp-muted);font-weight:500;">
+      Les machines avec des actions à revoir remontent en premier
+    </span>
+  </div>
+  <div class="p-3">
+    <div class="row g-2">
+      {% for item in effets_machines %}
+      <div class="col-12 col-md-6 col-xl-3">
+        <a href="{{ url_for('dashboard.actions_chef', statut='fait', machine=item.machine) }}"
+           class="d-block h-100"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid {% if item.a_revoir %}var(--wp-terracotta){% elif item.a_surveiller %}var(--wp-ochre){% elif item.observation %}var(--wp-sky){% else %}var(--wp-leaf){% endif %};border-radius:8px;padding:.8rem;background:#fff;">
+          <div class="d-flex justify-content-between align-items-center gap-2">
+            <strong style="font-size:.86rem;color:var(--wp-ink);">{{ item.machine }}</strong>
+            <span style="font-size:.7rem;color:var(--wp-muted);">{{ item.terminees }} terminée{{ 's' if item.terminees > 1 }}</span>
+          </div>
+          <div class="d-flex gap-2 flex-wrap mt-2" style="font-size:.73rem;color:var(--wp-muted);">
+            {% if item.efficaces %}<span style="color:var(--wp-leaf);font-weight:800;">{{ item.efficaces }} efficace{{ 's' if item.efficaces > 1 }}</span>{% endif %}
+            {% if item.observation %}<span style="color:var(--wp-sky);font-weight:800;">{{ item.observation }} à observer</span>{% endif %}
+            {% if item.a_surveiller %}<span style="color:var(--wp-ochre);font-weight:800;">{{ item.a_surveiller }} à surveiller</span>{% endif %}
+            {% if item.a_revoir %}<span style="color:var(--wp-terracotta);font-weight:800;">{{ item.a_revoir }} à revoir</span>{% endif %}
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {% if responsables_actions %}
 <div class="wp-card mb-4">
   <div class="wp-card-header">

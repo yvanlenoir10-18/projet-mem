@@ -362,6 +362,54 @@ def _stats_boucle_amelioration_actions_chef(aujourd_hui=None, depuis_jours=30):
     return stats
 
 
+def _efficacite_actions_par_machine(aujourd_hui=None, depuis_jours=30, limite=None):
+    """Regroupe les effets observés des actions terminées par machine."""
+    aujourd_hui = aujourd_hui or date.today()
+    depuis = datetime.combine(
+        aujourd_hui - timedelta(days=depuis_jours),
+        datetime.min.time(),
+    )
+    actions = ActionChef.query.filter(
+        ActionChef.statut == 'fait',
+        ActionChef.machine.isnot(None),
+        ActionChef.termine_le.isnot(None),
+        ActionChef.termine_le >= depuis,
+    ).all()
+    machines = defaultdict(lambda: {
+        'machine': '',
+        'terminees': 0,
+        'efficaces': 0,
+        'observation': 0,
+        'a_surveiller': 0,
+        'a_revoir': 0,
+    })
+    for action in actions:
+        machine = (action.machine or '').strip()
+        if not machine:
+            continue
+        bilan = _bilan_efficacite_action_chef(action, aujourd_hui=aujourd_hui)
+        niveau = bilan.get('niveau') if bilan else None
+        stats = machines[machine.lower()]
+        stats['machine'] = machine
+        stats['terminees'] += 1
+        if niveau in ('amelioration', 'stable'):
+            stats['efficaces'] += 1
+        elif niveau in ('observation', 'a_surveiller', 'a_revoir'):
+            stats[niveau] += 1
+
+    lignes = sorted(
+        machines.values(),
+        key=lambda item: (
+            item['a_revoir'],
+            item['a_surveiller'],
+            item['observation'],
+            item['terminees'],
+        ),
+        reverse=True,
+    )
+    return lignes[:limite] if limite else lignes
+
+
 def _ligne_action_chef(action, inclure_evenements=False):
     statut = _action_statut_meta(action.statut)
     signal = _signal_temporel_action(action)
@@ -2535,6 +2583,7 @@ def actions_chef():
         actions=lignes_actions,
         stats=_stats_actions_chef(),
         stats_boucle=_stats_boucle_amelioration_actions_chef(),
+        efficacite_par_machine=_efficacite_actions_par_machine(limite=8),
         responsables_actions=responsables_actions,
         responsables_connus=sorted(responsables_connus, key=lambda item: item.lower()),
         machines_actions=machines_actions,

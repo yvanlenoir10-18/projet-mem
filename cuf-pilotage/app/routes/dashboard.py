@@ -391,6 +391,36 @@ def _actions_chef_urgentes(aujourd_hui, limite=3):
     return lignes
 
 
+def _actions_chef_a_revoir(aujourd_hui, limite=None, depuis_jours=30):
+    """Actions machine terminées récemment mais sans amélioration observée."""
+    depuis = datetime.combine(
+        aujourd_hui - timedelta(days=depuis_jours),
+        datetime.min.time(),
+    )
+    actions = ActionChef.query.filter(
+        ActionChef.statut == 'fait',
+        ActionChef.machine.isnot(None),
+        ActionChef.termine_le.isnot(None),
+        ActionChef.termine_le >= depuis,
+    ).order_by(ActionChef.termine_le.desc()).all()
+
+    lignes = []
+    for action in actions:
+        ligne = _ligne_action_chef(action)
+        bilan = ligne.get('bilan_efficacite')
+        if not bilan or bilan.get('niveau') != 'a_revoir':
+            continue
+        ligne['href'] = url_for(
+            'dashboard.actions_chef',
+            statut='fait',
+            q=action.titre,
+        )
+        lignes.append(ligne)
+        if limite and len(lignes) >= limite:
+            break
+    return lignes
+
+
 def _commentaires_validation(equipe):
     commentaires = []
     if equipe.notes and equipe.notes.strip():
@@ -1861,6 +1891,7 @@ def vue_chef():
     ).count()
     stats_actions_chef = _stats_actions_chef()
     actions_chef_urgentes = _actions_chef_urgentes(aujourd_hui)
+    actions_chef_a_revoir = _actions_chef_a_revoir(aujourd_hui)
     priorites_chef = _priorites_chef(
         aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_actions_chef
     )
@@ -1902,6 +1933,7 @@ def vue_chef():
                                nb_problemes_ouverts=nb_problemes_ouverts,
                                stats_actions_chef=stats_actions_chef,
                                actions_chef_urgentes=actions_chef_urgentes,
+                               actions_chef_a_revoir=actions_chef_a_revoir,
                                priorites_chef=priorites_chef)
 
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
@@ -2143,6 +2175,7 @@ def vue_chef():
                            nb_problemes_ouverts=nb_problemes_ouverts,
                            stats_actions_chef=stats_actions_chef,
                            actions_chef_urgentes=actions_chef_urgentes,
+                           actions_chef_a_revoir=actions_chef_a_revoir,
                            priorites_chef=priorites_chef)
 
 

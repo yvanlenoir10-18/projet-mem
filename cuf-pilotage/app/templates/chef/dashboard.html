@@ -76,18 +76,20 @@
 
 {% set action_stats = stats_actions_chef|default({}) %}
 {% set actions_urgentes = actions_chef_urgentes|default([]) %}
-<div class="wp-card mb-4" style="border-left:4px solid {% if action_stats.retard|default(0) > 0 %}var(--wp-terracotta){% else %}var(--wp-sky){% endif %};">
+{% set actions_a_revoir = actions_chef_a_revoir|default([]) %}
+<div class="wp-card mb-4" style="border-left:4px solid {% if action_stats.retard|default(0) > 0 or actions_a_revoir %}var(--wp-terracotta){% else %}var(--wp-sky){% endif %};">
   <div class="p-3">
     <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
       <div>
         <div style="font-weight:900;color:var(--wp-ink);">
-          <i class="bi bi-check2-square" style="color:{% if action_stats.retard|default(0) > 0 %}var(--wp-terracotta){% else %}var(--wp-sky){% endif %};"></i>
+          <i class="bi bi-check2-square" style="color:{% if action_stats.retard|default(0) > 0 or actions_a_revoir %}var(--wp-terracotta){% else %}var(--wp-sky){% endif %};"></i>
           Actions Chef à suivre
         </div>
         <div style="font-size:.82rem;color:var(--wp-muted);">
           {{ action_stats.ouvertes|default(0) }} ouverte{{ 's' if action_stats.ouvertes|default(0) > 1 }}
           · {{ action_stats.retard|default(0) }} en retard
-          · {{ action_stats.aujourd_hui|default(0) }} aujourd'hui.
+          · {{ action_stats.aujourd_hui|default(0) }} aujourd'hui
+          · {{ actions_a_revoir|length }} terminée{{ 's' if actions_a_revoir|length > 1 }} à revoir.
         </div>
       </div>
       <div class="d-flex gap-2 flex-wrap">
@@ -99,6 +101,31 @@
         </a>
       </div>
     </div>
+
+    {% if actions_a_revoir %}
+    <div class="mt-3 d-grid gap-2">
+      <div style="font-size:.76rem;font-weight:900;color:var(--wp-terracotta);">
+        <i class="bi bi-exclamation-octagon"></i> Terminées mais à revoir
+      </div>
+      {% for action in actions_a_revoir[:3] %}
+      <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap"
+           style="border:1px solid #eadfce;border-left:4px solid var(--wp-terracotta);border-radius:8px;padding:.7rem .8rem;background:#fff;">
+        <div style="min-width:0;flex:1;">
+          <strong style="color:var(--wp-ink);">{{ action.titre }}</strong>
+          <span style="font-size:.78rem;color:var(--wp-muted);display:block;margin-top:.15rem;">
+            {{ action.machine }} · {{ action.bilan_efficacite.detail }}
+          </span>
+          <span style="font-size:.74rem;color:var(--wp-muted);display:block;margin-top:.15rem;">
+            Avant : {{ action.bilan_efficacite.avant.minutes_fmt }} · Après : {{ action.bilan_efficacite.apres.minutes_fmt }}
+          </span>
+        </div>
+        <a href="{{ action.href }}" class="btn btn-sm btn-outline-danger">
+          <i class="bi bi-arrow-repeat"></i> Revoir
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
 
     {% if actions_urgentes %}
     <div class="mt-3 d-grid gap-2">

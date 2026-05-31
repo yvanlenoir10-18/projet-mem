@@ -979,3 +979,17 @@ Objectif : aider le chef à vérifier si une action terminée a réellement réd
 - [x] Afficher un bilan léger dans les actions terminées liées à une machine.
 - [x] Vérifier calcul, rendu et compilation.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.27 — Profil Chef Scierie : rappel des actions inefficaces
+
+Objectif : empêcher qu'une action machine marquée `Fait` disparaisse du pilotage alors que les arrêts continuent.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Analyser le dashboard Chef et les bilans P3.26.
+- [x] Détecter les actions terminées récentes dont le bilan est `À revoir`.
+- [x] Afficher un rappel ciblé sur l'accueil Chef avec accès direct au suivi.
+- [x] Vérifier calcul, rendu dashboard et compilation.
+- [x] Commit et push GitHub.

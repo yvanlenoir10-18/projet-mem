@@ -119,9 +119,17 @@
             Avant : {{ action.bilan_efficacite.avant.minutes_fmt }} · Après : {{ action.bilan_efficacite.apres.minutes_fmt }}
           </span>
         </div>
-        <a href="{{ action.href }}" class="btn btn-sm btn-outline-danger">
-          <i class="bi bi-arrow-repeat"></i> Revoir
-        </a>
+        <div class="d-flex gap-2 flex-wrap">
+          <a href="{{ action.href }}" class="btn btn-sm btn-outline-danger">
+            <i class="bi bi-arrow-repeat"></i> Revoir
+          </a>
+          <a href="{{ action.href_nouvelle_action }}" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-plus-circle"></i> Nouvelle action
+          </a>
+          <a href="{{ action.href_analyse }}" class="btn btn-sm btn-primary">
+            <i class="bi bi-diagram-3"></i> Analyser les causes
+          </a>
+        </div>
       </div>
       {% endfor %}
     </div>

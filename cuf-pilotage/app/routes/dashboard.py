@@ -415,6 +415,34 @@ def _actions_chef_a_revoir(aujourd_hui, limite=None, depuis_jours=30):
             statut='fait',
             q=action.titre,
         )
+        origine_label = f"Action inefficace #{action.id} - {action.machine}"
+        contexte_combien = (
+            f"Temps d'arrêt avant : {bilan['avant']['minutes_fmt']} · "
+            f"après : {bilan['apres']['minutes_fmt']}. {bilan['detail']}"
+        )
+        ligne['href_nouvelle_action'] = url_for(
+            'dashboard.nouvelle_action_chef',
+            machine=action.machine,
+            origine_type='machine',
+            origine_label=origine_label,
+            origine_url=ligne['href'],
+            titre=f"Nouvelle action sur {action.machine}",
+            type_action='maintenance',
+            description=(
+                f"Réévaluer l'intervention sur {action.machine} : "
+                f"{contexte_combien}"
+            ),
+        )
+        ligne['href_analyse'] = url_for(
+            'problemes.nouveau',
+            origine_type='machine',
+            origine_label=origine_label,
+            origine_url=ligne['href'],
+            contexte_quoi=f"Action terminée mais inefficace sur {action.machine}",
+            contexte_quand="Après une première intervention clôturée",
+            contexte_ou=action.machine,
+            contexte_combien=contexte_combien,
+        )
         lignes.append(ligne)
         if limite and len(lignes) >= limite:
             break

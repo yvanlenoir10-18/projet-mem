@@ -993,3 +993,17 @@ Objectif : empêcher qu'une action machine marquée `Fait` disparaisse du pilota
 - [x] Afficher un rappel ciblé sur l'accueil Chef avec accès direct au suivi.
 - [x] Vérifier calcul, rendu dashboard et compilation.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.28 — Profil Chef Scierie : relance guidée après action inefficace
+
+Objectif : transformer un rappel rouge en décision praticable sans ressaisie inutile.
+
+- [x] Synchroniser la branche avec GitHub.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Analyser les paramètres de préremplissage Actions Chef et Ishikawa.
+- [x] Ajouter `Nouvelle action` avec la machine et le bilan préremplis.
+- [x] Ajouter `Analyser les causes` avec le contexte Ishikawa prérempli.
+- [x] Vérifier liens, rendu dashboard et compilation.
+- [x] Commit et push GitHub.

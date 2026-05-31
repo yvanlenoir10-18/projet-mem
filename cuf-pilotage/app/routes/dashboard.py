@@ -14,7 +14,7 @@ import io
 from ..models import (
     db, User, Equipe, Parametre, STATUT_A_CORRIGER, STATUT_A_VERIFIER,
     STATUT_BROUILLON, STATUT_VALIDE_CHEF, STATUT_VERROUILLE,
-    STATUTS_ANALYSES, STATUTS_NON_ANALYSES, Probleme, ActionChef, ActionChefEvenement,
+    STATUTS_ANALYSES, STATUTS_NON_ANALYSES, Probleme, Arret, ActionChef, ActionChefEvenement,
 )
 from ..services.trs import (
     pareto_arrets, couleur_trs,
@@ -251,6 +251,84 @@ def _evenements_action_chef(action, limite=6):
     return evenements
 
 
+def _stats_arrets_machine_periode(machine, debut, fin):
+    """Durée et nombre d'arrêts validés pour une machine sur une période."""
+    arrets = Arret.query.join(Equipe).filter(
+        Arret.machine.ilike(machine),
+        Equipe.statut.in_(STATUTS_ANALYSES),
+        Equipe.date >= debut,
+        Equipe.date <= fin,
+    ).all()
+    minutes = sum(arret.duree_impact_min for arret in arrets)
+    return {
+        'count': len(arrets),
+        'minutes': minutes,
+        'minutes_fmt': _format_duree(minutes),
+    }
+
+
+def _bilan_efficacite_action_chef(action, aujourd_hui=None):
+    """Compare les arrêts machine avant/après une action terminée."""
+    if action.statut != 'fait' or not action.machine or not action.termine_le:
+        return None
+
+    aujourd_hui = aujourd_hui or date.today()
+    date_fin_action = action.termine_le.date()
+    recul_jours = max(0, (aujourd_hui - date_fin_action).days)
+    fenetre_jours = min(7, recul_jours)
+
+    if fenetre_jours < 2:
+        return {
+            'niveau': 'observation',
+            'label': 'À observer',
+            'couleur': 'info',
+            'icon': 'bi-hourglass-split',
+            'detail': "Pas encore assez de recul après la clôture.",
+            'fenetre_jours': fenetre_jours,
+        }
+
+    avant = _stats_arrets_machine_periode(
+        action.machine,
+        date_fin_action - timedelta(days=fenetre_jours),
+        date_fin_action - timedelta(days=1),
+    )
+    apres = _stats_arrets_machine_periode(
+        action.machine,
+        date_fin_action + timedelta(days=1),
+        date_fin_action + timedelta(days=fenetre_jours),
+    )
+
+    if avant['minutes'] == 0 and apres['minutes'] == 0:
+        niveau, label, couleur, icon = 'stable', 'Aucun arrêt observé', 'success', 'bi-check-circle'
+        detail = "Aucun arrêt validé avant ou après l'action sur la fenêtre observée."
+    elif avant['minutes'] == 0:
+        niveau, label, couleur, icon = 'a_revoir', 'À revoir', 'danger', 'bi-exclamation-octagon'
+        detail = "Des arrêts apparaissent après l'action alors qu'aucun n'était observé avant."
+    else:
+        reduction_pct = round(((avant['minutes'] - apres['minutes']) / avant['minutes']) * 100)
+        if reduction_pct >= 20:
+            niveau, label, couleur, icon = 'amelioration', 'Amélioration visible', 'success', 'bi-graph-down-arrow'
+            detail = f"Temps d'arrêt réduit de {reduction_pct}% sur une fenêtre comparable."
+        elif apres['minutes'] > avant['minutes']:
+            hausse_pct = abs(reduction_pct)
+            niveau, label, couleur, icon = 'a_revoir', 'À revoir', 'danger', 'bi-exclamation-octagon'
+            detail = f"Temps d'arrêt en hausse de {hausse_pct}% malgré l'action."
+        else:
+            niveau, label, couleur, icon = 'a_surveiller', 'À surveiller', 'warning', 'bi-eye'
+            detail = "Évolution encore trop faible pour conclure."
+
+    return {
+        'niveau': niveau,
+        'label': label,
+        'couleur': couleur,
+        'icon': icon,
+        'detail': detail,
+        'fenetre_jours': fenetre_jours,
+        'avant': avant,
+        'apres': apres,
+    }
+
+
 def _ligne_action_chef(action, inclure_evenements=False):
     statut = _action_statut_meta(action.statut)
     signal = _signal_temporel_action(action)
@@ -274,6 +352,7 @@ def _ligne_action_chef(action, inclure_evenements=False):
         'machine': action.machine,
         'motif_classe_sans_action': action.motif_classe_sans_action,
         'note_resultat': action.note_resultat,
+        'bilan_efficacite': _bilan_efficacite_action_chef(action),
         'cree_par': action.cree_par.nom if action.cree_par else '—',
         'cree_le': action.cree_le,
     }

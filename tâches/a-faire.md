@@ -965,3 +965,17 @@ Objectif : aider le chef à retrouver rapidement les décisions ouvertes liées 
 - [x] Ajouter un filtre exact par machine.
 - [x] Vérifier compilation, rendu et filtrage.
 - [x] Commit et push GitHub.
+
+---
+
+## ⏳ P3.26 — Profil Chef Scierie : bilan d'efficacité des actions machine
+
+Objectif : aider le chef à vérifier si une action terminée a réellement réduit les arrêts de la machine concernée.
+
+- [x] Synchroniser la branche avec GitHub et relire les règles du projet.
+- [x] Créer une branche de sauvegarde avant modification.
+- [x] Analyser les données disponibles pour mesurer l'efficacité.
+- [x] Comparer une fenêtre courte d'arrêts validés avant et après la clôture.
+- [x] Afficher un bilan léger dans les actions terminées liées à une machine.
+- [x] Vérifier calcul, rendu et compilation.
+- [x] Commit et push GitHub.

@@ -250,6 +250,34 @@
             <strong>Résultat obtenu :</strong> {{ action.note_resultat }}
           </div>
           {% endif %}
+          {% if action.bilan_efficacite %}
+          <div class="mt-3"
+               style="border:1px solid #eadfce;border-left:4px solid var(--wp-{% if action.bilan_efficacite.couleur == 'success' %}leaf{% elif action.bilan_efficacite.couleur == 'danger' %}terracotta{% elif action.bilan_efficacite.couleur == 'warning' %}ochre{% else %}sky{% endif %});border-radius:8px;padding:.75rem;background:#fff;">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <strong style="font-size:.8rem;color:var(--wp-ink);">
+                <i class="bi {{ action.bilan_efficacite.icon }}"></i>
+                Bilan machine : {{ action.bilan_efficacite.label }}
+              </strong>
+              {% if action.bilan_efficacite.fenetre_jours %}
+              <span style="font-size:.72rem;color:var(--wp-muted);">
+                sur {{ action.bilan_efficacite.fenetre_jours }} jour{{ 's' if action.bilan_efficacite.fenetre_jours > 1 }} avant / après
+              </span>
+              {% endif %}
+            </div>
+            <div style="font-size:.76rem;color:var(--wp-muted);margin-top:.3rem;">
+              {{ action.bilan_efficacite.detail }}
+            </div>
+            {% if action.bilan_efficacite.avant and action.bilan_efficacite.apres %}
+            <div class="d-flex gap-3 flex-wrap mt-2" style="font-size:.75rem;color:var(--wp-muted);">
+              <span>Avant : <strong style="color:var(--wp-ink);">{{ action.bilan_efficacite.avant.minutes_fmt }}</strong> · {{ action.bilan_efficacite.avant.count }} arrêt{{ 's' if action.bilan_efficacite.avant.count > 1 }}</span>
+              <span>Après : <strong style="color:var(--wp-ink);">{{ action.bilan_efficacite.apres.minutes_fmt }}</strong> · {{ action.bilan_efficacite.apres.count }} arrêt{{ 's' if action.bilan_efficacite.apres.count > 1 }}</span>
+            </div>
+            {% endif %}
+            <div style="font-size:.7rem;color:var(--wp-muted);margin-top:.35rem;">
+              Comparaison basée sur les fiches validées de {{ action.machine }}.
+            </div>
+          </div>
+          {% endif %}
           <div class="d-flex gap-3 flex-wrap mt-3" style="font-size:.78rem;color:var(--wp-muted);">
             <span><i class="bi bi-person"></i> Responsable : <strong style="color:var(--wp-ink);">{{ action.responsable }}</strong></span>
             <span><i class="bi bi-calendar-event"></i> Délai : <strong style="color:var(--wp-ink);">{{ action.echeance_fmt }}</strong></span>

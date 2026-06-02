@@ -1,410 +1,369 @@
-# Plan ACTIF — Profil opérateur, Wave 1, F1 : Accueil action-first (Option B)
+# Audit critique — Profil Chef de Production (wood_pilot / CUF Chaîne 4)
 
-**Branche :** `claude/install-claude-excel-6MGzv`
-**Date :** 2026-05-27
-**Approche :** discussion pros/cons avant chaque fonctionnalité, design soigné sur tout le profil opérateur (exigence explicite de l'utilisateur).
-
----
-
-## Context
-
-L'accueil opérateur (`accueil_operateur.html`) répond déjà à « que dois-je faire ? » via la carte de priorité dynamique. Il manque la deuxième motivation : « est-ce que je progresse ? ». Le bloc stats motivant existe mais il est enterré dans `historique.html` (page peu visitée) et codé en styles inline non réutilisables. F1 Option B remonte la progression sur l'écran le plus consulté et, au passage, transforme ce bloc en composant propre partagé — pour éliminer la duplication et poser une base design réutilisable par tout le profil.
-
-But académique : renforce OS6 (outil de pilotage adapté) et la boucle de rétroaction opérateur (Kankkunen & Holopainen 2024 ; Mncwango & Mdunge 2025).
+> Produit le 2026-06-02 · Branche `claude/install-claude-excel-6MGzv`
+> Contexte : préparation d'une démonstration à un encadreur expert scierie, futur utilisateur potentiel du profil Chef.
 
 ---
 
-## Décisions de design
+## 1. Résumé exécutif
 
-1. **Pas de copier-coller des styles inline.** On extrait un composant réutilisable à 3 niveaux :
-   - Python : helper `_stats_operateur(user_id)` dans `saisie.py` → dict `{nb_equipes, trs_moyen, meilleur_trs, trs_recent, tendance}`.
-   - Template : partial `saisie/_progression.html` inclus par l'accueil ET l'historique.
-   - CSS : composant `.wp-progress*` dans `style.css` (remplace les styles inline de l'historique).
-2. **Mobile-first** : les métriques passent de 1 ligne (desktop) à grille 2 colonnes sous 480px. Cible terrain = tablette/téléphone wifi.
-3. **Cohérence Canopée** : réutilise les variables `--wp-leaf / --wp-ochre / --wp-terracotta / --wp-emerald / --wp-muted` et les seuils TRS existants (≥65 vert, ≥50 ochre, <50 terracotta).
+Le profil Chef de Production dispose d'un **moteur analytique solide et réel** : TRS D×P×Q calculé sur données terrain, attribution financière des pertes en FCFA, Pareto des arrêts, Ishikawa 6M + 5 Pourquoi complet, recommandations déterministes + IA. Ce n'est ni un tableau de bord vide ni une maquette.
 
----
+Pourtant, il échoue au test des 10 secondes. Pourquoi ? Parce que **tout est au même niveau d'altitude** dans un scroll continu de 15 sections. Le signal visuellement dominant est une grande carte verte « 70,6 % » qui rassure, pendant que 19,5 M FCFA de manque à gagner et un avertissement sur les arrêts non documentés sont enfouis en-dessous. Il n'existe pas de verdict synthétique « usine sous contrôle : OUI/NON ».
 
-## Étapes d'implémentation
+Il y a également **un bug de calcul de l'objectif** qui produira une gêne certaine face à un expert : l'atteinte affichée à 147,5 % sur la page Production est un artefact dû à un objectif qui rétrécit pour coller au nombre de fiches soumises, pas un objectif fixe. Un professionnel du bois qui sait que CUF vise 25 m³/jour lira « 147 % d'atteinte » et perdra confiance dans tous les autres chiffres.
 
-### 1. `app/routes/saisie.py`
-- Extraire la logique `stats_op` actuelle de `historique()` (lignes ~1384-1410) dans un helper module-level `_stats_operateur(user_id)` qui retourne le dict.
-- `historique()` : remplacer le bloc inline par `stats_op = _stats_operateur(current_user.id) if current_user.role == 'operateur' else None`.
-- `accueil_operateur()` (lignes 1283-1320) : ajouter `stats_operateur=...` au `render_template`. `fiches_aujourdhui` est déjà calculé et passé — il faut juste l'afficher.
-
-### 2. Nouveau partial `app/templates/saisie/_progression.html`
-- Reprend la logique emoji + message contextuel + 4 métriques + badge tendance, mais en classes `.wp-progress*` (zéro style inline).
-- Garde-fou : `{% if stats_operateur is not none %}`. Gère l'état `nb_equipes == 0` (message de bienvenue).
-
-### 3. `app/templates/saisie/accueil_operateur.html`
-- Header : sous `wp-operator-kicker`, ajouter une ligne « {{ fiches_aujourdhui }} fiche(s) aujourd'hui » (discrète).
-- Insérer `{% include 'saisie/_progression.html' %}` entre la carte priorité (ligne ~62) et `wp-operator-grid` (ligne 64), pour le rôle opérateur.
-
-### 4. `app/templates/saisie/historique.html`
-- Remplacer le bloc inline (lignes 194-269) par `{% include 'saisie/_progression.html' %}` → consistance visuelle, suppression de la duplication.
-
-### 5. `app/static/css/style.css`
-- Ajouter le composant `.wp-progress` (carte, bord gauche `--wp-leaf`), `.wp-progress-head` (emoji + message), `.wp-progress-metrics` (flex/grid responsive), `.wp-progress-metric` (valeur + label), `.wp-progress-trend` (badge ↑/↓). Réutilise `--wp-shadow-sm`, `--wp-line`, rayons 14px cohérents avec `.wp-operator-*`.
+**Verdict** : base prometteuse et sérieuse à restructurer sur l'axe de la hiérarchie décisionnelle — pas une reconstruction.
 
 ---
 
-## Vérification end-to-end
+## 2. Diagnostic global sans complaisance
 
-1. Lancer l'app Flask dans `cuf-pilotage/`.
-2. Se connecter en opérateur.
-3. Accueil : vérifier (a) le compteur « X fiches aujourd'hui » dans le header, (b) le bloc progression entre carte priorité et grille, (c) couleurs TRS + badge tendance corrects.
-4. Cas vide (opérateur sans poste soumis) : message de bienvenue 🌱, pas de crash.
-5. Historique : même bloc affiché à l'identique (composant partagé).
-6. Responsive 375px via Playwright : métriques lisibles en 2 colonnes, rien ne déborde.
-7. Aucune régression chef/pdg/admin (bloc réservé à `operateur`).
-
----
----
-
-# Plan PAUSED (phase chef) — Module Résolution Guidée (Ishikawa 6M + 5 Pourquoi)
-
-> Conservé pour reprise après complétion du profil opérateur.
-
-**Branche :** `claude/install-claude-excel-6MGzv`
-**Date :** 2026-05-27
-**Inspiration :** ProBeya "Structured Problem Resolution" → transposé bois/scierie
-
----
-
-## Context
-
-wood_pilot couvre déjà les piliers de mesure ProBeya (TRS D×P×Q, Pareto, criticité machine×catégorie, reco IA grounded). Ce qui manque pour la complétude du mémoire est **l'OS4** : "identifier et hiérarchiser les causes responsables de l'écart". L'Ishikawa 6M et les 5 Pourquoi sont les outils prescrit par le Dr Manga. Ce module les rend guidés, persistants et auditables — ni un tableau blanc mort, ni un PowerPoint. L'hypothèse H2 ("les pertes sont organisationnelles, pas techniques") sera vérifiable empiriquement via le champ `categorie_6m` des causes racines identifiées.
-
-**Périmètre hors scope (validé par l'utilisateur) :** multi-tenant, connecteurs machines (MES), MCP server, signatures réglementaires, PWA offline. Terrain = tablette + wifi, saisie responsive suffit.
-
----
-
-## Diagnostic — 16 capacités ProBeya vs wood_pilot
-
-| # | Capacité ProBeya | Statut |
+| Critère | État | Commentaire |
 |---|---|---|
-| 1 | TRS / analyse arrêts | ✅ Présent — D×P×Q, Pareto, criticité machine×catégorie |
-| 2 | Dialogues performance (IA) | ✅ Présent — Claude/Groq grounded sur KPIs réels, cache 7j |
-| 3 | Fiche suiveuse (dossier lot) | 🟡 Partiel — `fiche_poste.html` + AuditCorrection JSON snapshots |
-| 4 | Contrôle qualité (SPC) | 🟡 Partiel — rendement matière, déclassé %, anomalies R3 |
-| 5 | GMAO corrective | 🟡 Partiel — arrêts consignés + catégorie "Maintenance planifiée" |
-| 6 | Passation de poste | 🟡 Partiel — workflow statuts + dupliquer poste |
-| 7 | **Résolution guidée (Ishikawa)** | **❌ Absent — 1er module à implémenter** |
-| 8 | SQCDL board quotidien | ❌ Absent — KPIs Q/C/D existent, S et L manquent |
-| 9 | Actions + escalade T1→T3 | ❌ Absent — nécessaire pour la pérennité |
-| 10 | Matrice compétences opérateurs | ❌ Absent |
-| 11 | Marche Gemba / Leader Standard Work | ❌ Absent |
-| 12 | SOPs versionnées + Kaizen photo | ❌ Absent |
-| 13 | EHS + Andon | ❌ Absent |
-| 14 | Flux matière / Kanban bois | ❌ Absent |
-| 15 | Formation / onboarding | ❌ Absent |
-| 16 | Portail audit / inspecteur | ❌ Absent (hors périmètre mémoire) |
-
-**Score actuel : 2 présents + 4 partiels → Niveau 2 (Structuré) sur l'axe mesure. Niveau 1 (Réactif) sur les axes management visuel et résolution de problèmes.**
+| Données réelles | ✓ | Tous les calculs sont sur données BD, aucun placeholder |
+| Moteur TRS | ✓ | D×P×Q par essence et par équipe, avec impact arrêts exacts |
+| Attribution financière | ✓ | Manque à gagner, pertes D/P/Q en FCFA, prix snapshot figé |
+| Ishikawa 6M + 5 Pourquoi | ✓ | Implémenté complet (4 étapes, rapport A3) |
+| Verdict 10 secondes | ✗ | Absent — pas de statut global "sous contrôle / hors contrôle" |
+| Hiérarchie visuelle | ✗ | 15 sections à poids égal, pas de cockpit en tête |
+| Objectif affiché | ✗ BUG | 147,5 % = artefact (objectif shrinks avec nb postes soumis) |
+| Contexte temporel | ✗ | "Aujourd'hui" à 0 si aucune fiche du jour — aucun message d'état |
+| Cohérence mémoire | ✗ partiel | 147,5 % contredit H1/H3 (l'usine sous-performe) |
+| Navigation | ✓ | 9 pages cohérentes, liens directs actifs |
+| Mobile / terrain | ~ | Conçu desktop, tablette terrain non testée pour le profil chef |
 
 ---
 
-## Top 5 features à implémenter (roadmap priorisé)
+## 3. Forces actuelles (à préserver absolument)
 
-| Priorité | Module | Justification | Lien mémoire |
-|---|---|---|---|
-| **1** | **Ishikawa + 5 Pourquoi guidés** | Comble OS4 directement ; vérifie H2 empiriquement | OS4, H2 |
-| 2 | SQCDL board quotidien | Socle ProBeya ; KPIs Q/C/D déjà calculés (brancher S et L) | OS6 |
-| 3 | Actions + escalade T1→T2→T3 | Transversal à tous les modules ; "l'infrastructure survit aux consultants" | OS5, OS6 |
-| 4 | Matrice compétences opérateurs | Polyvalence, formation machine ; alimente H2 (causes organisationnelles) | OS4, H2 |
-| 5 | EHS + Andon | Pilier S du SQCDL ; presque-accidents, arrêt ligne en 1 tap | OS6 |
-
----
-
-## Module 1 — Ishikawa 6M + 5 Pourquoi (à implémenter)
-
-### Modèle de données — 3 nouvelles tables
-
-#### `Probleme`
-| Colonne | Type | Contrainte | Notes |
-|---|---|---|---|
-| id | Integer | PK | |
-| titre | String(200) | NOT NULL | |
-| statut | String(20) | NOT NULL, default='ouvert' | ouvert → en_analyse → cause_identifiee → clos |
-| description | Text | nullable | |
-| contexte_quoi | Text | nullable | "Quel phénomène ?" |
-| contexte_quand | Text | nullable | "Depuis quand / quelle fréquence ?" |
-| contexte_ou | Text | nullable | "Sur quelle machine / essence ?" |
-| contexte_combien | Text | nullable | "Quel impact quantifié ?" |
-| equipe_id | Integer | FK('equipe.id'), nullable | Poste déclencheur |
-| pareto_cause | String(200) | nullable | Cause Pareto texte verbatim |
-| reco_code | String(50) | nullable | Ex. 'TRS_CRITIQUE' |
-| cause_racine_selectionnee_id | Integer | nullable, **PAS de ForeignKey()** (évite FK circulaire SQLite) | Pointe vers IshikawaCause |
-| actions_correctives | Text | nullable | Plan d'action libre |
-| cree_par_id | Integer | FK('user.id') | |
-| cree_le | DateTime | default=utcnow | |
-| modifie_le | DateTime | onupdate=utcnow | |
-
-**Transitions de statut :**
-- `ouvert → en_analyse` : dès la 1re `IshikawaCause` ajoutée (dans `ajouter_cause()`)
-- `en_analyse → cause_identifiee` : quand `sauver_racine()` est appelé
-- `cause_identifiee → clos` : par le bouton Clôturer dans le rapport
-- `clos → ouvert` : réouverture chef/admin uniquement
-
-#### `IshikawaCause`
-| Colonne | Type | Contrainte | Notes |
-|---|---|---|---|
-| id | Integer | PK | |
-| probleme_id | Integer | FK('probleme.id'), NOT NULL | |
-| categorie_6m | String(30) | NOT NULL | Machine \| Main d'oeuvre \| Matière \| Méthode \| Milieu \| Mesure |
-| description | String(500) | NOT NULL | |
-| est_racine | Boolean | default=False | Un seul True par probleme_id (enforced app-level) |
-| cree_le | DateTime | default=utcnow | |
-
-#### `PourquoiNiveau`
-| Colonne | Type | Contrainte | Notes |
-|---|---|---|---|
-| id | Integer | PK | |
-| cause_id | Integer | FK('ishikawa_cause.id'), NOT NULL | |
-| niveau | Integer | NOT NULL | 1 à 5 |
-| question | String(600) | NOT NULL | Auto-généré : "Pourquoi [description N-1] ?" |
-| reponse | Text | nullable | Vide = non encore répondu |
-| cree_le | DateTime | default=utcnow | |
-
-**Règle de chaîne :** Pour ajouter le niveau N, `reponse` du niveau N-1 doit être non vide. La `question` du niveau N = `"Pourquoi " + reponse_N-1.strip() + " ?"`. Enforced dans `sauver_pourquoi()`.
-
-**Décision technique clé :** `cause_racine_selectionnee_id` est déclaré `db.Column(db.Integer, nullable=True)` **sans** `db.ForeignKey()` pour éviter la référence circulaire `Probleme → IshikawaCause → Probleme` qui cause une erreur sur SQLite avec SQLAlchemy. L'intégrité est enforced au niveau applicatif.
+1. **Moteur TRS réel** — `services/trs.py` : sweep line sur créneaux, impact arrêts (seul le dépassement maintenance planifiée est imputé). C'est le bon algorithme, pas une approximation.
+2. **Attribution D/P/Q en FCFA** — `calcule_pertes_equipe()` + `calcule_manque_gagner()` : chiffrage complet avec prix snapshot figé à la soumission, taux revente déclassé, valeur résiduelle déchets.
+3. **Ishikawa guidé** — workflow 4 étapes, solidité de l'analyse tracée (≥3 causes + profondeur ≥3 = "Solide"), lien automatique vers ActionChef.
+4. **Priorités décisionnelles** — `_priorites_chef()` : 5 priorités max scorées par urgence, en langage naturel, avec CTA. C'est le bon concept — il faut le monter en tête de page.
+5. **Boucle Lean traçable** — Pareto → Ishikawa → ActionChef → bilan efficacité avant/après 7j. C'est un argument de fond pour la démo.
+6. **Anti-chevauchement** — contrainte bicoupe (machine unique) enforced client + serveur. Cohérence physique garantie.
+7. **Scorecard semaine** — tableau 6j × 2 shifts, color-coded TRS. Outil de supervision concret.
 
 ---
 
-### Routes — nouveau blueprint `problemes_bp`
+## 4. Faiblesses et incohérences
 
-**Fichier :** `app/routes/problemes.py` — `url_prefix='/problemes'`
+### 4.1 Bug critique — Objectif à 147,5 %
 
-**Constantes dans le fichier :**
-```python
-CATEGORIES_6M = ['Machine', "Main d'oeuvre", 'Matière', 'Méthode', 'Milieu', 'Mesure']
-_LABELS_RECO = {'TRS_CRITIQUE': 'TRS critique', 'ARRETS_NON_DOCUMENTES': 'Arrêts non documentés', ...}
-```
+**Fichier** : `dashboard.py:1590–1649`, fonction `_resume_production()`
 
-| Route | Méthode | Fonction | Rôles | Description |
+**Problème** : `objectif = objectif_m3 × len(equipes)` — l'objectif total est calculé comme `12,5 m³ × nombre de postes effectivement soumis`, pas comme `12,5 m³ × nombre de postes attendus sur la période`. Si on a soumis 60 fiches sur 30 jours (objectif 60 × 12,5 = 750 m³) mais que le volume réel conforme est 1 106 m³, on obtient 147 % — qui n'a aucun sens métier car la seed génère des volumes d'entrée 22–36 m³ par poste (physiquement cohérent pour le bois brut) mais l'objectif de 12,5 m³ est une capacité de sortie conforme.
+
+**Impact démo** : un expert scierie qui sait que la bicoupe a une capacité physique de 12,5 m³/poste de sortie conforme verra immédiatement que les 147 % sont impossibles. C'est le risque de crédibilité n°1.
+
+**Hypothèse cause** : dans le ratio, le numérateur est probablement `volume_conforme + volume_declass` (sortie totale) au lieu de `volume_conforme` seul (sortie utilisable), OU la capacité de 12,5 m³ est définie comme une capacité de sortie conforme mais la seed génère des volumes d'entrée bien supérieurs. À vérifier dans `_resume_production()`.
+
+### 4.2 Absence de verdict synthétique
+
+La première question d'un chef en arrivant est « est-ce que l'usine est sous contrôle ? ». Il n'y a pas de réponse en tête de page. Le TRS 70,6 % est visible mais sans interprétation directe (au-dessus/en-dessous de l'objectif ? bonne ou mauvaise semaine ?).
+
+### 4.3 Confusion temporelle
+
+La section « Aujourd'hui » affiche des KPI à 0 si aucune fiche n'est soumise aujourd'hui. La collecte terrain commence demain — dès la première fiche soumise, ce composant sera utile. Mais tant qu'il affiche 0, il envoie un signal négatif lors d'une démo.
+
+### 4.4 Prix réservé à l'admin — chef aveugle sur le chiffrage
+
+Le chef voit le manque à gagner en FCFA mais ne peut pas accéder aux prix par essence (`PARAMS_ADMIN_ONLY` dans `admin.py:32-40`). Il ne peut donc pas valider si le calcul financier est cohérent avec les prix réels du marché. Devant un expert, il sera incapable de justifier les montants.
+
+### 4.5 Pas d'identifiant opérateur
+
+`Equipe.operateur_nom` est un texte libre (STR 100, non unique). Impossible d'agréger les performances par opérateur. Ce n'est pas un bug — c'est une limite de modèle connue, à mentionner comme limitation du mémoire.
+
+### 4.6 Pas de table Machine
+
+Les machines sont des strings figées dans `config.py`. Les analyses de criticité sont valides (durée arrêts par machine × catégorie), mais on ne peut pas afficher « la bicoupe est à 65 % de disponibilité sur la semaine » sans calculer manuellement depuis les arrêts.
+
+---
+
+## 5. Audit détaillé de l'existant
+
+| Élément | Problème métier traité | Décision rendue possible | Valeur opérationnelle | Limite actuelle | Verdict | Action recommandée |
+|---|---|---|---|---|---|---|
+| Cockpit aujourd'hui (`_aujourdhui.html`) | Que faire maintenant ? | Actions urgentes + fiches à traiter | Élevée | Affiché 0 si pas de fiche du jour | Indispensable | Améliorer : message "En attente de saisie" + contexte période récente |
+| Priorités décisionnelles (`_priorites_chef`) | Quelle est la priorité n°1 ? | Choisir où agir en premier | Très élevée | Enterrée dans le scroll, pas en tête de page | Indispensable | Reconstruire : monter en haut, simplifier à 3 priorités max avec verdict global |
+| TRS global (grand chiffre) | Performons-nous bien ? | Comparer à l'objectif | Élevée | Pas de comparaison explicite objectif/réel sur le même widget | Indispensable | Améliorer : ajouter flèche direction + "vs objectif 60 %" |
+| Manque à gagner FCFA | Combien coûte l'écart ? | Décider si le problème vaut une action | Très élevée | Affiché en 3e position, après le TRS | Indispensable | Améliorer : remonter juste après le verdict global |
+| Décomposition D×P×Q | D'où vient la perte ? | Choisir le levier (arrêts vs cadence vs qualité) | Très élevée | Bien placée, mais sans recommandation inline | Indispensable | Conserver + ajouter "Principal levier : [D/P/Q]" |
+| Simulateur gain FCFA | Quel gain si j'améliore le TRS ? | Prioriser un investissement | Élevée | Fonctionnel | Utile | Conserver (argument académique OS6) |
+| Scorecard semaine | Quelle régularité sur 6 jours ? | Identifier un shift qui décroche | Élevée | Bonne lisibilité | Indispensable | Conserver |
+| Pareto arrêts (`/analyse/arrets`) | Quelle cause coûte le plus de temps ? | Décider quelle cause analyser en premier | Très élevée | Page séparée, pas de résumé top-1 sur le dashboard | Indispensable | Améliorer : résumé "Cause n°1 : X — Yh perdues" sur le dashboard + lien |
+| Recommandations (`/recommandations/`) | Que recommande l'outil ? | Valider ou réfuter une recommandation IA | Élevée | Page séparée, top 3 en bas de dashboard | Utile | Améliorer : top 1 reco avec CTA |
+| Ishikawa + 5 Pourquoi (`/problemes/`) | Quelle est la cause racine ? | Choisir la cause à traiter + plan d'action | Très élevée (OS4/H2) | Accessible mais pas lié depuis le Pareto cockpit | Indispensable | Améliorer : bouton "Analyser" depuis le résumé Pareto |
+| Actions Chef (`/dashboard/chef/actions`) | Qu'est-ce qui est en cours / en retard ? | Relancer, clôturer, créer | Élevée | Bilan efficacité machine réel | Indispensable | Conserver |
+| Page Production & Objectifs | Atteint-on l'objectif ? | Décider si un rattrapage est nécessaire | Élevée | BUG : 147 % artefact | Indispensable | Reconstruire le calcul |
+| Page Qualité / Matière | Quel rendement matière par essence ? | Identifier l'essence qui perd le plus | Élevée | Pas d'alerte inline si déclassé > seuil | Utile | Améliorer : alerte seuil inline |
+| Page Machines & Arrêts | Quelle machine cumule le plus d'arrêts ? | Prioriser la maintenance | Élevée | Données réelles, bien structurée | Indispensable | Conserver |
+| Page Pertes financières (`/pertes`) | Comment sont réparties les pertes ? | Justifier un investissement maintenance | Très élevée | Accessible, drill-down par machine/essence | Indispensable | Conserver + prix visibles au chef |
+| Export Excel | Archiver le rapport mensuel | Partager avec la direction | Utile | Fonctionnel | Secondaire | Conserver |
+| Alertes chef (`_alertes.html`) | Saisies manquantes / brouillons | Relancer les opérateurs | Élevée | Template existe mais **non inclus** dans dashboard.html | Utile | Intégrer dans dashboard.html |
+
+---
+
+## 6. Angles morts
+
+| Question chef | Réponse actuelle | Ce qui manque | Donnée nécessaire | Fonctionnalité à créer |
 |---|---|---|---|---|
-| `/` | GET | `liste()` | chef, admin | Liste tous les problèmes, filtrable par statut. Passe `stats={ouvert, en_analyse, cause_identifiee, clos}`. |
-| `/nouveau` | GET | `nouveau()` | chef, admin | Form étape 1. Pré-remplit depuis `?pareto_cause=`, `?reco_code=`, `?equipe_id=`. |
-| `/nouveau` | POST | `nouveau()` | chef, admin | Crée `Probleme`, redirige vers `ishikawa(probleme_id)`. |
-| `/<id>/etape/2` | GET | `ishikawa(id)` | chef, admin | Diagramme Ishikawa. Charge `grouped_causes` par 6M. |
-| `/<id>/etape/2/cause` | POST | `ajouter_cause(id)` | chef, admin | **AJAX JSON**. Lit `{categorie_6m, description}`. Crée `IshikawaCause`. Si 1re cause → statut `en_analyse`. Retourne `{id, categorie_6m, description}` ou `{erreur}`. |
-| `/<id>/cause/<cause_id>` | DELETE | `supprimer_cause(id, cause_id)` | chef, admin | **AJAX JSON**. Supprime cause + PourquoiNiveau cascade. Si cause était racine → clear `cause_racine_selectionnee_id`, statut `en_analyse`. |
-| `/<id>/etape/3/<cause_id>` | GET | `pourquoi(id, cause_id)` | chef, admin | Affiche chaîne 5 Pourquoi pour une cause. |
-| `/<id>/etape/3/<cause_id>/pourquoi` | POST | `sauver_pourquoi(id, cause_id)` | chef, admin | **AJAX JSON**. Lit `{niveau, reponse}`. Valide niveau N-1 répondu. Upsert `PourquoiNiveau`. Génère `question_suivante`. Retourne `{niveau, question, reponse, question_suivante}`. |
-| `/<id>/etape/4` | GET | `selectionner_racine(id)` | chef, admin | Liste toutes les causes avec profondeur 5 Pourquoi. Radio bouton. Textarea actions. |
-| `/<id>/etape/4` | POST | `sauver_racine(id)` | chef, admin | Lit `cause_racine_id` + `actions_correctives`. Set `est_racine=True` sur cause choisie (False sur les autres). Set `cause_racine_selectionnee_id` + statut `cause_identifiee`. Redirige vers rapport. |
-| `/<id>/rapport` | GET | `rapport(id)` | chef, admin | Rapport A3 imprimable. Eager-load causes + pourquois. |
-| `/<id>/clore` | POST | `clore(id)` | chef, admin | `cause_identifiee → clos`. |
-| `/<id>/rouvrir` | POST | `rouvrir(id)` | chef, admin | `clos → ouvert`. |
-| `/<id>` | GET | `detail(id)` | chef, admin | Smart redirect selon `statut` : ouvert/en_analyse → étape 2 ; cause_identifiee/clos → rapport. |
-
-**CSRF AJAX :** Même pattern que `recommandations/index.html` : `X-CSRFToken: document.querySelector('meta[name="csrf-token"]')?.content` dans les headers `fetch()`. Étendre le handler d'erreur CSRF dans `__init__.py` aux paths `/problemes/`.
+| L'usine est-elle sous contrôle ? | ✗ Absent | Verdict global OUI/NON | TRS du jour vs objectif + anomalies bloquantes | Widget statut global (3 couleurs) en tête du cockpit |
+| Quelle est la machine critique en ce moment ? | ~ Partiel (Pareto page séparée) | Résumé "Machine n°1 cumule X h d'arrêts" sur le dashboard | Durée arrêts par machine cette semaine | Résumé machine critique sur le cockpit |
+| Quel est l'arrêt le plus coûteux ? | ✗ Absent sur cockpit | L'arrêt qui a coûté le plus en FCFA | Durée × capacité × prix | Ligne "Arrêt le plus coûteux : [cause] [machine] = X FCFA" |
+| Quelle est la principale perte de matière ? | ~ Page Qualité séparée | Résumé rendement + essence la plus problématique | Volume déclassé/déchet par essence | Widget rendement matière sur cockpit |
+| Quelle est la principale perte de temps ? | ~ Pareto sur page séparée | Cause n°1 Pareto sur cockpit | Durée arrêts par cause | Résumé Pareto top-1 sur cockpit |
+| Quelle est la principale perte financière ? | ~ Manque à gagner présent, trop bas | Position plus haute | FCFA calculés | Repositionnement |
+| Quel shift a besoin d'accompagnement ? | ~ Comparaison Matin/Soir existe | Pas d'alerte si un shift décroche systématiquement | TRS par shift sur 7j | Alerte "Soir décroche : TRS 48 % vs 65 % Matin" |
+| Quels objectifs sont menacés aujourd'hui ? | ~ Partiel si données du jour | Projection "À ce rythme, objectif atteint à X %" | Volume saisi + nb postes restants | Widget projection journalière |
 
 ---
 
-### Maquettes ASCII — 3 écrans clés (375px mobile)
+## 7. Architecture fonctionnelle cible
 
-#### Écran 1 — Étape 2 : Diagramme Ishikawa
+### Principe directeur
 
-```
-┌────────────────────────────────────────┐
-│ ← Analyse : Blocage grumes  [2 / 4]   │
-│ ─────────────────────────────────────  │
-│ DIAGRAMME ISHIKAWA (6M)                │
-│ Ajoutez les causes observées           │
-│ sur chaque branche.                    │
-│                                        │
-│ ▼ MACHINE  (2 causes)                  │
-│ ┌──────────────────────────────────┐   │
-│ │ • Courroie usée          [↗] [✕] │   │
-│ │ • Vibrations anormales   [↗] [✕] │   │
-│ └──────────────────────────────────┘   │
-│ [+ Ajouter une cause Machine       ]   │
-│                                        │
-│ ▼ MAIN D'OEUVRE  (0 causes)            │
-│ ┌──────────────────────────────────┐   │
-│ │  (aucune cause saisie)           │   │
-│ └──────────────────────────────────┘   │
-│ [+ Ajouter une cause Main d'oeuvre ]   │
-│                                        │
-│ ▼ MATIÈRE  (1 cause)                   │
-│ ┌──────────────────────────────────┐   │
-│ │ • Grumes trop humides    [↗] [✕] │   │
-│ └──────────────────────────────────┘   │
-│ [+ Ajouter une cause Matière       ]   │
-│                                        │
-│ [MÉTHODE +] [MILIEU +] [MESURE +]      │
-│                                        │
-│ ─── FORMULAIRE INLINE (collapse) ───   │
-│ Branche : [Machine               ▼]   │
-│ Description :                          │
-│ [__________________________________ ]  │
-│              [Annuler] [Ajouter →  ]   │
-│                                        │
-│ [← Étape 1]      [→ Étape 3 : 5 Pq]   │
-└────────────────────────────────────────┘
-```
-`[↗]` = lien vers la page 5 Pourquoi de cette cause. Le bouton `[→ Étape 3]` est désactivé si 0 cause totale.
+**Altitude d'abord.** Le cockpit doit être lisible en 10 secondes via 3 zones visuellement distinctes :
+- Zone rouge (altitude 1) : verdict + problème n°1 + action n°1
+- Zone orange (altitude 2) : causes + tendances + scorecard
+- Zone verte (altitude 3) : détails, export, historique
 
-#### Écran 2 — Étape 3 : Chaîne 5 Pourquoi
+### Module 1 — Cockpit exécutif (altitude 1) — À créer / refactorer
 
-```
-┌────────────────────────────────────────┐
-│ ← Ishikawa     5 Pourquoi  [3 / 4]    │
-│ ─────────────────────────────────────  │
-│ Cause analysée :                       │
-│ ┌──────────────────────────────────┐   │
-│ │ 🔧 Machine / Courroie usée       │   │
-│ └──────────────────────────────────┘   │
-│                                        │
-│ NIVEAU 1  ✓                            │
-│ ┌──────────────────────────────────┐   │
-│ │ Q : Pourquoi la courroie est-    │   │
-│ │     elle usée ?                  │   │
-│ │ R : La maintenance préventive    │   │
-│ │     n'est pas planifiée.         │   │
-│ └──────────────────────────────────┘   │
-│                                        │
-│ NIVEAU 2  ← en cours                   │
-│ ┌──────────────────────────────────┐   │
-│ │ Q : Pourquoi la maintenance      │   │
-│ │     préventive n'est pas         │   │
-│ │     planifiée ?                  │   │
-│ │ R : [Saisir la réponse...    ]   │   │
-│ │              [ Enregistrer ↓ ]   │   │
-│ └──────────────────────────────────┘   │
-│                                        │
-│ NIVEAU 3 ░░░ (débloqué après N2)       │
-│ NIVEAUX 4, 5 ░░░                       │
-│                                        │
-│ [← Autres causes]  [→ Sél. racine]     │
-└────────────────────────────────────────┘
-```
+**Objectif** : répondre à « est-ce que l'usine est sous contrôle ? » en un coup d'œil.
 
-#### Écran 3 — Rapport A3 (imprimable)
+Contenu de la bande supérieure fixe :
+- Statut global : VERT (TRS ≥ 60 % + pas d'anomalie bloquante) / ORANGE (TRS 50–60 % ou anomalies) / ROUGE (TRS < 50 % ou arrêt non documenté)
+- TRS du jour ou de la dernière période + flèche direction vs semaine précédente
+- Manque à gagner FCFA de la semaine
+- Problème n°1 en une ligne (cause principale Pareto ou anomalie bloquante)
+- Action n°1 (première priorité décisionnelle, déjà calculée par `_priorites_chef`)
 
-```
-┌────────────────────────────────────────┐
-│ [← Modifier]  RAPPORT A3  [🖨 Imprimer]│
-│ ─────────────────────────────────────  │
-│ ┌──────────────────────────────────┐   │
-│ │ ANALYSE : Blocage grumes         │   │
-│ │ CUF Chaîne 4 · Chef Scierie      │   │
-│ │ Créé le 27/05/2026               │   │
-│ │ Statut : ● CAUSE IDENTIFIÉE      │   │
-│ └──────────────────────────────────┘   │
-│                                        │
-│ 1. CONTEXTE DU PROBLÈME                │
-│ Quoi    : Blocage répété des grumes    │
-│ Quand   : 3 semaines, poste Matin      │
-│ Où      : Bicoupe                      │
-│ Combien : ~45 min perdues / poste      │
-│                                        │
-│ 2. CAUSES IDENTIFIÉES (6M)             │
-│ Machine (2) : Courroie usée,           │
-│               Vibrations anormales     │
-│ Matière (1) : Grumes trop humides      │
-│ Méthode, Milieu, Mesure : (vides)      │
-│                                        │
-│ 3. CAUSE RACINE                        │
-│ ★ Machine → Courroie usée              │
-│   N1 : Maintenance non planifiée       │
-│   N2 : Pas de planning hebdo           │
-│   N3 : Pas de responsable désigné      │
-│                                        │
-│ 4. ACTIONS CORRECTIVES                 │
-│ Désigner un référent maintenance.      │
-│ Créer un planning hebdo.               │
-│                                        │
-│ H2 : cause = Méthode/Organisationnelle │
-│ → confirme l'hypothèse H2 du mémoire  │
-│                                        │
-│            [Clôturer ce problème →]   │
-└────────────────────────────────────────┘
-```
+**Données requises** : toutes existantes.
+**Effort** : moyen — refactoring de position, aucun nouveau calcul.
+
+### Module 2 — Postes du jour — Existe, améliorer
+
+Si aucune fiche du jour : message « En attente de la première saisie » + TRS du dernier poste connu.
+
+### Module 3 — Pertes D×P×Q + Manque à gagner — Existe, remonter
+
+Repositionner immédiatement sous le cockpit (actuellement profond dans le scroll).
+
+### Module 4 — Machine critique + Pareto top-1 — À créer en résumé cockpit
+
+Deux lignes sur le cockpit :
+- « Machine critique : Bicoupe — 3h30 d'arrêts cette semaine »
+- « Cause n°1 Pareto : [cause] — Yh = Z FCFA »
+
+Avec lien vers page Causes d'arrêts + bouton « Analyser (Ishikawa) ».
+
+### Module 5 — Boucle Lean visible — Existe, à rendre visible
+
+Une section « Boucle Lean active » sur le cockpit : nombre de problèmes en cours + nombre d'actions en cours + nombre d'actions efficaces ce mois. Arguments OS4/H2 pour le mémoire.
+
+### Modules 6 et 7 — Scorecard + Recommandations — Conserver tels quels
 
 ---
 
-### Points d'intégration avec l'existant
+## 8. Parcours utilisateur idéal (chef, 9h00)
 
-| Fichier source | Modification | Changement |
+1. Ouvre le tableau de bord → voit en 3 secondes : **VERT / ORANGE / ROUGE** + TRS + manque à gagner du jour.
+2. Si ROUGE → lit le problème n°1 (une ligne) + l'action n°1 (un bouton).
+3. Clique « Voir les causes » → Pareto → voit la cause la plus coûteuse en temps et en FCFA.
+4. Clique « Analyser » → ouvre Ishikawa → saisit 2-3 causes → remonte les 5 Pourquoi → identifie cause racine → crée ActionChef.
+5. Revient en fin de poste → valide les fiches soumises par les opérateurs.
+6. En fin de semaine → exporte le rapport Excel mensuel.
+
+Ce parcours est **techniquement possible aujourd'hui** — il manque uniquement le cockpit de premier regard (étape 1) et le bouton « Analyser » depuis le Pareto du cockpit (étape 3→4).
+
+---
+
+## 9. Conservation / suppression / fusion / reconstruction
+
+| Élément | Action | Justification |
 |---|---|---|
-| `templates/analyse/arrets.html` | Colonne "Actions" dans le tableau Pareto | Bouton `<a href="{{ url_for('problemes.nouveau', pareto_cause=p.cause) }}">Analyser</a>` par ligne |
-| `templates/recommandations/index.html` | Dans chaque carte reco | Bouton "Lancer une analyse" sur `TRS_CRITIQUE`, `ARRETS_NON_DOCUMENTES`, `DECLASS_EXCESSIF` |
-| `templates/saisie/detail.html` | Après le bloc anomalies | Bouton "Ouvrir une analyse" si `current_user.role in ('chef','admin')` et `anomalies` |
-| `templates/chef/dashboard.html` | KPI row | Widget "Problèmes ouverts" (compte `Probleme.statut in ['ouvert','en_analyse']`) |
-| `templates/base.html` | Sidebar nav (desktop + mobile) | Lien "Résolution" (route `problemes.liste`) dans section Pilotage |
-| `app/routes/dashboard.py` → `vue_chef()` | Query avant `render_template` | `nb_problemes_ouverts = Probleme.query.filter(Probleme.statut.in_(['ouvert','en_analyse'])).count()` |
-| `app/__init__.py` | Import + register_blueprint | `from .routes.problemes import problemes_bp` + `app.register_blueprint(problemes_bp)` |
+| Moteur TRS (`trs.py`) | **Conserver** | Calcul correct, données réelles |
+| Attribution financière D/P/Q | **Conserver** | Argument clé démo |
+| Ishikawa 6M + 5 Pourquoi | **Conserver** | Complet et fonctionnel |
+| Actions Chef + bilan efficacité | **Conserver** | Boucle Lean réelle |
+| Scorecard semaine | **Conserver** | Outil de supervision concret |
+| Simulateur gain FCFA | **Conserver** | Argument académique OS6 |
+| Recommandations déterministes + IA | **Conserver** | Différenciateur fort |
+| Cockpit "Aujourd'hui" | **Améliorer** | Ajouter verdict global + message si vide |
+| Calcul objectif (`_resume_production`) | **Reconstruire** | Bug métier — objectif doit être fixe (× nb jours, pas × nb fiches) |
+| Position Manque à gagner | **Améliorer** | Remonter en altitude 1 |
+| Position Priorités décisionnelles | **Améliorer** | Première section visible, pas en scroll |
+| Machine critique — résumé cockpit | **Créer** | Angle mort critique |
+| Pareto top-1 sur cockpit | **Créer** | Lien cockpit → Pareto → Ishikawa |
+| Boucle Lean visible (widget) | **Créer** | Argument démo OS4 |
+| Alertes chef (`_alertes.html`) | **Intégrer** | Template exist mais non inclus dans dashboard.html |
+| Prix visibles par le chef | **Améliorer** | Actuellement admin-only — chef doit voir les prix pour valider le chiffrage |
 
 ---
 
-### Valeur académique (OS4 + H2)
+## 10. Priorisation P0 → P3
 
-**OS4** : Le module livre l'Ishikawa + 5 Pourquoi comme outils guidés, persistants et auditables. Le `Probleme.cause_racine_selectionnee_id` est la "cause racine formellement identifiée" du mémoire. La `pareto_cause` field crée un lien explicite entre le Pareto existant (déjà livrable OS4) et l'Ishikawa (approfondissement OS4).
+### P0 — Démo de demain
 
-**H2** : La distribution de `IshikawaCause.categorie_6m WHERE est_racine=True` sur tous les `Probleme` clos est le test empirique de H2. Une requête `GROUP BY categorie_6m` sur cette vue donne le tableau de résultats de H2. Si la majorité des causes racines sont dans "Méthode", "Main d'oeuvre" ou "Milieu" (plutôt que "Machine"), H2 est validée.
+| # | Recommandation | Fichier | Effort | Risque si non fait |
+|---|---|---|---|---|
+| P0-1 | **Corriger le bug objectif** : objectif = `12,5 × 2 × nb_jours_periode` (fixe), pas `12,5 × nb_postes_saisis` | `dashboard.py:1590` `_resume_production()` | 2h | 147 % → perte de crédibilité totale |
+| P0-2 | **Seed données récentes** : modifier `seed_data.py` pour générer `aujourd'hui − 7 jours` | `seed_data.py` ligne ~25 | 1h | "Aujourd'hui" reste à 0 pendant la démo |
+| P0-3 | **Message cockpit si vide** : `{% if fiches_du_jour %}...{% else %}En attente de saisie{% endif %}` | `templates/chef/_aujourdhui.html` | 30 min | Section vide = prototype non fini |
+| P0-4 | **Rendre les prix consultables par le chef** en lecture seule sur `/pertes` | `admin.py` ou template `pertes` | 30 min | Chef ne peut pas justifier les FCFA |
+| P0-5 | **Vérifier les prix seed** (Ayous 180k, Iroko 420k, Azobé 280k, Movingui 320k FCFA/m³) vs marché réel CUF | `seed_data.py:119-124` | 15 min vérification | L'encadreur connaît les vrais prix |
 
----
+### P1 — MVP opérationnel (cette semaine)
 
-### Fichiers à créer / modifier
+| # | Recommandation | Effort |
+|---|---|---|
+| P1-1 | Widget statut global OUI/NON (3 couleurs) en tête du cockpit | Moyen |
+| P1-2 | Résumé machine critique + Pareto top-1 sur cockpit avec bouton « Analyser (Ishikawa) » | Moyen |
+| P1-3 | Intégrer `_alertes.html` dans `dashboard.html` | Faible |
+| P1-4 | Repositionner Manque à gagner avant le TRS global | Faible |
+| P1-5 | Widget boucle Lean (X problèmes actifs, Y actions en cours, Z actions efficaces) | Faible |
 
-**Nouveaux fichiers :**
-```
-app/routes/problemes.py          — blueprint + toutes les routes
-app/templates/problemes/
-  liste.html                     — liste + filtres statut + stats pills
-  nouveau.html                   — étape 1 : contexte (QUOI/QUAND/OÙ/COMBIEN)
-  ishikawa.html                  — étape 2 : 6 branches accordion + AJAX
-  pourquoi.html                  — étape 3 : chaîne 5 niveaux + AJAX
-  selectionner_racine.html       — étape 4 : radio cause racine + actions
-  rapport.html                   — A3 imprimable (print CSS inline)
-```
+### P2 — Version avancée (avant soutenance)
 
-**Fichiers modifiés :**
-```
-app/models.py                    — +3 classes : Probleme, IshikawaCause, PourquoiNiveau
-app/__init__.py                  — import + register problemes_bp ; CSRF handler étendu
-app/routes/dashboard.py          — nb_problemes_ouverts query dans vue_chef()
-app/static/css/style.css         — +.wp-pourquoi-card, .wp-6m-branch, .wp-cause-chip, .wp-a3-rapport
-templates/base.html              — nav link "Résolution" (chef + admin)
-templates/chef/dashboard.html    — KPI widget problèmes ouverts
-templates/analyse/arrets.html    — bouton "Analyser" par ligne Pareto
-templates/recommandations/index.html — bouton "Lancer une analyse" sur 3 codes
-templates/saisie/detail.html     — bouton "Ouvrir une analyse" après anomalies
-```
+| # | Recommandation | Dépendances |
+|---|---|---|
+| P2-1 | Alerte "Soir décroche" si TRS shift du soir < TRS shift du matin de X pts sur 7j | Données existantes, règle à créer |
+| P2-2 | Alerte déclassement par essence sur page Qualité (seuil paramétrable) | Seuil existant, alerte inline à ajouter |
+| P2-3 | Projection journalière « À ce rythme, X % de l'objectif atteint » | Volume saisi + nb postes restants |
+| P2-4 | Table Machine (capacité actuelle, taux disponibilité calculé depuis arrêts) | Nouvelle table, migration |
+| P2-5 | Identifiant opérateur (FK User optionnel sur Equipe) | Refactor modèle |
 
-**Non modifiés (aucun changement nécessaire) :**
-```
-app/routes/analyse.py, saisie.py, recommandations.py — les intégrations sont 100% template-side
-app/services/                    — aucun changement
-```
+### P3 — Vision long terme
 
----
-
-### Ordre d'implémentation (8 phases)
-
-1. **Models** — 3 classes dans `models.py`. `db.create_all()` crée les tables automatiquement (nouvelles tables, pas d'ALTER TABLE).
-2. **Blueprint skeleton** — `problemes.py` avec routes retournant des placeholders. Register dans `__init__.py`. Vérifier le lien nav.
-3. **Étape 1 — Nouveau** — Form contexte + pré-remplissage query params. Créer `nouveau.html`.
-4. **Étape 2 — Ishikawa AJAX** — `ajouter_cause()` + `supprimer_cause()`. Créer `ishikawa.html` avec accordion Bootstrap + fetch AJAX.
-5. **Étape 3 — Pourquoi AJAX** — `sauver_pourquoi()` avec logique de chaîne. Créer `pourquoi.html` avec cartes locked/unlocked.
-6. **Étapes 4 + Rapport** — `sauver_racine()` + `rapport()` + `clore()` + `rouvrir()`. Templates restants.
-7. **Intégrations** — Modifier les 5 templates existants + `dashboard.py`. Tester les boutons pré-remplissage.
-8. **CSS + Print** — Nouveaux composants CSS. Print CSS dans `rapport.html`. Test `window.print()`.
+| # | Recommandation |
+|---|---|
+| P3-1 | Prédiction maintenance préventive (arrêts récurrents → alertes prévisionnelles) — nécessite ≥ 3 mois de données |
+| P3-2 | SQCDL board quotidien (S et L manquent actuellement) |
+| P3-3 | Matrice compétences opérateurs (dépend de P2-5) |
+| P3-4 | EHS / Andon (hors périmètre mémoire actuel) |
 
 ---
 
-## Vérification end-to-end
+## 11. Plan d'action concret — démo de demain
 
-1. Se connecter en tant que `chef`
-2. Aller sur `/analyse/arrets` → cliquer "Analyser" sur la 1re ligne Pareto → vérifier que le formulaire Étape 1 est pré-rempli avec `titre` et `pareto_cause`
-3. Remplir le contexte (QUOI/QUAND/OÙ/COMBIEN) → soumettre → arriver sur l'Ishikawa (Étape 2)
-4. Ajouter 2 causes sur la branche Machine, 1 sur Matière → vérifier les cartes apparaissent sans rechargement de page
-5. Cliquer `[↗]` sur la 1re cause → Étape 3 → saisir 3 niveaux de Pourquoi → vérifier que le niveau 4 se déverrouille
-6. Aller sur Étape 4 → sélectionner la cause racine → saisir des actions → soumettre → rapport A3
-7. Vérifier le rapport : toutes les sections remplies, `@media print` masque la nav
-8. Cliquer Clôturer → vérifier statut `clos` dans la liste
-9. Aller sur `/dashboard/chef` → vérifier le widget "Problèmes ouverts" = 0 (clos)
-10. Vérifier la cohérence H2 : dans `problemes.liste`, le problème clos montre la catégorie 6M de la cause racine
+### Étape 1 — Corriger le bug objectif (P0-1 — 2h)
+
+Dans `_resume_production()` (dashboard.py:1590), remplacer le calcul de `objectif` :
+
+```python
+# AVANT (bug — objectif shrinks avec nb postes soumis)
+objectif = objectif_m3 * len(equipes)
+
+# APRÈS (correct — objectif fixe basé sur la période)
+nb_jours_periode = max(1, (date_fin - date_debut).days + 1)
+objectif = objectif_m3 * 2 * nb_jours_periode  # 2 postes/jour × jours × 12,5 m³
+```
+
+Le même pattern existe dans `_resume_production_par_equipe()` (lignes ~1660–1680) — appliquer la même correction.
+
+Après correction, l'atteinte sur 30 jours (60 postes × 12,5 m³ = 750 m³ attendus) face à une production conforme ~500–600 m³ donnera 65–80 % — cohérent avec H3 (TRS < 60 %).
+
+### Étape 2 — Seed données récentes (P0-2 — 1h)
+
+Dans `seed_data.py`, remplacer la période de génération :
+
+```python
+# AVANT
+date_debut = date(2026, 4, 1)
+date_fin = date(2026, 4, 30)
+
+# APRÈS (7 jours incluant aujourd'hui)
+from datetime import date, timedelta
+date_fin = date.today()
+date_debut = date_fin - timedelta(days=6)
+```
+
+Relancer : `cd cuf-pilotage && python seed_data.py`. Cela peuple la section « Aujourd'hui » du cockpit et la scorecard semaine.
+
+### Étape 3 — Message cockpit si vide (P0-3 — 30 min)
+
+Dans `templates/chef/_aujourdhui.html`, entourer le bloc KPI du jour d'une condition :
+```jinja
+{% if fiches_du_jour %}
+  {# contenu actuel des KPI #}
+{% else %}
+  <div class="wp-card" style="text-align:center; color: var(--wp-muted); padding: 24px;">
+    <i class="bi bi-hourglass-split"></i>
+    En attente de la première saisie du jour
+    — Dernière période analysée : {{ periode_label }}
+  </div>
+{% endif %}
+```
+
+### Étape 4 — Prix consultables par le chef (P0-4 — 30 min)
+
+Dans le template `/pertes`, ajouter un encart discret avec les prix actuels en lecture seule. Ou, option plus propre : dans `admin.py`, déplacer les clés `prix_*` de `PARAMS_ADMIN_ONLY` vers `PARAMS_CHEF` avec `readonly=True` dans le formulaire.
+
+### Étape 5 — Vérification seed vs marché (P0-5 — 15 min)
+
+Confirmer avec l'encadreur ou via une source fiable que les prix seed (Ayous 180k FCFA/m³, Iroko 420k, Azobé 280k, Movingui 320k) sont dans les bons ordres de grandeur pour la filière bois Cameroun 2026. Ajuster dans `Parametre` via `/admin/parametres` si nécessaire — pas besoin de toucher au code.
+
+### Script de vérification post-corrections
+
+```bash
+bash .claude/skills/run-cuf-pilotage/smoke.sh
+python .claude/skills/run-cuf-pilotage/screenshot.py chef
+# Vérifier 05-chef-dashboard.png :
+#   — TRS visible avec flèche direction
+#   — Objectif affiché < 100 % (cohérent avec H3)
+#   — Section "Aujourd'hui" peuplée
+```
+
+---
+
+## 12. Questions à poser à l'encadreur pendant la présentation
+
+1. **« Le point de comptage est avant la bicoupe — est-ce que votre pratique CUF valide que volume_entree correspond bien à ce passage fixe ? »** → Confirme la cohérence avec la règle métier terrain.
+
+2. **« Les capacités par essence (Ayous, Azobé, Iroko, Movingui) sont configurables ici [montrer Paramètres] — correspondent-elles à ce que vous observez sur la chaîne 4 ? »** → Si non, correction en 30 secondes pendant la démo : argument OS6 (outil adaptable).
+
+3. **« La catégorie "Organisationnelle" contribue le plus au Pareto dans nos données de test — est-ce cohérent avec ce que vous observez terrain ? »** → Ouvre la discussion H2 (causes organisationnelles vs techniques).
+
+4. **« Pour la boucle Lean [montrer Pareto → Ishikawa → Action → Bilan] : est-ce que ce workflow correspond à comment vous traitez un problème récurrent aujourd'hui ? »** → Valide l'adéquation terrain de OS4.
+
+5. **« Le manque à gagner estimé à X FCFA par semaine — est-ce un ordre de grandeur que vous reconnaissez, ou est-il sur- ou sous-estimé ? »** → Valide (ou corrige) le chiffrage FCFA.
+
+6. **« Quel est votre outil de suivi au quotidien actuellement (tableau blanc, Excel, rien) ? »** → Donne le contexte de comparaison pour OS6 (avant / après) et renforce l'argument adoption terrain.
+
+---
+
+## 13. Vision produit long terme
+
+Le profil Chef de Production couvre aujourd'hui les niveaux 1 et 2 du modèle de maturité ProBeya :
+- **Niveau 1 (Réactif)** : saisie, statuts, validation
+- **Niveau 2 (Structuré)** : TRS, Pareto, Ishikawa, pertes FCFA
+
+Pour atteindre le **niveau 3 (Optimisé)**, les étapes sont :
+1. Cockpit décisionnel 10 secondes (P0/P1 — en cours)
+2. Pilotage par opérateur (P2 — nécessite FK opérateur)
+3. Pilotage prédictif par machine (P3 — nécessite historique ≥ 3 mois)
+
+Le **niveau 4 (Excellence)** nécessiterait des capteurs machine (IoT) hors scope du mémoire actuel.
+
+---
+
+## 14. Conclusion
+
+> Le profil Chef de Production actuel est-il déjà un véritable outil de pilotage industriel, une base prometteuse à renforcer, ou un tableau de bord à reconstruire en profondeur ?
+
+**C'est une base sérieuse qui nécessite un travail éditorial ciblé, pas une reconstruction.**
+
+Le moteur analytique est réel, complet et calculé sur données terrain : TRS D×P×Q, attribution financière des pertes en FCFA, Pareto, Ishikawa guidé, boucle Lean avec bilan d'efficacité. Ce n'est pas un tableau de bord générique — c'est un outil construit sur les contraintes spécifiques de la chaîne 4 (bicoupe goulot, 4 essences, anti-chevauchement, prix snapshot figés).
+
+Ce qui manque est un **cockpit de premier regard** : un verdict global, le problème n°1 et l'action n°1 visibles sans scroller. Aujourd'hui, 15 sections à poids égal imposent au chef de construire lui-même la synthèse — c'est l'inverse de ce qu'un outil de pilotage doit faire.
+
+Il y a un bug de calcul de l'objectif (P0-1) qui est le seul élément capable de faire perdre confiance instantanément à un professionnel du secteur bois — et qui contredit directement les hypothèses H1/H3 du mémoire.
+
+Avec les corrections P0 (4–5 heures) et les améliorations P1 (1–2 jours), l'outil sera à la hauteur d'une démonstration professionnelle et d'une utilisation terrain réelle.
+
+---
+
+*Fichiers clés P0 : `dashboard.py:1590` (bug objectif) · `_aujourdhui.html` (message vide) · `admin.py` (prix chef) · `seed_data.py:25` (dates récentes)*
+*Smoke test de référence : `bash .claude/skills/run-cuf-pilotage/smoke.sh` — 16/16 checks doivent rester verts après chaque modification.*

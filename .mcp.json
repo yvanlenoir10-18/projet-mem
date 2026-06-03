@@ -50,6 +50,10 @@
         "WORKSPACE_ROOTS": "/home/user/projet-mem",
         "TOKEN_SAVIOR_CLIENT": "claude"
       }
+    },
+    "code-review-graph": {
+      "command": "code-review-graph",
+      "args": ["mcp", "--auto-watch"]
     }
   }
 }

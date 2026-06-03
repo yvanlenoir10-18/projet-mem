@@ -89,11 +89,13 @@ def _init_donnees_defaut():
 
     if not Parametre.query.first():
         parametres = [
-            # Prix de vente par essence (FCFA/m³)
-            ('prix_ayous',         '85000',  'Prix de vente Ayous (FCFA/m³)'),
-            ('prix_azobe',         '120000', 'Prix de vente Azobé (FCFA/m³)'),
-            ('prix_iroko',         '110000', 'Prix de vente Iroko (FCFA/m³)'),
-            ('prix_movingui',      '95000',  'Prix de vente Movingui (FCFA/m³)'),
+            # Prix de vente par essence (FCFA/m³) — alignés sur les prix de
+            # référence figés dans les fiches (snapshots), pour cohérence entre
+            # l'historique et les saisies futures.
+            ('prix_ayous',         '180000', 'Prix de vente Ayous (FCFA/m³)'),
+            ('prix_azobe',         '280000', 'Prix de vente Azobé (FCFA/m³)'),
+            ('prix_iroko',         '420000', 'Prix de vente Iroko (FCFA/m³)'),
+            ('prix_movingui',      '320000', 'Prix de vente Movingui (FCFA/m³)'),
             # Paramètres de production
             ('objectif_m3',        '12.5',   'Objectif de production par équipe (m³) — V1 provisoire'),
             ('duree_poste',        '480',    'Durée officielle d\'un poste (minutes)'),

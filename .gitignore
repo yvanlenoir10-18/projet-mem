@@ -49,3 +49,5 @@ test-results/
 .omx/logs/
 .omx/project-memory.json
 ressources/agentic-ai-prompt-research/
+# Added by code-review-graph
+.code-review-graph/

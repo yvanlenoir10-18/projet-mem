@@ -1,13 +1,13 @@
 """
-Génération de données fictives — tout le mois d'avril 2026 × 2 équipes/jour = 60 équipes.
+Génération de données fictives — 30 derniers jours glissants × 2 équipes/jour = 60 équipes.
 Permet d'accéder à toutes les fonctionnalités de l'app sans saisie manuelle.
 
 Usage :
   python seed_data.py
 
 Tout est aléatoire mais réaliste :
-- volume_entree : 22-36 m³ par production
-- volume_conforme / declass / dechets : selon rendement matière (60-85% conforme)
+- volume_entree : ~16-28 m³ de matière brute par poste (réparti sur 1-2 essences)
+- volume_conforme : ~10-20 m³/poste, cohérent avec les relevés terrain de la chaîne 4
 - 1 à 2 productions par équipe (mixage essences possible)
 - 0 à 4 arrêts par équipe (15-90 min chacun)
 - essences pondérées : Ayous 40%, Iroko 25%, Azobé 20%, Movingui 15%
@@ -21,11 +21,11 @@ from app.services.trs import calcule_trs
 
 app = create_app()
 
-# Mois ciblé pour les données fictives : avril 2026
-ANNEE_CIBLE = 2026
-MOIS_CIBLE  = 4
-JOUR_DEBUT  = date(ANNEE_CIBLE, MOIS_CIBLE, 1)
-JOUR_FIN    = date(ANNEE_CIBLE, MOIS_CIBLE, 30)
+# Période des données fictives : 30 derniers jours glissants, finissant
+# aujourd'hui. Ainsi le cockpit « Aujourd'hui », la scorecard semaine et les
+# vues 7j / 30j du tableau de bord chef sont toujours peuplés.
+JOUR_FIN    = date.today()
+JOUR_DEBUT  = JOUR_FIN - timedelta(days=29)
 NB_JOURS    = (JOUR_FIN - JOUR_DEBUT).days + 1
 ESSENCES_PONDEREES = (
     ['Ayous'] * 40 +
@@ -97,19 +97,36 @@ def _genere_arrets():
 
 
 def _genere_productions():
-    """Retourne 1 ou 2 productions avec essences mixtes possibles."""
+    """Retourne 1 ou 2 productions avec essences mixtes possibles.
+
+    Le volume est raisonné AU NIVEAU DU POSTE, pas par planche : on fixe un
+    budget de matière brute (16-28 m³) que la bicoupe peut traiter en un poste,
+    puis on le répartit entre les essences. Après rendement (55-78 % conforme),
+    la production conforme atteint ~10-20 m³/poste — cohérent avec les relevés
+    terrain de la chaîne 4. L'objectif technique de 12,5 m³/poste est donc
+    parfois dépassé (bon poste) et parfois manqué (poste dégradé).
+    """
     nb = random.choices([1, 2], weights=[70, 30])[0]
+
+    # Budget matière brute du poste, avant la bicoupe (point de comptage fixe).
+    entree_poste = round(random.uniform(16.0, 28.0), 1)
+    if nb == 2:
+        part = random.uniform(0.4, 0.6)
+        volumes_entree = [round(entree_poste * part, 1),
+                          round(entree_poste * (1 - part), 1)]
+    else:
+        volumes_entree = [entree_poste]
+
     essences_utilisees = []
     productions = []
-    for _ in range(nb):
+    for volume_entree in volumes_entree:
         # éviter doublons d'essence dans la même équipe
         ess = random.choice(ESSENCES_PONDEREES)
         while ess in essences_utilisees and len(essences_utilisees) < 4:
             ess = random.choice(ESSENCES_PONDEREES)
         essences_utilisees.append(ess)
 
-        volume_entree = round(random.uniform(22.0, 36.0), 1)
-        # Rendement matière 55-85% (conforme + declass)
+        # Rendement matière 55-78% conforme + 5-15% déclassé
         taux_conforme = random.uniform(0.55, 0.78)
         taux_declass  = random.uniform(0.05, 0.15)
         if taux_conforme + taux_declass > 0.90:
@@ -158,7 +175,7 @@ def inserer_donnees():
         Production.query.delete()
         Equipe.query.delete()
         db.session.commit()
-        print(f"Base nettoyée. Génération avril {ANNEE_CIBLE} : {NB_JOURS} jours × 2 équipes…\n")
+        print(f"Base nettoyée. Génération {JOUR_DEBUT} → {JOUR_FIN} : {NB_JOURS} jours × 2 équipes…\n")
 
         random.seed(42)  # reproductibilité (changer pour des données différentes)
         compteur = 0

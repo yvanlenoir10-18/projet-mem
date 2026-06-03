@@ -5,6 +5,56 @@
 
 ---
 
+## 0. PLAN D'EXÉCUTION VALIDÉ (2026-06-03)
+
+**Contexte.** Le profil Chef est analytiquement solide mais échoue au test des 10 secondes et contient un bug d'objectif (147 %) qui ruinerait la crédibilité devant un expert scierie. Le chef ne peut ni vérifier sur quelles fiches reposent ses indicateurs, ni justifier les montants FCFA, ni naviguer facilement d'un chiffre vers son détail. La démo terrain approche. Les 5 corrections ci-dessous (toutes P0) ont été validées par l'utilisateur le 2026-06-03.
+
+### P0-1 — Corriger le bug objectif (147 %)
+
+**Fichier** : `app/routes/dashboard.py`, fonction `_comparaison_equipes_production()` **ligne 1669**.
+**Cause exacte** : `objectif = _safe_float_param('objectif_m3', 12.5) * len(items)` — l'objectif d'un shift est multiplié par le nombre de fiches soumises de ce shift, pas par le nombre de jours de la période. À l'inverse, `_resume_production()` (ligne 1590–1657) est **déjà correct** (il agrège `objectif_jour` par jour réel). Le 147 % vient donc de la comparaison par équipe.
+**Correction** : remplacer `len(items)` par le nombre de jours distincts de la période (`len({e.date for e in equipes})`). Objectif d'un shift = `12.5 × nb_jours_periode`.
+**Vérification** : après correction, l'atteinte affichée doit tomber sous 100 % (cohérent avec TRS ~70 % et H3).
+
+### P0-2 — Traçabilité de la validation (Problème 1 reformulé)
+
+**Fichiers** : `app/routes/dashboard.py` `vue_chef()` (ligne 1988) + `app/templates/chef/dashboard.html` (sous le sélecteur 7j/30j/90j, ligne ~16).
+**Backend** : dans `vue_chef()`, compter les fiches de la période par statut. Séparer comptabilisées (`STATUTS_ANALYSES` = valide_chef + verrouille) vs non comptabilisées (`STATUTS_NON_ANALYSES` = brouillon + a_verifier + a_corriger). Constantes déjà dans `models.py:30-31`. Règle R7 : aucune table nouvelle.
+**Template** : ligne discrète « X fiches validées comptabilisées · Y non prises en compte (a à vérifier · b à corriger · c brouillon) ». Les compteurs non nuls renvoient vers `dashboard.fiches_chef` filtré par statut (route existante).
+
+### P0-3 — Données récentes + message « Aujourd'hui » vide (Problème 3)
+
+**Fichier 1** : `seed_data.py` lignes 24–29. Remplacer avril 2026 par une fenêtre glissante : `JOUR_FIN = date.today()`, `JOUR_DEBUT = JOUR_FIN - timedelta(days=6)`. Conserver la logique de génération. Relancer `python seed_data.py`.
+**Fichier 2** : `app/templates/chef/_aujourdhui.html`. Si pas de fiche du jour, afficher « En attente de la première saisie du jour » + dernière période connue. Sinon, contenu actuel.
+
+### P0-4 — Prix consultables par le chef (Problème 4)
+
+**Fichiers** : template `/pertes` (encart lecture seule).
+**Attention à la source** (voir Insight session) : deux jeux de prix coexistent — `prix_snapshot` figé par fiche (seed : Ayous 180k, Iroko 420k, Azobé 280k, Movingui 320k) et les `Parametre` vivants (`__init__.py:93` : Ayous 85k, Iroko 110k, Azobé 120k, Movingui 95k). À l'exécution : afficher la source effectivement utilisée par `calcule_manque_gagner()` dans `trs.py`, pour cohérence avec les montants affichés. Le chef voit, ne modifie pas (modification reste admin-only).
+
+### P0-5 — Vérification des prix vs marché réel (Problème 5)
+
+**Aucun code.** Aligner d'abord les deux jeux de prix (P0-4) puis valider les ordres de grandeur avec l'utilisateur/encadreur. Ajustement via `/admin/parametres`. Argument démo : outil paramétrable.
+
+### Points explicitement reportés
+
+- **Boucle Lean visible** (Pareto → Ishikawa → Action → Bilan) : après validation, sur demande. Mécanique présente, manque la visibilité.
+- **Statut global VERT/ORANGE/ROUGE** : P1, juste après les P0.
+- **Performance par opérateur** : impossible proprement (`Equipe.operateur_nom` texte libre, sans FK). Reporté P2.
+- **Liens machine critique + top-1 Pareto sur cockpit** (Problème 2) : P1 — les liens existent dans `_priorites_chef`, il faut les exposer sur le cockpit.
+
+### Vérification de bout en bout
+
+```bash
+cd cuf-pilotage && python seed_data.py        # repeupler sur 7 jours glissants
+bash .claude/skills/run-cuf-pilotage/smoke.sh  # 16/16 checks doivent rester verts
+python .claude/skills/run-cuf-pilotage/screenshot.py chef
+# Contrôler : atteinte objectif < 100 % · ligne traçabilité fiches visible
+#   · section « Aujourd'hui » peuplée · prix par essence visibles sur /pertes
+```
+
+---
+
 ## 1. Résumé exécutif
 
 Le profil Chef de Production dispose d'un **moteur analytique solide et réel** : TRS D×P×Q calculé sur données terrain, attribution financière des pertes en FCFA, Pareto des arrêts, Ishikawa 6M + 5 Pourquoi complet, recommandations déterministes + IA. Ce n'est ni un tableau de bord vide ni une maquette.

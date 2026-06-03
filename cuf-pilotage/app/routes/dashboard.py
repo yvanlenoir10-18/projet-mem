@@ -2980,6 +2980,7 @@ def pertes():
     total_d = total_p = total_q = 0.0
     par_machine   = {}
     par_essence_q = {}
+    prix_essences_acc = {}  # P0-4 : prix de valorisation réellement utilisé par essence
     par_shift     = {'Matin': {'perte_p': 0.0, 'nb': 0}, 'Apres-midi': {'perte_p': 0.0, 'nb': 0}}
 
     capacite_h   = float(Parametre.get('capacite_equipe_h', 1.5625))
@@ -3031,6 +3032,12 @@ def pertes():
 
         # Perte Q par essence (déclassé + déchets séparés)
         for pr in e.productions:
+            # P0-4 : prix effectif (snapshot figé à la soumission) pondéré par volume
+            vol_pr = (pr.volume_conforme or 0) + (pr.volume_declass or 0)
+            if vol_pr > 0:
+                acc = prix_essences_acc.setdefault(pr.essence, {'val': 0.0, 'vol': 0.0})
+                acc['val'] += _prix_production(pr) * vol_pr
+                acc['vol'] += vol_pr
             pq_d  = pr.volume_declass  * _prix_production(pr) * (1 - taux_revente)
             pq_ch = pr.volume_dechets  * max(0, _prix_production(pr) - valeur_dechets_m3)
             ess   = pr.essence
@@ -3062,6 +3069,14 @@ def pertes():
     # D/P/Q deviennent les causes probables affichées en second plan)
     manque_periode = manque_a_gagner_agrege(equipes)
 
+    # P0-4 — Prix de valorisation réellement utilisés sur la période (snapshots
+    # figés à la soumission), consultables par le chef pour justifier les FCFA.
+    prix_essences = sorted(
+        ({'essence': ess, 'prix': int(round(acc['val'] / acc['vol']))}
+         for ess, acc in prix_essences_acc.items() if acc['vol'] > 0),
+        key=lambda x: x['essence']
+    )
+
     return render_template('dashboard/pertes.html',
                            mois=mois, annee=annee,
                            nom_mois=NOMS_MOIS[mois],
@@ -3073,6 +3088,7 @@ def pertes():
                            manque_periode=manque_periode,
                            machines=machines_tri,
                            essences=essences_tri,
+                           prix_essences=prix_essences,
                            par_shift=par_shift,
                            pareto=pareto[:10],
                            nb_equipes=len(equipes))

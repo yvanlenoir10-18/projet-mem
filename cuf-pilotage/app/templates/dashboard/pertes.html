@@ -97,6 +97,29 @@
   </div>
 </div>
 
+{# ── P0-4 : Prix de valorisation utilisés (lecture seule) ── #}
+{% if prix_essences %}
+<div class="wp-card mb-3" style="padding:14px 22px;background:#faf8f3;">
+  <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.5rem 1.25rem;">
+    <span style="font-size:.72rem;font-weight:700;text-transform:uppercase;
+                 letter-spacing:.08em;color:var(--wp-muted);">
+      <i class="bi bi-tag"></i> Prix de valorisation utilisés
+    </span>
+    {% for p in prix_essences %}
+    <span style="font-size:.86rem;color:var(--wp-ink);">
+      {{ p.essence }} :
+      <strong>{{ "{:,.0f}".format(p.prix).replace(",", " ") }}</strong>
+      <span style="color:var(--wp-muted);font-size:.78rem;">FCFA/m³</span>
+    </span>
+    {% if not loop.last %}<span style="color:#d8d2c4;">·</span>{% endif %}
+    {% endfor %}
+    <span style="font-size:.74rem;color:var(--wp-muted);margin-left:auto;">
+      Prix figés à la soumission des fiches · modifiables par l'administrateur
+    </span>
+  </div>
+</div>
+{% endif %}
+
 {# ── Causes probables (D/P/Q en attribution causale, secondaires) ── #}
 <div class="wp-card mb-4" style="padding:18px 22px;">
   <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;

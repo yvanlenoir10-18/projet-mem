@@ -109,6 +109,24 @@
   </div>
 </div>
 
+{% if k.vide %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-ochre);">
+  <div class="p-3 d-flex align-items-center gap-3 flex-wrap">
+    <i class="bi bi-hourglass-split" style="font-size:1.4rem;color:var(--wp-ochre);"></i>
+    <div>
+      <div style="font-weight:900;color:var(--wp-ink);">En attente de la première saisie du jour</div>
+      <div style="font-size:.82rem;color:var(--wp-muted);">
+        Les indicateurs du jour s'afficheront dès qu'un poste aura soumis sa fiche.
+        {% if k.derniere_activite %}Dernière activité analysée : {{ k.derniere_activite }}.{% endif %}
+      </div>
+    </div>
+    <a href="{{ url_for('dashboard.fiches_chef', statut='tous') }}"
+       class="btn btn-sm btn-outline-primary ms-auto">
+      <i class="bi bi-clock-history"></i> Voir la dernière période
+    </a>
+  </div>
+</div>
+{% else %}
 <div class="row g-3 mb-4">
   <div class="col-12 col-md-6 col-xl">
     <div class="wp-card h-100 p-3">
@@ -260,3 +278,4 @@
     </div>
   </div>
 </div>
+{% endif %}

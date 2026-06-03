@@ -795,7 +795,17 @@ def _kpi_aujourdhui(aujourd_hui):
 
     volume_attente = sum(e.volume_conforme for e in equipes_jour if e.statut == STATUT_A_VERIFIER)
 
+    # P0-3 — Signal d'état pour le cockpit : tant qu'aucune fiche n'est saisie
+    # aujourd'hui, on affiche un message d'attente plutôt qu'une rangée de zéros.
+    derniere = Equipe.query.filter(
+        Equipe.date < aujourd_hui,
+        Equipe.statut.in_(STATUTS_ANALYSES),
+    ).order_by(Equipe.date.desc()).first()
+    derniere_activite = derniere.date.strftime('%d/%m/%Y') if derniere else None
+
     return {
+        'vide': not equipes_jour,
+        'derniere_activite': derniere_activite,
         'objectif': {
             'realise': round(volume_conforme, 2),
             'objectif': round(objectif_jour, 2),

@@ -5,6 +5,7 @@
 {% block content %}
 
 {% include 'chef/_aujourdhui.html' %}
+{% include 'chef/_alertes.html' %}
 
 {# ── Barre d'actions ── #}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
@@ -87,20 +88,52 @@
 </div>
 {% endif %}
 
+{# ── P1-5 · Boucle Lean active ── #}
+{% set _sac = stats_actions_chef|default({}) %}
 <div class="wp-card mb-4" style="border-left:4px solid var(--wp-emerald);">
-  <div class="p-3 d-flex justify-content-between align-items-center gap-3 flex-wrap">
-    <div>
-      <div style="font-weight:900;color:var(--wp-ink);">
-        <i class="bi bi-diagram-3" style="color:var(--wp-emerald);"></i>
-        Problèmes ouverts
+  <div class="p-3">
+    <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+      <div>
+        <div style="font-weight:900;color:var(--wp-ink);">
+          <i class="bi bi-arrow-repeat" style="color:var(--wp-emerald);"></i>
+          Boucle Lean active
+        </div>
+        <div style="font-size:.82rem;color:var(--wp-muted);margin-top:2px;">
+          Pareto → Ishikawa → Action → Bilan efficacité
+        </div>
       </div>
-      <div style="font-size:.82rem;color:var(--wp-muted);">
-        {{ nb_problemes_ouverts|default(0) }} analyse{{ 's' if nb_problemes_ouverts|default(0) > 1 }} Ishikawa / 5 Pourquoi à suivre.
+      <div class="d-flex gap-2 flex-wrap">
+        <a href="{{ url_for('problemes.liste') }}" class="btn btn-sm btn-outline-primary">
+          <i class="bi bi-diagram-3"></i> Analyses
+        </a>
+        <a href="{{ url_for('dashboard.actions_chef') }}" class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-check2-square"></i> Actions
+        </a>
       </div>
     </div>
-    <a href="{{ url_for('problemes.liste') }}" class="btn btn-sm btn-outline-primary">
-      Ouvrir Résolution
-    </a>
+    <div class="d-flex gap-4 flex-wrap mt-2" style="font-size:.82rem;">
+      <span>
+        <strong style="color:var(--wp-emerald);">{{ nb_problemes_ouverts|default(0) }}</strong>
+        <span style="color:var(--wp-muted);"> problème{{ 's' if nb_problemes_ouverts|default(0) > 1 }} ouvert{{ 's' if nb_problemes_ouverts|default(0) > 1 }}</span>
+      </span>
+      <span style="color:#c9c2b4;">·</span>
+      <span>
+        <strong style="color:var(--wp-ink);">{{ _sac.en_cours|default(0) }}</strong>
+        <span style="color:var(--wp-muted);"> action{{ 's' if _sac.en_cours|default(0) > 1 }} en cours</span>
+      </span>
+      <span style="color:#c9c2b4;">·</span>
+      <span>
+        <strong style="color:var(--wp-leaf);">{{ _sac.fait|default(0) }}</strong>
+        <span style="color:var(--wp-muted);"> terminée{{ 's' if _sac.fait|default(0) > 1 }}</span>
+      </span>
+      {% if _sac.retard|default(0) > 0 %}
+      <span style="color:#c9c2b4;">·</span>
+      <span>
+        <strong style="color:var(--wp-terracotta);">{{ _sac.retard }}</strong>
+        <span style="color:var(--wp-terracotta);"> en retard</span>
+      </span>
+      {% endif %}
+    </div>
   </div>
 </div>
 
@@ -225,6 +258,29 @@
 
 {% else %}
 
+{# ── P1-1 · Verdict global ── #}
+{% if statut_global %}
+<div class="mb-4" style="background:{{ statut_global.bg }};border:2px solid {{ statut_global.border }};border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+  <i class="bi {{ statut_global.icon }}" style="font-size:1.6rem;color:{{ statut_global.color }};flex-shrink:0;"></i>
+  <div style="flex:1;min-width:0;">
+    <span style="font-weight:900;font-size:1.0rem;color:{{ statut_global.color }};">{{ statut_global.label }}</span>
+    <span style="color:var(--wp-muted);font-size:.85rem;margin-left:.65rem;">TRS {{ stats.trs_moyen }}% · {{ label_periode|lower }}</span>
+    {% if statut_global.detail %}
+    <span style="color:var(--wp-muted);font-size:.82rem;margin-left:.5rem;">· {{ statut_global.detail }}</span>
+    {% endif %}
+  </div>
+  {% if statut_global.code == 'rouge' %}
+  <a href="{{ url_for('dashboard.machines_chef') }}" class="btn btn-sm" style="background:var(--wp-terracotta);color:#fff;border:none;">
+    <i class="bi bi-tools"></i> Voir machines
+  </a>
+  {% elif statut_global.code == 'orange' %}
+  <a href="{{ url_for('dashboard.machines_chef') }}" class="btn btn-sm btn-outline-warning">
+    <i class="bi bi-tools"></i> Voir machines
+  </a>
+  {% endif %}
+</div>
+{% endif %}
+
 {# ── HERO TRS ── #}
 <div class="wp-hero">
   <div class="wp-hero-blob" style="width:300px;height:300px;top:-80px;right:-60px;"></div>
@@ -267,55 +323,7 @@
   </div>
 </div>
 
-{# ── P12 · Anomalies de saisie à revoir (alertes non bloquantes) ── #}
-{% if anomalies_periode and anomalies_periode.nb_postes_concernes > 0 %}
-<div class="wp-card mb-4"
-     style="border-left:4px solid var(--wp-ochre);background:#fffaf0;">
-  <div class="wp-card-header" style="color:var(--wp-ochre);">
-    <i class="bi bi-shield-exclamation"></i>
-    Saisies à revoir · {{ jours }} j
-    <span class="ms-auto" style="font-weight:400;color:var(--wp-muted);font-size:.78rem;">
-      Contrôles qualité — alertes non bloquantes
-    </span>
-  </div>
-  <div class="p-3 d-flex align-items-center gap-4 flex-wrap">
-    <div>
-      <div class="wp-kpi-label">Postes concernés</div>
-      <div style="font-size:1.55rem;font-weight:800;color:var(--wp-ochre);">
-        {{ anomalies_periode.nb_postes_concernes }}
-      </div>
-      <div class="wp-kpi-sub">sur {{ manque_periode.nb_postes if manque_periode else postes | length }} postes</div>
-    </div>
-    <div style="border-left:1px solid #e5e0d6;padding-left:20px;">
-      <div class="wp-kpi-label">Anomalies au total</div>
-      <div style="font-size:1.55rem;font-weight:700;color:var(--wp-ink);">
-        {{ anomalies_periode.nb_anomalies_total }}
-      </div>
-    </div>
-    <div style="border-left:1px solid #e5e0d6;padding-left:20px;flex:1 1 auto;">
-      <div class="wp-kpi-label" style="margin-bottom:6px;">Répartition par règle</div>
-      <div class="d-flex gap-2 flex-wrap" style="font-size:.78rem;">
-        {% set libelle = {'R1': 'TRS bas sans arrêt', 'R2': 'Arrêt sans commentaire',
-                         'R3': 'Déclassé excessif', 'R4': 'Production absente',
-                         'R5': 'Horaire arrêt invalide', 'R6': 'Chevauchement machine',
-                         'R7': 'Créneau essence invalide', 'R8': 'Chevauchement essence'} %}
-        {% for code, n in anomalies_periode.par_code.items() if n > 0 %}
-        <span class="wp-pill" style="background:#fff4e0;color:var(--wp-ochre);">
-          <strong>{{ code }}</strong> · {{ libelle.get(code, code) }} : {{ n }}
-        </span>
-        {% endfor %}
-      </div>
-    </div>
-    <div>
-      <a href="{{ url_for('saisie.historique') }}" class="btn btn-sm btn-outline-secondary">
-        <i class="bi bi-list-check"></i> Voir les postes
-      </a>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-{# ── Manque à gagner estimé (P11 — indicateur principal) ── #}
+{# ── Manque à gagner estimé (P11 — P1-4 : remonté en altitude 2) ── #}
 {% if manque_periode and manque_periode.nb_postes > 0 %}
 <div class="wp-card mb-4">
   <div class="wp-card-header">
@@ -360,6 +368,88 @@
       Estimation prudente — D/P/Q ci-dessous fournissent l'attribution causale.
       <a href="{{ url_for('dashboard.pertes') }}" style="color:var(--wp-terracotta);">
         Drill-down causes →
+      </a>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── P1-2 · Machine critique + Pareto top-1 ── #}
+{% if (machine_top and machine_top.duree >= 30) or pareto_chef %}
+<div class="wp-card mb-4" style="padding:16px 18px 14px;">
+  <div style="font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:var(--wp-muted);margin-bottom:12px;">
+    <i class="bi bi-tools"></i> Signaux critiques · 7 derniers jours
+  </div>
+  <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;">
+    {% if machine_top and machine_top.duree >= 30 %}
+    <div style="flex:1;min-width:160px;">
+      <div style="font-size:.74rem;color:var(--wp-muted);margin-bottom:2px;">Machine critique</div>
+      <div style="font-weight:900;color:var(--wp-terracotta);font-size:.95rem;">{{ machine_top.machine }}</div>
+      <div style="font-size:.82rem;color:var(--wp-ink);">{{ machine_top.duree_fmt }} d'arrêts · {{ machine_top.count }} événement{{ 's' if machine_top.count > 1 }}</div>
+      {% if machine_top.cause %}<div style="font-size:.74rem;color:var(--wp-muted);margin-top:2px;">Cause : {{ machine_top.cause }}</div>{% endif %}
+      <a href="{{ url_for('dashboard.machines_chef', jours=7) }}" class="btn btn-sm btn-outline-secondary mt-2" style="font-size:.72rem;">Détail machines →</a>
+    </div>
+    {% endif %}
+    {% if pareto_chef %}
+    {% set top = pareto_chef[0] %}
+    <div style="flex:1;min-width:200px;{% if machine_top and machine_top.duree >= 30 %}border-left:1px solid #e5e0d6;padding-left:20px;{% endif %}">
+      <div style="font-size:.74rem;color:var(--wp-muted);margin-bottom:2px;">Cause n°1 Pareto</div>
+      <div style="font-weight:900;color:var(--wp-ink);font-size:.95rem;">{{ top.cause or 'Non documentée' }}</div>
+      <div style="font-size:.82rem;color:var(--wp-muted);">{{ top.pct }}% du temps d'arrêt · {{ top.count }} arrêt{{ 's' if top.count > 1 }}</div>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
+        <a href="{{ url_for('problemes.nouveau') }}" class="btn btn-sm btn-primary" style="font-size:.72rem;">
+          <i class="bi bi-diagram-3"></i> Analyser (Ishikawa)
+        </a>
+        <a href="{{ url_for('analyse.arrets') }}" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;">Pareto complet →</a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{# ── P12 · Anomalies de saisie à revoir (alertes non bloquantes) ── #}
+{% if anomalies_periode and anomalies_periode.nb_postes_concernes > 0 %}
+<div class="wp-card mb-4"
+     style="border-left:4px solid var(--wp-ochre);background:#fffaf0;">
+  <div class="wp-card-header" style="color:var(--wp-ochre);">
+    <i class="bi bi-shield-exclamation"></i>
+    Saisies à revoir · {{ jours }} j
+    <span class="ms-auto" style="font-weight:400;color:var(--wp-muted);font-size:.78rem;">
+      Contrôles qualité — alertes non bloquantes
+    </span>
+  </div>
+  <div class="p-3 d-flex align-items-center gap-4 flex-wrap">
+    <div>
+      <div class="wp-kpi-label">Postes concernés</div>
+      <div style="font-size:1.55rem;font-weight:800;color:var(--wp-ochre);">
+        {{ anomalies_periode.nb_postes_concernes }}
+      </div>
+      <div class="wp-kpi-sub">sur {{ manque_periode.nb_postes if manque_periode else postes | length }} postes</div>
+    </div>
+    <div style="border-left:1px solid #e5e0d6;padding-left:20px;">
+      <div class="wp-kpi-label">Anomalies au total</div>
+      <div style="font-size:1.55rem;font-weight:700;color:var(--wp-ink);">
+        {{ anomalies_periode.nb_anomalies_total }}
+      </div>
+    </div>
+    <div style="border-left:1px solid #e5e0d6;padding-left:20px;flex:1 1 auto;">
+      <div class="wp-kpi-label" style="margin-bottom:6px;">Répartition par règle</div>
+      <div class="d-flex gap-2 flex-wrap" style="font-size:.78rem;">
+        {% set libelle = {'R1': 'TRS bas sans arrêt', 'R2': 'Arrêt sans commentaire',
+                         'R3': 'Déclassé excessif', 'R4': 'Production absente',
+                         'R5': 'Horaire arrêt invalide', 'R6': 'Chevauchement machine',
+                         'R7': 'Créneau essence invalide', 'R8': 'Chevauchement essence'} %}
+        {% for code, n in anomalies_periode.par_code.items() if n > 0 %}
+        <span class="wp-pill" style="background:#fff4e0;color:var(--wp-ochre);">
+          <strong>{{ code }}</strong> · {{ libelle.get(code, code) }} : {{ n }}
+        </span>
+        {% endfor %}
+      </div>
+    </div>
+    <div>
+      <a href="{{ url_for('saisie.historique') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-list-check"></i> Voir les postes
       </a>
     </div>
   </div>

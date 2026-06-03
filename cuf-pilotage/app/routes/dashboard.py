@@ -1066,6 +1066,39 @@ def _action_secondaire_suivi_probleme(probleme):
     }
 
 
+def _statut_global(trs_moyen, alertes):
+    """P1-1 — Verdict cockpit VERT / ORANGE / ROUGE."""
+    nb_saisies = len(alertes.get('saisies_manquantes', [])) if alertes else 0
+    nb_fiches_anomalies = sum(
+        1 for f in (alertes.get('fiches_a_verifier', []) or [])
+        if f.get('nb_anomalies', 0) > 0
+    )
+    details = []
+    if nb_saisies:
+        details.append(f"{nb_saisies} saisie{'s' if nb_saisies > 1 else ''} manquante{'s' if nb_saisies > 1 else ''}")
+    if nb_fiches_anomalies:
+        details.append(f"{nb_fiches_anomalies} fiche{'s' if nb_fiches_anomalies > 1 else ''} avec anomalie{'s' if nb_fiches_anomalies > 1 else ''}")
+
+    if trs_moyen < 50 or nb_saisies >= 3:
+        return {
+            'code': 'rouge', 'icon': 'bi-x-circle-fill', 'label': 'HORS CONTRÔLE',
+            'color': 'var(--wp-terracotta)', 'bg': 'rgba(180,60,50,0.07)', 'border': 'var(--wp-terracotta)',
+            'detail': ' · '.join(details) if details else f'TRS {trs_moyen}% — sous le seuil critique (50%)',
+        }
+    elif trs_moyen < 60 or nb_saisies > 0 or nb_fiches_anomalies > 0:
+        return {
+            'code': 'orange', 'icon': 'bi-exclamation-circle-fill', 'label': 'À SURVEILLER',
+            'color': 'var(--wp-ochre)', 'bg': 'rgba(197,151,58,0.07)', 'border': 'var(--wp-ochre)',
+            'detail': ' · '.join(details) if details else f'TRS {trs_moyen}% — proche du seuil objectif (60%)',
+        }
+    else:
+        return {
+            'code': 'vert', 'icon': 'bi-check-circle-fill', 'label': 'SOUS CONTRÔLE',
+            'color': 'var(--wp-leaf)', 'bg': 'rgba(63,138,92,0.07)', 'border': 'var(--wp-leaf)',
+            'detail': 'Aucune anomalie détectée',
+        }
+
+
 def _priorites_chef(aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_actions_chef):
     """
     P3.10 — Synthèse décisionnelle courte.
@@ -2052,6 +2085,7 @@ def vue_chef():
     priorites_chef = _priorites_chef(
         aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_actions_chef
     )
+    machine_top = _machine_prioritaire_recent(aujourd_hui, jours=7)
 
     try:
         mois_sel  = int(request.args.get('mois',  0))
@@ -2096,7 +2130,10 @@ def vue_chef():
                                stats_actions_chef=stats_actions_chef,
                                actions_chef_urgentes=actions_chef_urgentes,
                                actions_chef_a_revoir=actions_chef_a_revoir,
-                               priorites_chef=priorites_chef)
+                               priorites_chef=priorites_chef,
+                               statut_global=None,
+                               machine_top=machine_top,
+                               pareto_chef=[])
 
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen    = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
@@ -2311,6 +2348,10 @@ def vue_chef():
     # P14 — Top 3 recommandations pour le chef (30 derniers jours)
     top_recos = top_n_recommandations(equipes, role='chef', n=3)
 
+    # P1-1 cockpit décisionnel
+    statut_global = _statut_global(trs_moyen, alertes)
+    pareto_chef = pareto_arrets(equipes)[:3]
+
     return render_template('chef/dashboard.html',
                            postes=equipes[:10],
                            stats=stats,
@@ -2339,7 +2380,10 @@ def vue_chef():
                            stats_actions_chef=stats_actions_chef,
                            actions_chef_urgentes=actions_chef_urgentes,
                            actions_chef_a_revoir=actions_chef_a_revoir,
-                           priorites_chef=priorites_chef)
+                           priorites_chef=priorites_chef,
+                           statut_global=statut_global,
+                           machine_top=machine_top,
+                           pareto_chef=pareto_chef)
 
 
 @dashboard_bp.route('/chef/fiches')

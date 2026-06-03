@@ -1995,6 +1995,44 @@ def _get_equipes_periode(jours=30):
     ).order_by(Equipe.date.desc()).all()
 
 
+def _tracabilite_validation(date_debut, date_fin=None):
+    """P0-2 — Sur quelles fiches reposent les indicateurs du chef ?
+
+    Distingue les fiches comptabilisées (validées + verrouillées, seules
+    incluses dans les calculs) des fiches non prises en compte (brouillon,
+    à vérifier, à corriger), sur la même fenêtre que le tableau de bord.
+    Aucune table nouvelle (règle R7) : simple comptage par statut.
+    """
+    q = Equipe.query.filter(Equipe.date >= date_debut)
+    if date_fin is not None:
+        q = q.filter(Equipe.date < date_fin)
+    par_statut = defaultdict(int)
+    for f in q.all():
+        par_statut[f.statut] += 1
+
+    comptabilisees = sum(par_statut[s] for s in STATUTS_ANALYSES)
+    non_comptabilisees = sum(par_statut[s] for s in STATUTS_NON_ANALYSES)
+
+    # Dernière mise à jour = soumission la plus récente parmi les fiches comptées.
+    derniere_q = Equipe.query.filter(
+        Equipe.date >= date_debut,
+        Equipe.statut.in_(STATUTS_ANALYSES),
+    )
+    if date_fin is not None:
+        derniere_q = derniere_q.filter(Equipe.date < date_fin)
+    derniere = derniere_q.order_by(Equipe.soumis_le.desc()).first()
+    maj = derniere.soumis_le.strftime('%d/%m/%Y à %H:%M') if derniere and derniere.soumis_le else None
+
+    return {
+        'comptabilisees': comptabilisees,
+        'non_comptabilisees': non_comptabilisees,
+        'a_verifier': par_statut.get(STATUT_A_VERIFIER, 0),
+        'a_corriger': par_statut.get(STATUT_A_CORRIGER, 0),
+        'brouillon': par_statut.get(STATUT_BROUILLON, 0),
+        'maj': maj,
+    }
+
+
 @dashboard_bp.route('/chef')
 @login_required
 @roles_required('chef', 'admin')
@@ -2031,10 +2069,14 @@ def vue_chef():
         label_periode = f"{NOMS_MOIS[mois_sel]} {annee_sel}"
         mode_mois = True
         jours = (fin_m - debut_m).days
+        trace_debut, trace_fin = debut_m, fin_m
     else:
         equipes = _get_equipes_periode(jours)
         label_periode = f"{jours} derniers jours"
         mode_mois = False
+        trace_debut, trace_fin = aujourd_hui - timedelta(days=jours), None
+
+    tracabilite = _tracabilite_validation(trace_debut, trace_fin)
 
     if not equipes:
         return render_template('chef/dashboard.html',
@@ -2045,6 +2087,7 @@ def vue_chef():
                                regularite=None, gain_potentiel=None,
                                mode_mois=mode_mois, label_periode=label_periode,
                                mois_options=_mois_disponibles(),
+                               tracabilite=tracabilite,
                                kpi_jour=kpi_jour,
                                postes_du_jour=postes_du_jour,
                                actions_immediates=actions_immediates,
@@ -2287,6 +2330,7 @@ def vue_chef():
                            manque_periode=manque_periode,
                            anomalies_periode=anomalies_periode,
                            top_recos=top_recos,
+                           tracabilite=tracabilite,
                            kpi_jour=kpi_jour,
                            postes_du_jour=postes_du_jour,
                            actions_immediates=actions_immediates,

@@ -57,6 +57,36 @@
   </div>
 </div>
 
+{% if tracabilite %}
+{% set tr = tracabilite %}
+<div class="mb-4" style="font-size:.82rem;color:var(--wp-muted);display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .75rem;">
+  <span>
+    <i class="bi bi-funnel" style="color:var(--wp-leaf);"></i>
+    <strong style="color:var(--wp-ink);">{{ tr.comptabilisees }}</strong> fiche{{ 's' if tr.comptabilisees > 1 }} validée{{ 's' if tr.comptabilisees > 1 }} comptabilisée{{ 's' if tr.comptabilisees > 1 }}
+    sur {{ label_periode|lower }}
+  </span>
+  {% if tr.non_comptabilisees > 0 %}
+  <span style="color:#c9c2b4;">·</span>
+  <span>
+    <strong style="color:var(--wp-terracotta);">{{ tr.non_comptabilisees }}</strong> non prise{{ 's' if tr.non_comptabilisees > 1 }} en compte
+    (
+    {%- set parts = [] -%}
+    {%- if tr.a_verifier %}{% set _ = parts.append(('à vérifier', tr.a_verifier, 'a_verifier')) %}{% endif -%}
+    {%- if tr.a_corriger %}{% set _ = parts.append(('à corriger', tr.a_corriger, 'a_corriger')) %}{% endif -%}
+    {%- if tr.brouillon %}{% set _ = parts.append(('brouillon', tr.brouillon, 'brouillon')) %}{% endif -%}
+    {%- for libelle, n, statut in parts -%}
+      <a href="{{ url_for('dashboard.fiches_chef', statut=statut) }}" style="color:var(--wp-terracotta);text-decoration:underline;">{{ n }} {{ libelle }}</a>{% if not loop.last %} · {% endif %}
+    {%- endfor -%}
+    )
+  </span>
+  {% endif %}
+  {% if tr.maj %}
+  <span style="color:#c9c2b4;">·</span>
+  <span><i class="bi bi-clock-history"></i> dernière mise à jour {{ tr.maj }}</span>
+  {% endif %}
+</div>
+{% endif %}
+
 <div class="wp-card mb-4" style="border-left:4px solid var(--wp-emerald);">
   <div class="p-3 d-flex justify-content-between align-items-center gap-3 flex-wrap">
     <div>

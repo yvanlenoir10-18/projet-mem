@@ -1,0 +1,79 @@
+{% set actions = actions_immediates|default([]) %}
+{% set priorites = priorites_chef|default([]) %}
+
+{# Priorités du chef #}
+<div class="wp-card mb-3" style="border-left:4px solid var(--wp-emerald);">
+  <div class="wp-card-header">
+    <i class="bi bi-compass"></i> Priorités du chef
+    <span class="ms-auto" style="font-size:.74rem;font-weight:500;color:var(--wp-muted);">Décisions à prendre en premier</span>
+  </div>
+  <div class="p-3">
+    {% if priorites %}
+    <div class="d-grid gap-2">
+      {% for p in priorites %}
+      {% set p_color = 'var(--wp-terracotta)' if p.niveau == 'danger' else ('var(--wp-ochre)' if p.niveau == 'warning' else 'var(--wp-sky)') %}
+      <div style="border:1px solid #e6e0d5;border-left:4px solid {{ p_color }};border-radius:8px;padding:10px;background:#fff;">
+        <div class="d-flex justify-content-between align-items-start gap-2">
+          <div class="d-flex gap-2" style="min-width:0;">
+            <i class="bi {{ p.icon }}" style="color:{{ p_color }};font-size:1rem;margin-top:1px;flex-shrink:0;"></i>
+            <div style="min-width:0;">
+              <div style="font-weight:900;color:var(--wp-ink);font-size:.85rem;">{{ p.titre }}</div>
+              <div style="font-size:.75rem;color:var(--wp-muted);line-height:1.35;margin-top:2px;">{{ p.signal }}</div>
+            </div>
+          </div>
+          <span class="badge {% if p.niveau == 'danger' %}bg-danger{% elif p.niveau == 'warning' %}bg-warning text-dark{% else %}bg-info text-dark{% endif %}" style="flex-shrink:0;font-size:.65rem;">
+            {% if p.niveau == 'danger' %}Urgent{% elif p.niveau == 'warning' %}À décider{% else %}À suivre{% endif %}
+          </span>
+        </div>
+        <div style="font-size:.77rem;color:var(--wp-ink);line-height:1.35;margin-top:.5rem;">{{ p.decision }}</div>
+        <div class="mt-2 d-flex gap-2 flex-wrap">
+          <a href="{{ p.href }}" class="btn btn-sm btn-outline-primary">{{ p.cta }}</a>
+          {% if p.action_secondaire %}
+          <a href="{{ p.action_secondaire.href }}" class="btn btn-sm btn-{{ p.action_secondaire.couleur|default('primary') }}">
+            <i class="bi {{ p.action_secondaire.icon }}"></i> {{ p.action_secondaire.label }}
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="d-flex align-items-center gap-2" style="color:var(--wp-leaf);font-weight:800;">
+      <i class="bi bi-check-circle"></i> Rien de critique à prioriser.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# Actions immédiates #}
+<div class="wp-card mb-3" style="border-left:4px solid var(--wp-leaf);">
+  <div class="wp-card-header">
+    <i class="bi bi-lightning-charge"></i> Actions immédiates
+    <span class="ms-auto" style="font-size:.74rem;font-weight:500;color:var(--wp-muted);">Priorisées pour le chef scierie</span>
+  </div>
+  <div class="p-3">
+    {% if actions %}
+    <div class="d-grid gap-2">
+      {% for action in actions %}
+      {% set action_color = 'var(--wp-terracotta)' if action.niveau == 'danger' else ('var(--wp-ochre)' if action.niveau == 'warning' else 'var(--wp-sky)') %}
+      <a href="{{ action.href }}"
+         class="d-flex align-items-center justify-content-between gap-3 flex-wrap"
+         style="text-decoration:none;color:var(--wp-ink);border-left:3px solid {{ action_color }};background:#fff;padding:10px 12px;border-radius:8px;box-shadow:0 1px 0 rgba(0,0,0,.04);">
+        <span class="d-flex align-items-start gap-2" style="min-width:0;flex:1;">
+          <i class="bi {{ action.icon }}" style="color:{{ action_color }};font-size:1rem;margin-top:2px;"></i>
+          <span style="min-width:0;">
+            <span style="font-weight:800;font-size:.86rem;display:block;">{{ action.titre }}</span>
+            <span style="font-size:.76rem;color:var(--wp-muted);line-height:1.35;">{{ action.detail }}</span>
+          </span>
+        </span>
+        <span class="btn btn-sm btn-outline-secondary" style="pointer-events:none;">{{ action.cta }}</span>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="d-flex align-items-center gap-2" style="color:var(--wp-leaf);font-weight:700;">
+      <i class="bi bi-check-circle"></i> Aucune action immédiate en attente.
+    </div>
+    {% endif %}
+  </div>
+</div>

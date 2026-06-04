@@ -4,10 +4,6 @@
 
 {% block content %}
 
-{% include 'chef/_aujourdhui.html' %}
-{% include 'chef/_alertes.html' %}
-{% include 'chef/_signaux_p2.html' %}
-
 {# ── Barre d'actions ── #}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
   <div class="d-flex gap-2 align-items-center flex-wrap">
@@ -59,195 +55,6 @@
   </div>
 </div>
 
-{% if tracabilite %}
-{% set tr = tracabilite %}
-<div class="mb-4" style="font-size:.82rem;color:var(--wp-muted);display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .75rem;">
-  <span>
-    <i class="bi bi-funnel" style="color:var(--wp-leaf);"></i>
-    <strong style="color:var(--wp-ink);">{{ tr.comptabilisees }}</strong> fiche{{ 's' if tr.comptabilisees > 1 }} validée{{ 's' if tr.comptabilisees > 1 }} comptabilisée{{ 's' if tr.comptabilisees > 1 }}
-    sur {{ label_periode|lower }}
-  </span>
-  {% if tr.non_comptabilisees > 0 %}
-  <span style="color:#c9c2b4;">·</span>
-  <span>
-    <strong style="color:var(--wp-terracotta);">{{ tr.non_comptabilisees }}</strong> non prise{{ 's' if tr.non_comptabilisees > 1 }} en compte
-    (
-    {%- set parts = [] -%}
-    {%- if tr.a_verifier %}{% set _ = parts.append(('à vérifier', tr.a_verifier, 'a_verifier')) %}{% endif -%}
-    {%- if tr.a_corriger %}{% set _ = parts.append(('à corriger', tr.a_corriger, 'a_corriger')) %}{% endif -%}
-    {%- if tr.brouillon %}{% set _ = parts.append(('brouillon', tr.brouillon, 'brouillon')) %}{% endif -%}
-    {%- for libelle, n, statut in parts -%}
-      <a href="{{ url_for('dashboard.fiches_chef', statut=statut) }}" style="color:var(--wp-terracotta);text-decoration:underline;">{{ n }} {{ libelle }}</a>{% if not loop.last %} · {% endif %}
-    {%- endfor -%}
-    )
-  </span>
-  {% endif %}
-  {% if tr.maj %}
-  <span style="color:#c9c2b4;">·</span>
-  <span><i class="bi bi-clock-history"></i> dernière mise à jour {{ tr.maj }}</span>
-  {% endif %}
-</div>
-{% endif %}
-
-{# ── P1-5 · Boucle Lean active ── #}
-{% set _sac = stats_actions_chef|default({}) %}
-<div class="wp-card mb-4" style="border-left:4px solid var(--wp-emerald);">
-  <div class="p-3">
-    <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
-      <div>
-        <div style="font-weight:900;color:var(--wp-ink);">
-          <i class="bi bi-arrow-repeat" style="color:var(--wp-emerald);"></i>
-          Boucle Lean active
-        </div>
-        <div style="font-size:.82rem;color:var(--wp-muted);margin-top:2px;">
-          Pareto → Ishikawa → Action → Bilan efficacité
-        </div>
-      </div>
-      <div class="d-flex gap-2 flex-wrap">
-        <a href="{{ url_for('problemes.liste') }}" class="btn btn-sm btn-outline-primary">
-          <i class="bi bi-diagram-3"></i> Analyses
-        </a>
-        <a href="{{ url_for('dashboard.actions_chef') }}" class="btn btn-sm btn-outline-secondary">
-          <i class="bi bi-check2-square"></i> Actions
-        </a>
-      </div>
-    </div>
-    <div class="d-flex gap-4 flex-wrap mt-2" style="font-size:.82rem;">
-      <span>
-        <strong style="color:var(--wp-emerald);">{{ nb_problemes_ouverts|default(0) }}</strong>
-        <span style="color:var(--wp-muted);"> problème{{ 's' if nb_problemes_ouverts|default(0) > 1 }} ouvert{{ 's' if nb_problemes_ouverts|default(0) > 1 }}</span>
-      </span>
-      <span style="color:#c9c2b4;">·</span>
-      <span>
-        <strong style="color:var(--wp-ink);">{{ _sac.en_cours|default(0) }}</strong>
-        <span style="color:var(--wp-muted);"> action{{ 's' if _sac.en_cours|default(0) > 1 }} en cours</span>
-      </span>
-      <span style="color:#c9c2b4;">·</span>
-      <span>
-        <strong style="color:var(--wp-leaf);">{{ _sac.fait|default(0) }}</strong>
-        <span style="color:var(--wp-muted);"> terminée{{ 's' if _sac.fait|default(0) > 1 }}</span>
-      </span>
-      {% if _sac.retard|default(0) > 0 %}
-      <span style="color:#c9c2b4;">·</span>
-      <span>
-        <strong style="color:var(--wp-terracotta);">{{ _sac.retard }}</strong>
-        <span style="color:var(--wp-terracotta);"> en retard</span>
-      </span>
-      {% endif %}
-    </div>
-  </div>
-</div>
-
-{% set action_stats = stats_actions_chef|default({}) %}
-{% set actions_urgentes = actions_chef_urgentes|default([]) %}
-{% set actions_a_revoir = actions_chef_a_revoir|default([]) %}
-<div class="wp-card mb-4" style="border-left:4px solid {% if action_stats.retard|default(0) > 0 or actions_a_revoir %}var(--wp-terracotta){% else %}var(--wp-sky){% endif %};">
-  <div class="p-3">
-    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
-      <div>
-        <div style="font-weight:900;color:var(--wp-ink);">
-          <i class="bi bi-check2-square" style="color:{% if action_stats.retard|default(0) > 0 or actions_a_revoir %}var(--wp-terracotta){% else %}var(--wp-sky){% endif %};"></i>
-          Actions Chef à suivre
-        </div>
-        <div style="font-size:.82rem;color:var(--wp-muted);">
-          {{ action_stats.ouvertes|default(0) }} ouverte{{ 's' if action_stats.ouvertes|default(0) > 1 }}
-          · {{ action_stats.retard|default(0) }} en retard
-          · {{ action_stats.aujourd_hui|default(0) }} aujourd'hui
-          · {{ actions_a_revoir|length }} terminée{{ 's' if actions_a_revoir|length > 1 }} à revoir.
-        </div>
-      </div>
-      <div class="d-flex gap-2 flex-wrap">
-        <a href="{{ url_for('dashboard.nouvelle_action_chef') }}" class="btn btn-sm btn-outline-primary">
-          Nouvelle action
-        </a>
-        <a href="{{ url_for('dashboard.actions_chef') }}" class="btn btn-sm btn-primary">
-          Suivre les actions
-        </a>
-      </div>
-    </div>
-
-    {% if actions_a_revoir %}
-    <div class="mt-3 d-grid gap-2">
-      <div style="font-size:.76rem;font-weight:900;color:var(--wp-terracotta);">
-        <i class="bi bi-exclamation-octagon"></i> Terminées mais à revoir
-      </div>
-      {% for action in actions_a_revoir[:3] %}
-      <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap"
-           style="border:1px solid #eadfce;border-left:4px solid var(--wp-terracotta);border-radius:8px;padding:.7rem .8rem;background:#fff;">
-        <div style="min-width:0;flex:1;">
-          <strong style="color:var(--wp-ink);">{{ action.titre }}</strong>
-          <span style="font-size:.78rem;color:var(--wp-muted);display:block;margin-top:.15rem;">
-            {{ action.machine }} · {{ action.bilan_efficacite.detail }}
-          </span>
-          <span style="font-size:.74rem;color:var(--wp-muted);display:block;margin-top:.15rem;">
-            Avant : {{ action.bilan_efficacite.avant.minutes_fmt }} · Après : {{ action.bilan_efficacite.apres.minutes_fmt }}
-          </span>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <a href="{{ action.href }}" class="btn btn-sm btn-outline-danger">
-            <i class="bi bi-arrow-repeat"></i> Revoir
-          </a>
-          <a href="{{ action.href_nouvelle_action }}" class="btn btn-sm btn-outline-primary">
-            <i class="bi bi-plus-circle"></i> Nouvelle action
-          </a>
-          <a href="{{ action.href_analyse }}" class="btn btn-sm btn-primary">
-            <i class="bi bi-diagram-3"></i> Analyser les causes
-          </a>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    {% if actions_urgentes %}
-    <div class="mt-3 d-grid gap-2">
-      {% for action in actions_urgentes %}
-      <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap"
-           style="border:1px solid #eadfce;border-radius:8px;padding:.7rem .8rem;background:#fff;">
-        <div style="min-width:0;flex:1;">
-          <span class="badge bg-{{ action.signal_temporel.couleur }} me-1">
-            <i class="bi {{ action.signal_temporel.icon }}"></i> {{ action.signal_temporel.label }}
-          </span>
-          <strong style="color:var(--wp-ink);">{{ action.titre }}</strong>
-          <span style="font-size:.78rem;color:var(--wp-muted);display:block;margin-top:.15rem;">
-            {{ action.type_label }} · Responsable : {{ action.responsable }} · {{ action.signal_temporel.detail }}
-          </span>
-        </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <a href="{{ action.href }}" class="btn btn-sm btn-outline-primary">Voir</a>
-          {% if action.statut == 'a_faire' %}
-          <form method="POST" action="{{ url_for('dashboard.changer_statut_action_chef', action_id=action.id) }}">
-            {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
-            <input type="hidden" name="statut" value="en_cours">
-            <button class="btn btn-sm btn-outline-primary">
-              <i class="bi bi-play-circle"></i> Démarrer
-            </button>
-          </form>
-          {% endif %}
-          {% if action.statut in ['a_faire', 'en_cours'] %}
-          <form method="POST"
-                action="{{ url_for('dashboard.changer_statut_action_chef', action_id=action.id) }}"
-                onsubmit="return demanderResultatAction(this);">
-            {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
-            <input type="hidden" name="statut" value="fait">
-            <input type="hidden" name="note_resultat" value="">
-            <button class="btn btn-sm btn-success">
-              <i class="bi bi-check2-circle"></i> Fait
-            </button>
-          </form>
-          {% endif %}
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div class="mt-3" style="font-size:.82rem;color:var(--wp-muted);">
-      Aucune action en retard ou proche de l'échéance. Les actions sans délai restent visibles dans le suivi complet.
-    </div>
-    {% endif %}
-  </div>
-</div>
-
 {% if not postes %}
 <div class="wp-card p-4 text-center">
   <i class="bi bi-inbox fs-2 mb-2 d-block" style="color:var(--wp-muted);"></i>
@@ -259,336 +66,804 @@
 
 {% else %}
 
-{# ── P1-1 · Verdict global ── #}
-{% if statut_global %}
-<div class="mb-4" style="background:{{ statut_global.bg }};border:2px solid {{ statut_global.border }};border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
-  <i class="bi {{ statut_global.icon }}" style="font-size:1.6rem;color:{{ statut_global.color }};flex-shrink:0;"></i>
-  <div style="flex:1;min-width:0;">
-    <span style="font-weight:900;font-size:1.0rem;color:{{ statut_global.color }};">{{ statut_global.label }}</span>
-    <span style="color:var(--wp-muted);font-size:.85rem;margin-left:.65rem;">TRS {{ stats.trs_moyen }}% · {{ label_periode|lower }}</span>
-    {% if statut_global.detail %}
-    <span style="color:var(--wp-muted);font-size:.82rem;margin-left:.5rem;">· {{ statut_global.detail }}</span>
-    {% endif %}
-  </div>
-  {% if statut_global.code == 'rouge' %}
-  <a href="{{ url_for('dashboard.machines_chef') }}" class="btn btn-sm" style="background:var(--wp-terracotta);color:#fff;border:none;">
-    <i class="bi bi-tools"></i> Voir machines
-  </a>
-  {% elif statut_global.code == 'orange' %}
-  <a href="{{ url_for('dashboard.machines_chef') }}" class="btn btn-sm btn-outline-warning">
-    <i class="bi bi-tools"></i> Voir machines
-  </a>
-  {% endif %}
-</div>
-{% endif %}
+<div class="row g-4 align-items-start">
 
-{# ── HERO TRS ── #}
-<div class="wp-hero">
-  <div class="wp-hero-blob" style="width:300px;height:300px;top:-80px;right:-60px;"></div>
-  <div class="row g-0 align-items-center">
-    <div class="col-md-5">
-      <div class="wp-hero-label">Performance globale (TRS)</div>
-      <div class="wp-hero-num">{{ stats.trs_moyen }}<span style="font-size:2rem;">%</span></div>
-      <div class="wp-hero-pill">
-        {% if stats.couleur_trs == 'success' %}<i class="bi bi-check-circle-fill"></i> Objectif atteint
-        {% elif stats.couleur_trs == 'warning' %}<i class="bi bi-exclamation-circle"></i> À surveiller
-        {% else %}<i class="bi bi-x-circle"></i> Sous l'objectif{% endif %}
-      </div>
-      {% if regularite %}
-      <div class="mt-2" style="font-size:.74rem;opacity:.75;">
-        Régularité : {{ regularite.cv }}% CV — {{ regularite.label }} ({{ regularite.n }} postes)
-        {% if regularite.essence_note %} · présence Azobé/Iroko{% endif %}
-      </div>
-      {% endif %}
-    </div>
-    <div class="col-md-7">
-      <div class="row g-2">
-        <div class="col-6"><div class="wp-hero-stat">
-          <div class="wp-hero-stat-label">Production</div>
-          <div class="wp-hero-stat-val">{{ stats.total_produit }}<span style="font-size:.9rem;"> m³</span></div>
-        </div></div>
-        <div class="col-6"><div class="wp-hero-stat">
-          <div class="wp-hero-stat-label">Postes saisis</div>
-          <div class="wp-hero-stat-val">{{ stats.nb_postes }}</div>
-        </div></div>
-        <div class="col-6"><div class="wp-hero-stat">
-          <div class="wp-hero-stat-label">Arrêts</div>
-          <div class="wp-hero-stat-val">{{ stats.total_arrets_h }}<span style="font-size:.9rem;"> h</span></div>
-        </div></div>
-        <div class="col-6"><div class="wp-hero-stat">
-          <div class="wp-hero-stat-label">Déclassé</div>
-          <div class="wp-hero-stat-val">{{ stats.total_declass }}<span style="font-size:.9rem;"> m³</span></div>
-        </div></div>
-      </div>
-    </div>
-  </div>
-</div>
+  {# ════════════════════════════════════════════
+     COLONNE GAUCHE — Cockpit décisionnel (sticky)
+     ════════════════════════════════════════════ #}
+  <div class="col-12 col-lg-5">
+    <div style="position:sticky;top:16px;max-height:calc(100vh - 80px);overflow-y:auto;padding-bottom:1rem;">
 
-{# ── Manque à gagner estimé (P11 — P1-4 : remonté en altitude 2) ── #}
-{% if manque_periode and manque_periode.nb_postes > 0 %}
-<div class="wp-card mb-4">
-  <div class="wp-card-header">
-    <i class="bi bi-cash-coin" style="color:var(--wp-terracotta);"></i>
-    Manque à gagner estimé · {{ jours }} j
-    <span class="ms-auto" style="font-weight:400;color:var(--wp-muted);font-size:.78rem;">
-      Valeur potentielle − Valeur réelle valorisée
-    </span>
-  </div>
-  <div class="p-4">
-    <div class="row g-3 align-items-stretch">
-      <div class="col-md-4">
-        <div style="border-left:3px solid var(--wp-terracotta);padding-left:14px;">
-          <div class="wp-kpi-label">Manque à gagner estimé</div>
-          <div style="font-size:1.85rem;font-weight:800;color:var(--wp-terracotta);">
-            {{ "{:,.0f}".format(manque_periode.manque_a_gagner_estime).replace(",", " ") }}
-          </div>
-          <div class="wp-kpi-sub">FCFA · {{ manque_periode.nb_postes }} poste{{ 's' if manque_periode.nb_postes > 1 }}</div>
+      {# P1-1 · Verdict global #}
+      {% if statut_global %}
+      <div class="mb-3" style="background:{{ statut_global.bg }};border:2px solid {{ statut_global.border }};border-radius:12px;padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <i class="bi {{ statut_global.icon }}" style="font-size:1.5rem;color:{{ statut_global.color }};flex-shrink:0;"></i>
+        <div style="flex:1;min-width:0;">
+          <span style="font-weight:900;font-size:.95rem;color:{{ statut_global.color }};">{{ statut_global.label }}</span>
+          <span style="color:var(--wp-muted);font-size:.82rem;margin-left:.6rem;">TRS {{ stats.trs_moyen }}% · {{ label_periode|lower }}</span>
+          {% if statut_global.detail %}
+          <span style="color:var(--wp-muted);font-size:.78rem;margin-left:.4rem;">· {{ statut_global.detail }}</span>
+          {% endif %}
         </div>
-      </div>
-      <div class="col-md-4">
-        <div style="border-left:3px solid var(--wp-ink);padding-left:14px;">
-          <div class="wp-kpi-label">Valeur potentielle</div>
-          <div style="font-size:1.4rem;font-weight:700;color:var(--wp-ink);">
-            {{ "{:,.0f}".format(manque_periode.valeur_potentielle).replace(",", " ") }}
-          </div>
-          <div class="wp-kpi-sub">FCFA · objectif × prix moyen</div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div style="border-left:3px solid var(--wp-leaf);padding-left:14px;">
-          <div class="wp-kpi-label">Valeur réelle valorisée</div>
-          <div style="font-size:1.4rem;font-weight:700;color:var(--wp-leaf);">
-            {{ "{:,.0f}".format(manque_periode.valeur_reelle_valorisee).replace(",", " ") }}
-          </div>
-          <div class="wp-kpi-sub">FCFA · conforme + déclassé revendu</div>
-        </div>
-      </div>
-    </div>
-    <div class="mt-3" style="font-size:.72rem;color:var(--wp-muted);">
-      <i class="bi bi-info-circle"></i>
-      Estimation prudente — D/P/Q ci-dessous fournissent l'attribution causale.
-      <a href="{{ url_for('dashboard.pertes') }}" style="color:var(--wp-terracotta);">
-        Drill-down causes →
-      </a>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-{# ── P1-2 · Machine critique + Pareto top-1 ── #}
-{% if (machine_top and machine_top.duree >= 30) or pareto_chef %}
-<div class="wp-card mb-4" style="padding:16px 18px 14px;">
-  <div style="font-size:.72rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:var(--wp-muted);margin-bottom:12px;">
-    <i class="bi bi-tools"></i> Signaux critiques · 7 derniers jours
-  </div>
-  <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start;">
-    {% if machine_top and machine_top.duree >= 30 %}
-    <div style="flex:1;min-width:160px;">
-      <div style="font-size:.74rem;color:var(--wp-muted);margin-bottom:2px;">Machine critique</div>
-      <div style="font-weight:900;color:var(--wp-terracotta);font-size:.95rem;">{{ machine_top.machine }}</div>
-      <div style="font-size:.82rem;color:var(--wp-ink);">{{ machine_top.duree_fmt }} d'arrêts · {{ machine_top.count }} événement{{ 's' if machine_top.count > 1 }}</div>
-      {% if machine_top.disponibilite_pct is not none %}
-      <div style="font-size:.74rem;color:var(--wp-muted);margin-top:2px;">
-        Disponibilité : <strong style="color:{% if machine_top.disponibilite_pct >= 90 %}var(--wp-leaf){% elif machine_top.disponibilite_pct >= 75 %}var(--wp-ochre){% else %}var(--wp-terracotta){% endif %};">{{ machine_top.disponibilite_pct }}%</strong>
-        <span style="color:var(--wp-muted);">(7 j)</span>
-      </div>
-      {% endif %}
-      {% if machine_top.cause %}<div style="font-size:.74rem;color:var(--wp-muted);margin-top:2px;">Cause : {{ machine_top.cause }}</div>{% endif %}
-      <a href="{{ url_for('dashboard.machines_chef', jours=7) }}" class="btn btn-sm btn-outline-secondary mt-2" style="font-size:.72rem;">Détail machines →</a>
-    </div>
-    {% endif %}
-    {% if pareto_chef %}
-    {% set top = pareto_chef[0] %}
-    <div style="flex:1;min-width:200px;{% if machine_top and machine_top.duree >= 30 %}border-left:1px solid #e5e0d6;padding-left:20px;{% endif %}">
-      <div style="font-size:.74rem;color:var(--wp-muted);margin-bottom:2px;">Cause n°1 Pareto</div>
-      <div style="font-weight:900;color:var(--wp-ink);font-size:.95rem;">{{ top.cause or 'Non documentée' }}</div>
-      <div style="font-size:.82rem;color:var(--wp-muted);">{{ top.pct }}% du temps d'arrêt · {{ top.count }} arrêt{{ 's' if top.count > 1 }}</div>
-      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap;">
-        <a href="{{ url_for('problemes.nouveau') }}" class="btn btn-sm btn-primary" style="font-size:.72rem;">
-          <i class="bi bi-diagram-3"></i> Analyser (Ishikawa)
+        {% if statut_global.code == 'rouge' %}
+        <a href="{{ url_for('dashboard.machines_chef') }}" class="btn btn-sm" style="background:var(--wp-terracotta);color:#fff;border:none;flex-shrink:0;">
+          <i class="bi bi-tools"></i> Machines
         </a>
-        <a href="{{ url_for('analyse.arrets') }}" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;">Pareto complet →</a>
-      </div>
-    </div>
-    {% endif %}
-  </div>
-</div>
-{% endif %}
-
-{# ── P12 · Anomalies de saisie à revoir (alertes non bloquantes) ── #}
-{% if anomalies_periode and anomalies_periode.nb_postes_concernes > 0 %}
-<div class="wp-card mb-4"
-     style="border-left:4px solid var(--wp-ochre);background:#fffaf0;">
-  <div class="wp-card-header" style="color:var(--wp-ochre);">
-    <i class="bi bi-shield-exclamation"></i>
-    Saisies à revoir · {{ jours }} j
-    <span class="ms-auto" style="font-weight:400;color:var(--wp-muted);font-size:.78rem;">
-      Contrôles qualité — alertes non bloquantes
-    </span>
-  </div>
-  <div class="p-3 d-flex align-items-center gap-4 flex-wrap">
-    <div>
-      <div class="wp-kpi-label">Postes concernés</div>
-      <div style="font-size:1.55rem;font-weight:800;color:var(--wp-ochre);">
-        {{ anomalies_periode.nb_postes_concernes }}
-      </div>
-      <div class="wp-kpi-sub">sur {{ manque_periode.nb_postes if manque_periode else postes | length }} postes</div>
-    </div>
-    <div style="border-left:1px solid #e5e0d6;padding-left:20px;">
-      <div class="wp-kpi-label">Anomalies au total</div>
-      <div style="font-size:1.55rem;font-weight:700;color:var(--wp-ink);">
-        {{ anomalies_periode.nb_anomalies_total }}
-      </div>
-    </div>
-    <div style="border-left:1px solid #e5e0d6;padding-left:20px;flex:1 1 auto;">
-      <div class="wp-kpi-label" style="margin-bottom:6px;">Répartition par règle</div>
-      <div class="d-flex gap-2 flex-wrap" style="font-size:.78rem;">
-        {% set libelle = {'R1': 'TRS bas sans arrêt', 'R2': 'Arrêt sans commentaire',
-                         'R3': 'Déclassé excessif', 'R4': 'Production absente',
-                         'R5': 'Horaire arrêt invalide', 'R6': 'Chevauchement machine',
-                         'R7': 'Créneau essence invalide', 'R8': 'Chevauchement essence'} %}
-        {% for code, n in anomalies_periode.par_code.items() if n > 0 %}
-        <span class="wp-pill" style="background:#fff4e0;color:var(--wp-ochre);">
-          <strong>{{ code }}</strong> · {{ libelle.get(code, code) }} : {{ n }}
-        </span>
-        {% endfor %}
-      </div>
-    </div>
-    <div>
-      <a href="{{ url_for('saisie.historique') }}" class="btn btn-sm btn-outline-secondary">
-        <i class="bi bi-list-check"></i> Voir les postes
-      </a>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-{# ── Décomposition D×P×Q (causes probables) ── #}
-{% if decomposition %}
-<div class="wp-card mb-4">
-  <div class="wp-card-header">
-    <i class="bi bi-layers"></i> Causes probables — cascade D × P × Q (m³)
-    <span class="ms-auto" style="font-weight:400;">
-      Cap. {{ decomposition.cap_total }} m³ · {{ stats.nb_postes }} postes
-    </span>
-  </div>
-  <div class="p-4">
-    <div class="progress mb-3" style="height:26px;border-radius:8px;">
-      <div class="progress-bar" style="width:{{ decomposition.pct_produit }}%;background:var(--wp-leaf);"
-           title="Produit : {{ decomposition.vol_produit }} m³">
-        {% if decomposition.pct_produit > 8 %}{{ decomposition.pct_produit }}%{% endif %}
-      </div>
-      <div class="progress-bar" style="width:{{ decomposition.pct_d }}%;background:var(--wp-terracotta);"
-           title="Perte D : {{ decomposition.perte_d }} m³">
-        {% if decomposition.pct_d > 5 %}D {{ decomposition.pct_d }}%{% endif %}
-      </div>
-      <div class="progress-bar" style="width:{{ decomposition.pct_p }}%;background:var(--wp-ochre);"
-           title="Perte P : {{ decomposition.perte_p }} m³">
-        {% if decomposition.pct_p > 5 %}P {{ decomposition.pct_p }}%{% endif %}
-      </div>
-      <div class="progress-bar" style="width:{{ decomposition.pct_q }}%;background:var(--wp-sky);"
-           title="Perte Q : {{ decomposition.perte_q }} m³">
-        {% if decomposition.pct_q > 5 %}Q {{ decomposition.pct_q }}%{% endif %}
-      </div>
-    </div>
-    <div class="row g-3">
-      <div class="col-6 col-md-3">
-        <div style="border-left:3px solid var(--wp-leaf);padding-left:10px;">
-          <div class="wp-kpi-label">Produit conforme</div>
-          <div style="font-size:1.2rem;font-weight:800;color:var(--wp-leaf);">{{ decomposition.vol_produit }} m³</div>
-          <div class="wp-kpi-sub">{{ decomposition.pct_produit }}% de la capacité</div>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div style="border-left:3px solid var(--wp-terracotta);padding-left:10px;">
-          <div class="wp-kpi-label">Perte D · arrêts</div>
-          <div style="font-size:1.2rem;font-weight:800;color:var(--wp-terracotta);">{{ decomposition.perte_d }} m³</div>
-          <div class="wp-kpi-sub">{{ decomposition.pct_d }}%</div>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div style="border-left:3px solid var(--wp-ochre);padding-left:10px;">
-          <div class="wp-kpi-label">Perte P · sous-cadence</div>
-          <div style="font-size:1.2rem;font-weight:800;color:var(--wp-ochre);">{{ decomposition.perte_p }} m³</div>
-          <div class="wp-kpi-sub">{{ decomposition.pct_p }}%</div>
-        </div>
-      </div>
-      <div class="col-6 col-md-3">
-        <div style="border-left:3px solid var(--wp-sky);padding-left:10px;">
-          <div class="wp-kpi-label">Perte Q · déclassé/déchets</div>
-          <div style="font-size:1.2rem;font-weight:800;color:var(--wp-sky);">{{ decomposition.perte_q }} m³</div>
-          <div class="wp-kpi-sub">{{ decomposition.pct_q }}%</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-{% endif %}
-
-{# ── Calculateur gain FCFA ── #}
-{% if gain_potentiel %}
-<div class="wp-card mb-4"
-     id="card-gain-potentiel"
-     data-cap="{{ gain_potentiel.cap_total }}"
-     data-vol="{{ gain_potentiel.vol_actuel }}"
-     data-trs="{{ gain_potentiel.trs_actuel }}"
-     data-prix="{{ gain_potentiel.prix_moyen }}">
-  <div class="wp-card-header">
-    <i class="bi bi-graph-up-arrow" style="color:var(--wp-leaf);"></i> Simulateur de gain · projection à cible TRS
-    <span class="ms-auto" style="font-weight:400;">TRS actuel {{ gain_potentiel.trs_actuel }}%</span>
-  </div>
-  <div class="p-4">
-    <div class="mb-3">
-      <label class="form-label d-flex justify-content-between">
-        <span>Cible TRS :</span>
-        <strong id="cible-pct" style="color:var(--wp-emerald);">70%</strong>
-      </label>
-      <input type="range" class="form-range" id="slider-trs"
-             min="30" max="85" step="5" value="70"
-             oninput="recalculeGain(this.value)">
-      <div class="d-flex justify-content-between" style="font-size:.72rem;color:var(--wp-muted);">
-        <span>30%</span><span>50%</span><span>70%</span><span>85%</span>
-      </div>
-    </div>
-    <div class="row g-3">
-      <div class="col-md-4">
-        <div class="wp-kpi">
-          <div class="wp-kpi-label">Gain m³ projeté</div>
-          <div class="wp-kpi-value" id="gain-m3" style="color:var(--wp-leaf);">—</div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        <div class="wp-kpi">
-          <div class="wp-kpi-label">Équivalent jours</div>
-          <div class="wp-kpi-value" id="gain-jours" style="color:var(--wp-emerald);">—</div>
-        </div>
-      </div>
-      <div class="col-md-4">
-        {% if gain_potentiel.prix_moyen > 0 %}
-        <div class="wp-kpi">
-          <div class="wp-kpi-label">Gain FCFA projeté</div>
-          <div class="wp-kpi-value" id="gain-fcfa" style="color:var(--wp-ochre);font-size:1.4rem;">—</div>
-          <div class="wp-kpi-sub">Prix moy. {{ "{:,}".format(gain_potentiel.prix_moyen).replace(",", " ") }} FCFA/m³</div>
-        </div>
-        {% else %}
-        <div class="wp-kpi">
-          <div style="color:var(--wp-ochre);font-size:.82rem;">
-            <i class="bi bi-exclamation-triangle me-1"></i>
-            Prix non renseignés —
-            <a href="{{ url_for('admin.parametres') }}" style="color:var(--wp-ochre);">Configurer</a>
-          </div>
-        </div>
+        {% elif statut_global.code == 'orange' %}
+        <a href="{{ url_for('dashboard.machines_chef') }}" class="btn btn-sm btn-outline-warning" style="flex-shrink:0;">
+          <i class="bi bi-tools"></i> Machines
+        </a>
         {% endif %}
       </div>
-    </div>
-    <div id="msg-cible-atteinte" class="alert alert-info mt-3 mb-0 py-2 d-none">
-      <i class="bi bi-check-circle me-1"></i> Vous dépassez déjà cette cible.
+      {% endif %}
+
+      {# TRS compact + Matin/AM #}
+      <div class="wp-card mb-3">
+        <div class="p-3 d-flex align-items-center gap-3 flex-wrap">
+          <div style="text-align:center;min-width:76px;">
+            {% set c_trs = 'var(--wp-leaf)' if stats.trs_moyen >= 70 else ('var(--wp-ochre)' if stats.trs_moyen >= 50 else 'var(--wp-terracotta)') %}
+            <div style="font-size:2.2rem;font-weight:900;color:{{ c_trs }};line-height:1;">{{ stats.trs_moyen }}%</div>
+            <div style="font-size:.65rem;color:var(--wp-muted);margin-top:2px;text-transform:uppercase;letter-spacing:.06em;">TRS global</div>
+          </div>
+          <div style="flex:1;display:grid;grid-template-columns:1fr 1fr;gap:5px 10px;font-size:.78rem;">
+            <div><span style="color:var(--wp-muted);">Production</span><br><strong>{{ stats.total_produit }} m³</strong></div>
+            <div><span style="color:var(--wp-muted);">Arrêts</span><br><strong>{{ stats.total_arrets_h }} h</strong></div>
+            <div>
+              <span style="color:var(--wp-muted);">Matin</span><br>
+              <strong style="color:{% if stats.trs_matin >= 70 %}var(--wp-leaf){% elif stats.trs_matin >= 50 %}var(--wp-ochre){% else %}var(--wp-terracotta){% endif %};">{{ stats.trs_matin }}%</strong>
+            </div>
+            <div>
+              <span style="color:var(--wp-muted);">Après-midi</span><br>
+              <strong style="color:{% if stats.trs_apres_midi >= 70 %}var(--wp-leaf){% elif stats.trs_apres_midi >= 50 %}var(--wp-ochre){% else %}var(--wp-terracotta){% endif %};">{{ stats.trs_apres_midi }}%</strong>
+            </div>
+          </div>
+          {% if regularite %}
+          <div style="font-size:.68rem;color:var(--wp-muted);width:100%;">
+            Régularité {{ regularite.cv }}% CV — {{ regularite.label }} · {{ regularite.n }} postes
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# Manque à gagner compact #}
+      {% if manque_periode and manque_periode.nb_postes > 0 %}
+      <div class="wp-card mb-3" style="border-left:3px solid var(--wp-terracotta);">
+        <div class="p-3 d-flex align-items-center justify-content-between gap-2 flex-wrap">
+          <div>
+            <div style="font-size:.65rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:var(--wp-muted);">Manque à gagner · {{ jours }} j</div>
+            <div style="font-size:1.45rem;font-weight:800;color:var(--wp-terracotta);">
+              {{ "{:,.0f}".format(manque_periode.manque_a_gagner_estime).replace(",", " ") }} FCFA
+            </div>
+            <div style="font-size:.72rem;color:var(--wp-muted);">{{ manque_periode.nb_postes }} poste{{ 's' if manque_periode.nb_postes > 1 }} · <a href="{{ url_for('dashboard.pertes') }}" style="color:var(--wp-terracotta);">Détail D/P/Q →</a></div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {# Priorités du chef + Actions immédiates #}
+      {% include 'chef/_priorites_actions.html' %}
+
+      {# Alertes saisies + Signaux P2 #}
+      {% include 'chef/_alertes.html' %}
+      {% include 'chef/_signaux_p2.html' %}
+
+      {# P1-2 · Machine critique + Pareto top-1 #}
+      {% if (machine_top and machine_top.duree >= 30) or pareto_chef %}
+      <div class="wp-card mb-3" style="padding:14px 16px;">
+        <div style="font-size:.66rem;font-weight:900;text-transform:uppercase;letter-spacing:.08em;color:var(--wp-muted);margin-bottom:10px;">
+          <i class="bi bi-tools"></i> Signaux critiques · 7 derniers jours
+        </div>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;">
+          {% if machine_top and machine_top.duree >= 30 %}
+          <div style="flex:1;min-width:130px;">
+            <div style="font-size:.7rem;color:var(--wp-muted);margin-bottom:2px;">Machine critique</div>
+            <div style="font-weight:900;color:var(--wp-terracotta);font-size:.9rem;">{{ machine_top.machine }}</div>
+            <div style="font-size:.78rem;color:var(--wp-ink);">{{ machine_top.duree_fmt }} d'arrêts · {{ machine_top.count }} événement{{ 's' if machine_top.count > 1 }}</div>
+            {% if machine_top.disponibilite_pct is not none %}
+            <div style="font-size:.7rem;color:var(--wp-muted);margin-top:2px;">
+              Disponibilité :
+              <strong style="color:{% if machine_top.disponibilite_pct >= 90 %}var(--wp-leaf){% elif machine_top.disponibilite_pct >= 75 %}var(--wp-ochre){% else %}var(--wp-terracotta){% endif %};">{{ machine_top.disponibilite_pct }}%</strong>
+              (7 j)
+            </div>
+            {% endif %}
+            {% if machine_top.cause %}<div style="font-size:.7rem;color:var(--wp-muted);margin-top:2px;">Cause : {{ machine_top.cause }}</div>{% endif %}
+            <a href="{{ url_for('dashboard.machines_chef', jours=7) }}" class="btn btn-sm btn-outline-secondary mt-2" style="font-size:.7rem;">Détail →</a>
+          </div>
+          {% endif %}
+          {% if pareto_chef %}
+          {% set top = pareto_chef[0] %}
+          <div style="flex:1;min-width:160px;{% if machine_top and machine_top.duree >= 30 %}border-left:1px solid #e5e0d6;padding-left:16px;{% endif %}">
+            <div style="font-size:.7rem;color:var(--wp-muted);margin-bottom:2px;">Cause n°1 Pareto</div>
+            <div style="font-weight:900;color:var(--wp-ink);font-size:.9rem;">{{ top.cause or 'Non documentée' }}</div>
+            <div style="font-size:.78rem;color:var(--wp-muted);">{{ top.pct }}% du temps · {{ top.count }} arrêt{{ 's' if top.count > 1 }}</div>
+            <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;">
+              <a href="{{ url_for('problemes.nouveau') }}" class="btn btn-sm btn-primary" style="font-size:.7rem;">
+                <i class="bi bi-diagram-3"></i> Analyser
+              </a>
+              <a href="{{ url_for('analyse.arrets') }}" class="btn btn-sm btn-outline-secondary" style="font-size:.7rem;">Pareto →</a>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      {# Lien fiches à traiter #}
+      <a href="{{ url_for('dashboard.fiches_chef', statut='a_verifier') }}"
+         class="btn btn-sm btn-outline-primary w-100 mb-1">
+        <i class="bi bi-clipboard-check"></i> Fiches à traiter
+      </a>
+
     </div>
   </div>
-</div>
+
+  {# ════════════════════════════════════════════
+     COLONNE DROITE — Accordéons détail
+     ════════════════════════════════════════════ #}
+  <div class="col-12 col-lg-7">
+
+    {# ── Accordéon 1 : Aujourd'hui (KPIs + Postes) — ouvert par défaut ── #}
+    <div class="wp-card mb-3" style="overflow:hidden;">
+      <button class="w-100 d-flex align-items-center gap-2 p-3"
+              type="button" data-bs-toggle="collapse" data-bs-target="#acc-aujourdhui"
+              aria-expanded="true"
+              style="background:transparent;border:none;text-align:left;cursor:pointer;font-weight:900;color:var(--wp-ink);">
+        <i class="bi bi-speedometer2" style="color:var(--wp-emerald);flex-shrink:0;"></i>
+        <span style="flex:1;">Aujourd'hui — Objectifs & Postes</span>
+        {% if kpi_jour and not kpi_jour.vide|default(false) %}
+        <span class="badge bg-secondary" style="font-size:.68rem;font-weight:400;">{{ kpi_jour.objectif.realise|default('—') }} m³</span>
+        {% endif %}
+        <i class="bi bi-chevron-down ms-2 acc-chevron" style="transition:transform .2s;flex-shrink:0;"></i>
+      </button>
+      <div id="acc-aujourdhui" class="collapse show">
+        <div class="px-3 pb-3">
+          {% include 'chef/_aujourdhui.html' %}
+        </div>
+      </div>
+    </div>
+
+    {# ── Accordéon 2 : Performance & Analyse ── #}
+    <div class="wp-card mb-3" style="overflow:hidden;">
+      <button class="w-100 d-flex align-items-center gap-2 p-3"
+              type="button" data-bs-toggle="collapse" data-bs-target="#acc-analyse"
+              aria-expanded="false"
+              style="background:transparent;border:none;text-align:left;cursor:pointer;font-weight:900;color:var(--wp-ink);">
+        <i class="bi bi-graph-up" style="color:var(--wp-sky);flex-shrink:0;"></i>
+        <span style="flex:1;">Performance & Analyse</span>
+        <i class="bi bi-chevron-right ms-2 acc-chevron" style="transition:transform .2s;flex-shrink:0;"></i>
+      </button>
+      <div id="acc-analyse" class="collapse">
+        <div class="px-3 pb-3">
+
+          {# D×P×Q #}
+          {% if decomposition %}
+          <div class="wp-card mb-3">
+            <div class="wp-card-header">
+              <i class="bi bi-layers"></i> Causes probables — cascade D × P × Q (m³)
+              <span class="ms-auto" style="font-weight:400;">Cap. {{ decomposition.cap_total }} m³ · {{ stats.nb_postes }} postes</span>
+            </div>
+            <div class="p-4">
+              <div class="progress mb-3" style="height:26px;border-radius:8px;">
+                <div class="progress-bar" style="width:{{ decomposition.pct_produit }}%;background:var(--wp-leaf);"
+                     title="Produit : {{ decomposition.vol_produit }} m³">
+                  {% if decomposition.pct_produit > 8 %}{{ decomposition.pct_produit }}%{% endif %}
+                </div>
+                <div class="progress-bar" style="width:{{ decomposition.pct_d }}%;background:var(--wp-terracotta);"
+                     title="Perte D : {{ decomposition.perte_d }} m³">
+                  {% if decomposition.pct_d > 5 %}D {{ decomposition.pct_d }}%{% endif %}
+                </div>
+                <div class="progress-bar" style="width:{{ decomposition.pct_p }}%;background:var(--wp-ochre);"
+                     title="Perte P : {{ decomposition.perte_p }} m³">
+                  {% if decomposition.pct_p > 5 %}P {{ decomposition.pct_p }}%{% endif %}
+                </div>
+                <div class="progress-bar" style="width:{{ decomposition.pct_q }}%;background:var(--wp-sky);"
+                     title="Perte Q : {{ decomposition.perte_q }} m³">
+                  {% if decomposition.pct_q > 5 %}Q {{ decomposition.pct_q }}%{% endif %}
+                </div>
+              </div>
+              <div class="row g-3">
+                <div class="col-6 col-md-3">
+                  <div style="border-left:3px solid var(--wp-leaf);padding-left:10px;">
+                    <div class="wp-kpi-label">Produit conforme</div>
+                    <div style="font-size:1.2rem;font-weight:800;color:var(--wp-leaf);">{{ decomposition.vol_produit }} m³</div>
+                    <div class="wp-kpi-sub">{{ decomposition.pct_produit }}% de la capacité</div>
+                  </div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div style="border-left:3px solid var(--wp-terracotta);padding-left:10px;">
+                    <div class="wp-kpi-label">Perte D · arrêts</div>
+                    <div style="font-size:1.2rem;font-weight:800;color:var(--wp-terracotta);">{{ decomposition.perte_d }} m³</div>
+                    <div class="wp-kpi-sub">{{ decomposition.pct_d }}%</div>
+                  </div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div style="border-left:3px solid var(--wp-ochre);padding-left:10px;">
+                    <div class="wp-kpi-label">Perte P · sous-cadence</div>
+                    <div style="font-size:1.2rem;font-weight:800;color:var(--wp-ochre);">{{ decomposition.perte_p }} m³</div>
+                    <div class="wp-kpi-sub">{{ decomposition.pct_p }}%</div>
+                  </div>
+                </div>
+                <div class="col-6 col-md-3">
+                  <div style="border-left:3px solid var(--wp-sky);padding-left:10px;">
+                    <div class="wp-kpi-label">Perte Q · déclassé/déchets</div>
+                    <div style="font-size:1.2rem;font-weight:800;color:var(--wp-sky);">{{ decomposition.perte_q }} m³</div>
+                    <div class="wp-kpi-sub">{{ decomposition.pct_q }}%</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          {# Manque à gagner détail #}
+          {% if manque_periode and manque_periode.nb_postes > 0 %}
+          <div class="wp-card mb-3">
+            <div class="wp-card-header">
+              <i class="bi bi-cash-coin" style="color:var(--wp-terracotta);"></i>
+              Manque à gagner détaillé · {{ jours }} j
+              <span class="ms-auto" style="font-weight:400;color:var(--wp-muted);font-size:.78rem;">Valeur potentielle − Valeur réelle valorisée</span>
+            </div>
+            <div class="p-4">
+              <div class="row g-3 align-items-stretch">
+                <div class="col-md-4">
+                  <div style="border-left:3px solid var(--wp-terracotta);padding-left:14px;">
+                    <div class="wp-kpi-label">Manque à gagner estimé</div>
+                    <div style="font-size:1.85rem;font-weight:800;color:var(--wp-terracotta);">
+                      {{ "{:,.0f}".format(manque_periode.manque_a_gagner_estime).replace(",", " ") }}
+                    </div>
+                    <div class="wp-kpi-sub">FCFA · {{ manque_periode.nb_postes }} poste{{ 's' if manque_periode.nb_postes > 1 }}</div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div style="border-left:3px solid var(--wp-ink);padding-left:14px;">
+                    <div class="wp-kpi-label">Valeur potentielle</div>
+                    <div style="font-size:1.4rem;font-weight:700;color:var(--wp-ink);">{{ "{:,.0f}".format(manque_periode.valeur_potentielle).replace(",", " ") }}</div>
+                    <div class="wp-kpi-sub">FCFA · objectif × prix moyen</div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div style="border-left:3px solid var(--wp-leaf);padding-left:14px;">
+                    <div class="wp-kpi-label">Valeur réelle valorisée</div>
+                    <div style="font-size:1.4rem;font-weight:700;color:var(--wp-leaf);">{{ "{:,.0f}".format(manque_periode.valeur_reelle_valorisee).replace(",", " ") }}</div>
+                    <div class="wp-kpi-sub">FCFA · conforme + déclassé revendu</div>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-3" style="font-size:.72rem;color:var(--wp-muted);">
+                <i class="bi bi-info-circle"></i>
+                Estimation prudente — D/P/Q ci-dessus fournissent l'attribution causale.
+                <a href="{{ url_for('dashboard.pertes') }}" style="color:var(--wp-terracotta);">Drill-down causes →</a>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          {# Scorecard semaine #}
+          {% if scorecard %}
+          <div class="wp-card mb-3">
+            <div class="wp-card-header">
+              <i class="bi bi-calendar-week"></i> Scorecard semaine
+              <span class="ms-auto" style="font-weight:400;">{{ scorecard.week_label }}</span>
+            </div>
+            <div class="table-responsive">
+              <table class="wp-table">
+                <thead>
+                  <tr>
+                    <th style="min-width:100px;">Poste</th>
+                    {% for d in scorecard.days %}
+                    <th class="text-center {% if d.is_today %}text-primary{% endif %}" style="min-width:72px;">
+                      {{ d.label_court }}<br>
+                      <span style="font-size:.65rem;font-weight:400;color:var(--wp-muted);">{{ d.label_complet }}</span>
+                    </th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for shift in scorecard.shifts %}
+                  <tr>
+                    <td style="font-weight:700;">{{ shift }}</td>
+                    {% for d in scorecard.days %}
+                    {% set cell = d.shifts[shift] %}
+                    {% if cell.state == 'submitted' %}
+                    <td class="text-center">
+                      <span class="wp-pill
+                        {% if cell.couleur == 'success' %}wp-pill-success
+                        {% elif cell.couleur == 'warning' %}wp-pill-warning
+                        {% else %}wp-pill-danger{% endif %}">
+                        {{ cell.display }}
+                      </span>
+                    </td>
+                    {% elif cell.state == 'brouillon' %}
+                    <td class="text-center"><span class="wp-pill wp-pill-warning">⏳</span></td>
+                    {% elif cell.state == 'a_verifier' %}
+                    <td class="text-center"><span class="wp-pill wp-pill-info">À vérif.</span></td>
+                    {% elif cell.state == 'a_corriger' %}
+                    <td class="text-center"><span class="wp-pill wp-pill-warning">Corr.</span></td>
+                    {% else %}
+                    <td class="text-center" style="color:var(--wp-muted);">—</td>
+                    {% endif %}
+                    {% endfor %}
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            <div class="px-4 py-2 d-flex flex-wrap gap-3" style="font-size:.72rem;color:var(--wp-muted);border-top:1px solid var(--wp-line);">
+              <span><span class="wp-pill wp-pill-success">70%</span> ≥70%</span>
+              <span><span class="wp-pill wp-pill-warning">55%</span> 50–69%</span>
+              <span><span class="wp-pill wp-pill-danger">42%</span> &lt;50%</span>
+              <span><span class="wp-pill wp-pill-warning">⏳</span> Brouillon</span>
+              <span><span class="wp-pill wp-pill-info">À vérif.</span> Non compté</span>
+              <span><span class="wp-pill wp-pill-warning">Corr.</span> À corriger</span>
+            </div>
+          </div>
+          {% endif %}
+
+          {# Graphiques TRS + Matin vs AM #}
+          <div class="row g-3 mb-3">
+            <div class="col-md-8">
+              <div class="wp-card h-100">
+                <div class="wp-card-header"><i class="bi bi-graph-up"></i> Évolution du TRS ({{ jours }} j)</div>
+                <div class="p-4"><canvas id="chartTRS" height="120"></canvas></div>
+              </div>
+            </div>
+            <div class="col-md-4">
+              <div class="wp-card h-100">
+                <div class="wp-card-header"><i class="bi bi-sun"></i> Matin vs Après-midi</div>
+                <div class="p-4 d-flex flex-column justify-content-center gap-4">
+                  <div>
+                    <div class="wp-kpi-label">Matin</div>
+                    {% set c_m = 'var(--wp-leaf)' if stats.trs_matin >= 70 else ('var(--wp-ochre)' if stats.trs_matin >= 50 else 'var(--wp-terracotta)') %}
+                    <div class="wp-kpi-value" style="color:{{ c_m }};">{{ stats.trs_matin }}%</div>
+                  </div>
+                  <div>
+                    <div class="wp-kpi-label">Après-midi</div>
+                    {% set c_am = 'var(--wp-leaf)' if stats.trs_apres_midi >= 70 else ('var(--wp-ochre)' if stats.trs_apres_midi >= 50 else 'var(--wp-terracotta)') %}
+                    <div class="wp-kpi-value" style="color:{{ c_am }};">{{ stats.trs_apres_midi }}%</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {# TRS + volume par essence + Matrice criticité #}
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <div class="wp-card h-100">
+                <div class="wp-card-header">
+                  <i class="bi bi-tree"></i> TRS et volume par essence
+                  <a href="{{ url_for('dashboard.pertes') }}" class="btn btn-sm ms-auto"
+                     style="background:rgba(216,113,73,.1);color:var(--wp-terracotta);font-size:.75rem;padding:3px 10px;">
+                    <i class="bi bi-cash-coin"></i> Manque à gagner
+                  </a>
+                </div>
+                <table class="wp-table">
+                  <thead>
+                    <tr>
+                      <th>Essence</th>
+                      <th>Volume</th>
+                      <th>Temps</th>
+                      <th>Arrêts</th>
+                      <th>TRS moy.</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for e in stats.essence_stats %}
+                    <tr>
+                      <td><span class="wp-essence"><span class="wp-essence-mark"><i class="bi bi-tree"></i></span>{{ e.essence }}</span></td>
+                      <td>{{ e.volume_total }} m³</td>
+                      <td>
+                        {% if e.mode == 'temporalise' %}
+                          {{ (e.temps_planifie // 60)|int }}h{{ '%02d'|format(e.temps_planifie % 60) }}
+                        {% else %}
+                          <span style="color:var(--wp-muted);">—</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% if e.mode == 'temporalise' %}
+                          {{ (e.duree_arrets // 60)|int }}h{{ '%02d'|format(e.duree_arrets % 60) }}
+                        {% else %}
+                          <span style="color:var(--wp-muted);">poste</span>
+                        {% endif %}
+                      </td>
+                      <td>
+                        {% set ce = 'var(--wp-leaf)' if e.trs_moyen >= 70 else ('var(--wp-ochre)' if e.trs_moyen >= 50 else 'var(--wp-terracotta)') %}
+                        <strong style="color:{{ ce }};">{{ e.trs_moyen }}%</strong>
+                        {% if e.mode == 'temporalise' %}
+                          <div style="font-size:.68rem;color:var(--wp-muted);">D {{ e.disponibilite }} · P {{ e.performance }} · Q {{ e.qualite }}</div>
+                        {% else %}
+                          <div style="font-size:.68rem;color:var(--wp-muted);">ancien calcul</div>
+                        {% endif %}
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <div class="wp-card h-100">
+                <div class="wp-card-header"><i class="bi bi-grid-3x3-gap" style="color:var(--wp-terracotta);"></i> Matrice criticité arrêts</div>
+                <div class="table-responsive" style="max-height:280px;overflow-y:auto;">
+                  <table class="wp-table" style="font-size:.75rem;">
+                    <thead>
+                      <tr>
+                        <th>Machine</th>
+                        {% for cat in categories %}<th class="text-center" style="font-size:.6rem;">{{ cat[:8] }}</th>{% endfor %}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {% for machine in machines %}
+                      <tr>
+                        <td style="font-weight:600;white-space:nowrap;">{{ machine }}</td>
+                        {% for cat in categories %}
+                        {% set cell = matrice[machine][cat] %}
+                        <td class="text-center {{ cell.couleur }}">
+                          {% if cell.duree == 0 %}<span style="color:var(--wp-muted);">—</span>
+                          {% else %}
+                            <div>{{ cell.duree_fmt }}</div>
+                            <span style="font-size:.65rem;color:var(--wp-muted);">×{{ cell.count }}</span>
+                          {% endif %}
+                        </td>
+                        {% endfor %}
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+                <div class="px-3 py-2 d-flex gap-3" style="font-size:.7rem;color:var(--wp-muted);border-top:1px solid var(--wp-line);">
+                  <span><span class="wp-pill wp-pill-danger">&nbsp;&nbsp;</span> &gt;120 min</span>
+                  <span><span class="wp-pill wp-pill-warning">&nbsp;&nbsp;</span> 30–120 min</span>
+                  <span><span class="wp-pill wp-pill-success">&nbsp;&nbsp;</span> &lt;30 min</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {# Simulateur de gain FCFA #}
+          {% if gain_potentiel %}
+          <div class="wp-card"
+               id="card-gain-potentiel"
+               data-cap="{{ gain_potentiel.cap_total }}"
+               data-vol="{{ gain_potentiel.vol_actuel }}"
+               data-trs="{{ gain_potentiel.trs_actuel }}"
+               data-prix="{{ gain_potentiel.prix_moyen }}">
+            <div class="wp-card-header">
+              <i class="bi bi-graph-up-arrow" style="color:var(--wp-leaf);"></i> Simulateur de gain · projection à cible TRS
+              <span class="ms-auto" style="font-weight:400;">TRS actuel {{ gain_potentiel.trs_actuel }}%</span>
+            </div>
+            <div class="p-4">
+              <div class="mb-3">
+                <label class="form-label d-flex justify-content-between">
+                  <span>Cible TRS :</span>
+                  <strong id="cible-pct" style="color:var(--wp-emerald);">70%</strong>
+                </label>
+                <input type="range" class="form-range" id="slider-trs"
+                       min="30" max="85" step="5" value="70"
+                       oninput="recalculeGain(this.value)">
+                <div class="d-flex justify-content-between" style="font-size:.72rem;color:var(--wp-muted);">
+                  <span>30%</span><span>50%</span><span>70%</span><span>85%</span>
+                </div>
+              </div>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <div class="wp-kpi">
+                    <div class="wp-kpi-label">Gain m³ projeté</div>
+                    <div class="wp-kpi-value" id="gain-m3" style="color:var(--wp-leaf);">—</div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  <div class="wp-kpi">
+                    <div class="wp-kpi-label">Équivalent jours</div>
+                    <div class="wp-kpi-value" id="gain-jours" style="color:var(--wp-emerald);">—</div>
+                  </div>
+                </div>
+                <div class="col-md-4">
+                  {% if gain_potentiel.prix_moyen > 0 %}
+                  <div class="wp-kpi">
+                    <div class="wp-kpi-label">Gain FCFA projeté</div>
+                    <div class="wp-kpi-value" id="gain-fcfa" style="color:var(--wp-ochre);font-size:1.4rem;">—</div>
+                    <div class="wp-kpi-sub">Prix moy. {{ "{:,}".format(gain_potentiel.prix_moyen).replace(",", " ") }} FCFA/m³</div>
+                  </div>
+                  {% else %}
+                  <div class="wp-kpi">
+                    <div style="color:var(--wp-ochre);font-size:.82rem;">
+                      <i class="bi bi-exclamation-triangle me-1"></i>
+                      Prix non renseignés — <a href="{{ url_for('admin.parametres') }}" style="color:var(--wp-ochre);">Configurer</a>
+                    </div>
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+              <div id="msg-cible-atteinte" class="alert alert-info mt-3 mb-0 py-2 d-none">
+                <i class="bi bi-check-circle me-1"></i> Vous dépassez déjà cette cible.
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+    </div>
+
+    {# ── Accordéon 3 : Boucle d'amélioration (Lean + Actions fusionnés + Recommandations) ── #}
+    {% set _sac = stats_actions_chef|default({}) %}
+    {% set actions_urgentes = actions_chef_urgentes|default([]) %}
+    {% set actions_a_revoir = actions_chef_a_revoir|default([]) %}
+    {% set _nb_alerte = _sac.retard|default(0) + actions_a_revoir|length %}
+    <div class="wp-card mb-3" style="overflow:hidden;">
+      <button class="w-100 d-flex align-items-center gap-2 p-3"
+              type="button" data-bs-toggle="collapse" data-bs-target="#acc-amelioration"
+              aria-expanded="false"
+              style="background:transparent;border:none;text-align:left;cursor:pointer;font-weight:900;color:var(--wp-ink);">
+        <i class="bi bi-arrow-repeat" style="color:var(--wp-emerald);flex-shrink:0;"></i>
+        <span style="flex:1;">Boucle d'amélioration</span>
+        {% if _nb_alerte > 0 %}
+        <span class="badge bg-danger" style="font-size:.68rem;">{{ _nb_alerte }}</span>
+        {% endif %}
+        <i class="bi bi-chevron-right ms-2 acc-chevron" style="transition:transform .2s;flex-shrink:0;"></i>
+      </button>
+      <div id="acc-amelioration" class="collapse">
+        <div class="px-3 pb-3">
+
+          {# Boucle Lean + Actions (fusionnés) #}
+          <div class="wp-card mb-3" style="border-left:4px solid {% if _nb_alerte > 0 %}var(--wp-terracotta){% else %}var(--wp-emerald){% endif %};">
+            <div class="p-3">
+              <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap">
+                <div>
+                  <div style="font-weight:900;color:var(--wp-ink);">
+                    <i class="bi bi-arrow-repeat" style="color:var(--wp-emerald);"></i>
+                    Cycle d'amélioration continue
+                  </div>
+                  <div style="font-size:.82rem;color:var(--wp-muted);margin-top:2px;">
+                    {{ nb_problemes_ouverts|default(0) }} problème{{ 's' if nb_problemes_ouverts|default(0) > 1 }} ouvert{{ 's' if nb_problemes_ouverts|default(0) > 1 }}
+                    · {{ _sac.en_cours|default(0) }} action{{ 's' if _sac.en_cours|default(0) > 1 }} en cours
+                    · {{ _sac.fait|default(0) }} terminée{{ 's' if _sac.fait|default(0) > 1 }}
+                    {% if _sac.retard|default(0) > 0 %}
+                    · <strong style="color:var(--wp-terracotta);">{{ _sac.retard }} en retard</strong>
+                    {% endif %}
+                  </div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                  <a href="{{ url_for('problemes.liste') }}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-diagram-3"></i> Analyses
+                  </a>
+                  <a href="{{ url_for('dashboard.nouvelle_action_chef') }}" class="btn btn-sm btn-outline-primary">
+                    Nouvelle action
+                  </a>
+                  <a href="{{ url_for('dashboard.actions_chef') }}" class="btn btn-sm btn-primary">
+                    Suivre les actions
+                  </a>
+                </div>
+              </div>
+
+              {% if actions_a_revoir %}
+              <div class="mt-3 d-grid gap-2">
+                <div style="font-size:.76rem;font-weight:900;color:var(--wp-terracotta);">
+                  <i class="bi bi-exclamation-octagon"></i> Terminées mais à revoir
+                </div>
+                {% for action in actions_a_revoir[:3] %}
+                <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap"
+                     style="border:1px solid #eadfce;border-left:4px solid var(--wp-terracotta);border-radius:8px;padding:.7rem .8rem;background:#fff;">
+                  <div style="min-width:0;flex:1;">
+                    <strong style="color:var(--wp-ink);">{{ action.titre }}</strong>
+                    <span style="font-size:.78rem;color:var(--wp-muted);display:block;margin-top:.15rem;">
+                      {{ action.machine }} · {{ action.bilan_efficacite.detail }}
+                    </span>
+                    <span style="font-size:.74rem;color:var(--wp-muted);display:block;margin-top:.15rem;">
+                      Avant : {{ action.bilan_efficacite.avant.minutes_fmt }} · Après : {{ action.bilan_efficacite.apres.minutes_fmt }}
+                    </span>
+                  </div>
+                  <div class="d-flex gap-2 flex-wrap">
+                    <a href="{{ action.href }}" class="btn btn-sm btn-outline-danger"><i class="bi bi-arrow-repeat"></i> Revoir</a>
+                    <a href="{{ action.href_nouvelle_action }}" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus-circle"></i> Nouvelle action</a>
+                    <a href="{{ action.href_analyse }}" class="btn btn-sm btn-primary"><i class="bi bi-diagram-3"></i> Analyser</a>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+
+              {% if actions_urgentes %}
+              <div class="mt-3 d-grid gap-2">
+                {% for action in actions_urgentes %}
+                <div class="d-flex justify-content-between align-items-center gap-3 flex-wrap"
+                     style="border:1px solid #eadfce;border-radius:8px;padding:.7rem .8rem;background:#fff;">
+                  <div style="min-width:0;flex:1;">
+                    <span class="badge bg-{{ action.signal_temporel.couleur }} me-1">
+                      <i class="bi {{ action.signal_temporel.icon }}"></i> {{ action.signal_temporel.label }}
+                    </span>
+                    <strong style="color:var(--wp-ink);">{{ action.titre }}</strong>
+                    <span style="font-size:.78rem;color:var(--wp-muted);display:block;margin-top:.15rem;">
+                      {{ action.type_label }} · Responsable : {{ action.responsable }} · {{ action.signal_temporel.detail }}
+                    </span>
+                  </div>
+                  <div class="d-flex gap-2 flex-wrap">
+                    <a href="{{ action.href }}" class="btn btn-sm btn-outline-primary">Voir</a>
+                    {% if action.statut == 'a_faire' %}
+                    <form method="POST" action="{{ url_for('dashboard.changer_statut_action_chef', action_id=action.id) }}">
+                      {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                      <input type="hidden" name="statut" value="en_cours">
+                      <button class="btn btn-sm btn-outline-primary"><i class="bi bi-play-circle"></i> Démarrer</button>
+                    </form>
+                    {% endif %}
+                    {% if action.statut in ['a_faire', 'en_cours'] %}
+                    <form method="POST"
+                          action="{{ url_for('dashboard.changer_statut_action_chef', action_id=action.id) }}"
+                          onsubmit="return demanderResultatAction(this);">
+                      {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+                      <input type="hidden" name="statut" value="fait">
+                      <input type="hidden" name="note_resultat" value="">
+                      <button class="btn btn-sm btn-success"><i class="bi bi-check2-circle"></i> Fait</button>
+                    </form>
+                    {% endif %}
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              {% else %}
+              <div class="mt-3" style="font-size:.82rem;color:var(--wp-muted);">
+                Aucune action en retard ou proche de l'échéance.
+              </div>
+              {% endif %}
+
+            </div>
+          </div>
+
+          {# Recommandations #}
+          {% if top_recos %}
+          <div class="wp-card" style="border-left:4px solid var(--wp-ochre);">
+            <div class="wp-card-header" style="background:#fffaf0;">
+              <i class="bi bi-lightbulb-fill" style="color:var(--wp-ochre);"></i>
+              Recommandations prioritaires
+              <span class="wp-pill wp-pill-neutral ms-2" style="font-size:.65rem;">{{ top_recos|length }} action{{ 's' if top_recos|length > 1 }}</span>
+              <a href="{{ url_for('recommandations.index') }}" class="btn btn-sm btn-outline-secondary ms-auto" style="font-size:.72rem;">
+                Voir tout <i class="bi bi-arrow-right"></i>
+              </a>
+            </div>
+            <div class="p-3">
+              {% for reco in top_recos %}
+              {% set prio_label = 'Haute' if reco.priorite == 3 else ('Moyenne' if reco.priorite == 2 else 'Basse') %}
+              {% set prio_class = 'wp-reco-prio-haute' if reco.priorite == 3 else ('wp-reco-prio-moyenne' if reco.priorite == 2 else 'wp-reco-prio-basse') %}
+              <div class="d-flex align-items-start gap-3 {% if not loop.last %}mb-3 pb-3{% endif %}"
+                   style="{% if not loop.last %}border-bottom:1px solid #f0ebe2;{% endif %}">
+                <div class="wp-reco-top-num">{{ loop.index }}</div>
+                <div style="flex:1;">
+                  <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                    <i class="bi {{ reco.icone }}" style="color:var(--wp-ochre);"></i>
+                    <span style="font-weight:600;font-size:.88rem;color:var(--wp-ink);">{{ reco.titre }}</span>
+                    <span class="wp-pill {{ prio_class }}">{{ prio_label }}</span>
+                  </div>
+                  <div style="font-size:.78rem;color:var(--wp-muted);">{{ reco.solutions[0].titre }}</div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+    </div>
+
+    {# ── Accordéon 4 : Saisies & Traçabilité ── #}
+    {% set _nb_non_compta = tracabilite.non_comptabilisees|default(0) if tracabilite else 0 %}
+    {% set _nb_anomalies = anomalies_periode.nb_postes_concernes|default(0) if anomalies_periode else 0 %}
+    <div class="wp-card mb-3" style="overflow:hidden;">
+      <button class="w-100 d-flex align-items-center gap-2 p-3"
+              type="button" data-bs-toggle="collapse" data-bs-target="#acc-saisies"
+              aria-expanded="false"
+              style="background:transparent;border:none;text-align:left;cursor:pointer;font-weight:900;color:var(--wp-ink);">
+        <i class="bi bi-funnel" style="color:var(--wp-muted);flex-shrink:0;"></i>
+        <span style="flex:1;">Saisies & Traçabilité</span>
+        {% if _nb_non_compta > 0 or _nb_anomalies > 0 %}
+        <span class="badge bg-warning text-dark" style="font-size:.68rem;">{{ _nb_non_compta + _nb_anomalies }}</span>
+        {% endif %}
+        <i class="bi bi-chevron-right ms-2 acc-chevron" style="transition:transform .2s;flex-shrink:0;"></i>
+      </button>
+      <div id="acc-saisies" class="collapse">
+        <div class="px-3 pb-3">
+
+          {# Traçabilité fiches #}
+          {% if tracabilite %}
+          {% set tr = tracabilite %}
+          <div class="wp-card mb-3">
+            <div class="p-3" style="font-size:.85rem;">
+              <div style="font-weight:700;color:var(--wp-ink);margin-bottom:.4rem;">
+                <i class="bi bi-funnel" style="color:var(--wp-leaf);"></i>
+                Fiches comptabilisées · {{ label_periode|lower }}
+              </div>
+              <div style="color:var(--wp-muted);">
+                <strong style="color:var(--wp-ink);">{{ tr.comptabilisees }}</strong>
+                fiche{{ 's' if tr.comptabilisees > 1 }} validée{{ 's' if tr.comptabilisees > 1 }} comptabilisée{{ 's' if tr.comptabilisees > 1 }}
+                {% if tr.non_comptabilisees > 0 %}
+                · <strong style="color:var(--wp-terracotta);">{{ tr.non_comptabilisees }}</strong> non prise{{ 's' if tr.non_comptabilisees > 1 }} en compte
+                (
+                {%- set parts = [] -%}
+                {%- if tr.a_verifier %}{% set _ = parts.append(('à vérifier', tr.a_verifier, 'a_verifier')) %}{% endif -%}
+                {%- if tr.a_corriger %}{% set _ = parts.append(('à corriger', tr.a_corriger, 'a_corriger')) %}{% endif -%}
+                {%- if tr.brouillon %}{% set _ = parts.append(('brouillon', tr.brouillon, 'brouillon')) %}{% endif -%}
+                {%- for libelle, n, statut in parts -%}
+                  <a href="{{ url_for('dashboard.fiches_chef', statut=statut) }}" style="color:var(--wp-terracotta);text-decoration:underline;">{{ n }} {{ libelle }}</a>{% if not loop.last %} · {% endif %}
+                {%- endfor -%}
+                )
+                {% endif %}
+                {% if tr.maj %}
+                · <i class="bi bi-clock-history"></i> dernière mise à jour {{ tr.maj }}
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+          {# Anomalies de saisie #}
+          {% if anomalies_periode and anomalies_periode.nb_postes_concernes > 0 %}
+          <div class="wp-card" style="border-left:4px solid var(--wp-ochre);background:#fffaf0;">
+            <div class="wp-card-header" style="color:var(--wp-ochre);">
+              <i class="bi bi-shield-exclamation"></i>
+              Saisies à revoir · {{ jours }} j
+              <span class="ms-auto" style="font-weight:400;color:var(--wp-muted);font-size:.78rem;">Contrôles qualité — alertes non bloquantes</span>
+            </div>
+            <div class="p-3 d-flex align-items-center gap-4 flex-wrap">
+              <div>
+                <div class="wp-kpi-label">Postes concernés</div>
+                <div style="font-size:1.55rem;font-weight:800;color:var(--wp-ochre);">{{ anomalies_periode.nb_postes_concernes }}</div>
+                <div class="wp-kpi-sub">sur {{ manque_periode.nb_postes if manque_periode else postes | length }} postes</div>
+              </div>
+              <div style="border-left:1px solid #e5e0d6;padding-left:20px;">
+                <div class="wp-kpi-label">Anomalies au total</div>
+                <div style="font-size:1.55rem;font-weight:700;color:var(--wp-ink);">{{ anomalies_periode.nb_anomalies_total }}</div>
+              </div>
+              <div style="border-left:1px solid #e5e0d6;padding-left:20px;flex:1 1 auto;">
+                <div class="wp-kpi-label" style="margin-bottom:6px;">Répartition par règle</div>
+                <div class="d-flex gap-2 flex-wrap" style="font-size:.78rem;">
+                  {% set libelle = {'R1': 'TRS bas sans arrêt', 'R2': 'Arrêt sans commentaire',
+                                   'R3': 'Déclassé excessif', 'R4': 'Production absente',
+                                   'R5': 'Horaire arrêt invalide', 'R6': 'Chevauchement machine',
+                                   'R7': 'Créneau essence invalide', 'R8': 'Chevauchement essence'} %}
+                  {% for code, n in anomalies_periode.par_code.items() if n > 0 %}
+                  <span class="wp-pill" style="background:#fff4e0;color:var(--wp-ochre);">
+                    <strong>{{ code }}</strong> · {{ libelle.get(code, code) }} : {{ n }}
+                  </span>
+                  {% endfor %}
+                </div>
+              </div>
+              <div>
+                <a href="{{ url_for('saisie.historique') }}" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-list-check"></i> Voir les postes
+                </a>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+
+        </div>
+      </div>
+    </div>
+
+  </div>{# fin col-lg-7 #}
+
+</div>{# fin row #}
+
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
 <script>
+function demanderResultatAction(formulaire) {
+  const resultat = window.prompt('Résultat obtenu (minimum 5 caractères) :');
+  if (!resultat || resultat.trim().length < 5) {
+    window.alert('Ajoutez une courte note de résultat avant de clôturer cette action.');
+    return false;
+  }
+  formulaire.querySelector('[name="note_resultat"]').value = resultat.trim();
+  return true;
+}
+
+{% if gain_potentiel %}
 (function () {
     var card = document.getElementById('card-gain-potentiel');
+    if (!card) return;
     var cap  = parseFloat(card.dataset.cap);
     var vol  = parseFloat(card.dataset.vol);
     var prix = parseFloat(card.dataset.prix);
@@ -608,261 +883,50 @@
     };
     recalculeGain(document.getElementById('slider-trs').value);
 }());
-</script>
 {% endif %}
 
-{# ── P14 · Top 3 recommandations Chef ── #}
-{% if top_recos %}
-<div class="wp-card mb-4" style="border-left:4px solid var(--wp-ochre);">
-  <div class="wp-card-header" style="background:#fffaf0;">
-    <i class="bi bi-lightbulb-fill" style="color:var(--wp-ochre);"></i>
-    Recommandations prioritaires
-    <span class="wp-pill wp-pill-neutral ms-2" style="font-size:.65rem;">{{ top_recos|length }} action{{ 's' if top_recos|length > 1 }}</span>
-    <a href="{{ url_for('recommandations.index') }}" class="btn btn-sm btn-outline-secondary ms-auto" style="font-size:.72rem;">
-      Voir tout <i class="bi bi-arrow-right"></i>
-    </a>
-  </div>
-  <div class="p-3">
-    {% for reco in top_recos %}
-    {% set prio_label = 'Haute' if reco.priorite == 3 else ('Moyenne' if reco.priorite == 2 else 'Basse') %}
-    {% set prio_class = 'wp-reco-prio-haute' if reco.priorite == 3 else ('wp-reco-prio-moyenne' if reco.priorite == 2 else 'wp-reco-prio-basse') %}
-    <div class="d-flex align-items-start gap-3 {% if not loop.last %}mb-3 pb-3{% endif %}" style="{% if not loop.last %}border-bottom:1px solid #f0ebe2;{% endif %}">
-      <div class="wp-reco-top-num">{{ loop.index }}</div>
-      <div style="flex:1;">
-        <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
-          <i class="bi {{ reco.icone }}" style="color:var(--wp-ochre);"></i>
-          <span style="font-weight:600;font-size:.88rem;color:var(--wp-ink);">{{ reco.titre }}</span>
-          <span class="wp-pill {{ prio_class }}">{{ prio_label }}</span>
-        </div>
-        <div style="font-size:.78rem;color:var(--wp-muted);">{{ reco.solutions[0].titre }}</div>
-      </div>
-    </div>
-    {% endfor %}
-  </div>
-</div>
-{% endif %}
-
-{# ── Scorecard semaine ── #}
-{% if scorecard %}
-<div class="wp-card mb-4">
-  <div class="wp-card-header">
-    <i class="bi bi-calendar-week"></i> Scorecard semaine
-    <span class="ms-auto" style="font-weight:400;">{{ scorecard.week_label }}</span>
-  </div>
-  <div class="table-responsive">
-    <table class="wp-table">
-      <thead>
-        <tr>
-          <th style="min-width:100px;">Poste</th>
-          {% for d in scorecard.days %}
-          <th class="text-center {% if d.is_today %}text-primary{% endif %}" style="min-width:72px;">
-            {{ d.label_court }}<br>
-            <span style="font-size:.65rem;font-weight:400;color:var(--wp-muted);">{{ d.label_complet }}</span>
-          </th>
-          {% endfor %}
-        </tr>
-      </thead>
-      <tbody>
-        {% for shift in scorecard.shifts %}
-        <tr>
-          <td style="font-weight:700;">{{ shift }}</td>
-          {% for d in scorecard.days %}
-          {% set cell = d.shifts[shift] %}
-          {% if cell.state == 'submitted' %}
-          <td class="text-center">
-            <span class="wp-pill
-              {% if cell.couleur == 'success' %}wp-pill-success
-              {% elif cell.couleur == 'warning' %}wp-pill-warning
-              {% else %}wp-pill-danger{% endif %}">
-              {{ cell.display }}
-            </span>
-          </td>
-          {% elif cell.state == 'brouillon' %}
-          <td class="text-center"><span class="wp-pill wp-pill-warning">⏳</span></td>
-          {% elif cell.state == 'a_verifier' %}
-          <td class="text-center"><span class="wp-pill wp-pill-info">À vérif.</span></td>
-          {% elif cell.state == 'a_corriger' %}
-          <td class="text-center"><span class="wp-pill wp-pill-warning">Corr.</span></td>
-          {% else %}
-          <td class="text-center" style="color:var(--wp-muted);">—</td>
-          {% endif %}
-          {% endfor %}
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-  <div class="px-4 py-2 d-flex flex-wrap gap-3" style="font-size:.72rem;color:var(--wp-muted);border-top:1px solid var(--wp-line);">
-    <span><span class="wp-pill wp-pill-success">70%</span> ≥70%</span>
-    <span><span class="wp-pill wp-pill-warning">55%</span> 50–69%</span>
-    <span><span class="wp-pill wp-pill-danger">42%</span> &lt;50%</span>
-    <span><span class="wp-pill wp-pill-warning">⏳</span> Brouillon</span>
-    <span><span class="wp-pill wp-pill-info">À vérif.</span> Non compté</span>
-    <span><span class="wp-pill wp-pill-warning">Corr.</span> À corriger</span>
-  </div>
-</div>
-{% endif %}
-
-{# ── Graphiques TRS + Matin vs AM ── #}
-<div class="row g-3 mb-4">
-  <div class="col-md-8">
-    <div class="wp-card h-100">
-      <div class="wp-card-header"><i class="bi bi-graph-up"></i> Évolution du TRS ({{ jours }} j)</div>
-      <div class="p-4"><canvas id="chartTRS" height="120"></canvas></div>
-    </div>
-  </div>
-  <div class="col-md-4">
-    <div class="wp-card h-100">
-      <div class="wp-card-header"><i class="bi bi-sun"></i> Matin vs Après-midi</div>
-      <div class="p-4 d-flex flex-column justify-content-center gap-4">
-        <div>
-          <div class="wp-kpi-label">Matin</div>
-          {% set c_m = 'var(--wp-leaf)' if stats.trs_matin >= 70 else ('var(--wp-ochre)' if stats.trs_matin >= 50 else 'var(--wp-terracotta)') %}
-          <div class="wp-kpi-value" style="color:{{ c_m }};">{{ stats.trs_matin }}%</div>
-        </div>
-        <div>
-          <div class="wp-kpi-label">Après-midi</div>
-          {% set c_am = 'var(--wp-leaf)' if stats.trs_apres_midi >= 70 else ('var(--wp-ochre)' if stats.trs_apres_midi >= 50 else 'var(--wp-terracotta)') %}
-          <div class="wp-kpi-value" style="color:{{ c_am }};">{{ stats.trs_apres_midi }}%</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-{# ── TRS + volume par essence ── #}
-<div class="row g-3 mb-4">
-  <div class="col-md-6">
-    <div class="wp-card h-100">
-      <div class="wp-card-header">
-        <i class="bi bi-tree"></i> TRS et volume par essence
-        <a href="{{ url_for('dashboard.pertes') }}" class="btn btn-sm ms-auto"
-           style="background:rgba(216,113,73,.1);color:var(--wp-terracotta);font-size:.75rem;padding:3px 10px;">
-          <i class="bi bi-cash-coin"></i> Manque à gagner
-        </a>
-      </div>
-      <table class="wp-table">
-        <thead>
-          <tr>
-            <th>Essence</th>
-            <th>Volume</th>
-            <th>Temps</th>
-            <th>Arrêts</th>
-            <th>TRS moy.</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for e in stats.essence_stats %}
-          <tr>
-            <td><span class="wp-essence"><span class="wp-essence-mark"><i class="bi bi-tree"></i></span>{{ e.essence }}</span></td>
-            <td>{{ e.volume_total }} m³</td>
-            <td>
-              {% if e.mode == 'temporalise' %}
-                {{ (e.temps_planifie // 60)|int }}h{{ '%02d'|format(e.temps_planifie % 60) }}
-              {% else %}
-                <span style="color:var(--wp-muted);">—</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if e.mode == 'temporalise' %}
-                {{ (e.duree_arrets // 60)|int }}h{{ '%02d'|format(e.duree_arrets % 60) }}
-              {% else %}
-                <span style="color:var(--wp-muted);">poste</span>
-              {% endif %}
-            </td>
-            <td>
-              {% set ce = 'var(--wp-leaf)' if e.trs_moyen >= 70 else ('var(--wp-ochre)' if e.trs_moyen >= 50 else 'var(--wp-terracotta)') %}
-              <strong style="color:{{ ce }};">{{ e.trs_moyen }}%</strong>
-              {% if e.mode == 'temporalise' %}
-                <div style="font-size:.68rem;color:var(--wp-muted);">D {{ e.disponibilite }} · P {{ e.performance }} · Q {{ e.qualite }}</div>
-              {% else %}
-                <div style="font-size:.68rem;color:var(--wp-muted);">ancien calcul</div>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-  {# ── Matrice criticité arrêts ── #}
-  <div class="col-md-6">
-    <div class="wp-card h-100">
-      <div class="wp-card-header"><i class="bi bi-grid-3x3-gap" style="color:var(--wp-terracotta);"></i> Matrice criticité arrêts</div>
-      <div class="table-responsive" style="max-height:280px;overflow-y:auto;">
-        <table class="wp-table" style="font-size:.75rem;">
-          <thead>
-            <tr>
-              <th>Machine</th>
-              {% for cat in categories %}<th class="text-center" style="font-size:.6rem;">{{ cat[:8] }}</th>{% endfor %}
-            </tr>
-          </thead>
-          <tbody>
-            {% for machine in machines %}
-            <tr>
-              <td style="font-weight:600;white-space:nowrap;">{{ machine }}</td>
-              {% for cat in categories %}
-              {% set cell = matrice[machine][cat] %}
-              <td class="text-center {{ cell.couleur }}">
-                {% if cell.duree == 0 %}<span style="color:var(--wp-muted);">—</span>
-                {% else %}
-                  <div>{{ cell.duree_fmt }}</div>
-                  <span style="font-size:.65rem;color:var(--wp-muted);">×{{ cell.count }}</span>
-                {% endif %}
-              </td>
-              {% endfor %}
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-      <div class="px-3 py-2 d-flex gap-3" style="font-size:.7rem;color:var(--wp-muted);border-top:1px solid var(--wp-line);">
-        <span><span class="wp-pill wp-pill-danger">&nbsp;&nbsp;</span> &gt;120 min</span>
-        <span><span class="wp-pill wp-pill-warning">&nbsp;&nbsp;</span> 30–120 min</span>
-        <span><span class="wp-pill wp-pill-success">&nbsp;&nbsp;</span> &lt;30 min</span>
-      </div>
-    </div>
-  </div>
-</div>
-
-{% endif %}
-{% endblock %}
-
-{% block scripts %}
-<script>
-function demanderResultatAction(formulaire) {
-  const resultat = window.prompt('Résultat obtenu (minimum 5 caractères) :');
-  if (!resultat || resultat.trim().length < 5) {
-    window.alert('Ajoutez une courte note de résultat avant de clôturer cette action.');
-    return false;
-  }
-  formulaire.querySelector('[name="note_resultat"]').value = resultat.trim();
-  return true;
-}
-</script>
 {% if postes %}
-<script>
-new Chart(document.getElementById('chartTRS'), {
-  type: 'line',
-  data: {
-    labels: {{ chart_labels | tojson }},
-    datasets: [{
-      label: 'TRS (%)',
-      data:  {{ chart_trs | tojson }},
-      borderColor: '#1F5C3D',
-      backgroundColor: 'rgba(31,92,61,0.08)',
-      fill: true,
-      tension: 0.35,
-      pointRadius: 4,
-      pointBackgroundColor: '#1F5C3D',
-    }]
-  },
-  options: {
-    scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' } } },
-    plugins: { legend: { display: false } }
-  }
-});
-</script>
+{# Graphique TRS — initialisé uniquement si le canvas est dans le DOM (accordion ouvert) #}
+function initChartTRS() {
+  var canvas = document.getElementById('chartTRS');
+  if (!canvas || canvas._chartInit) return;
+  canvas._chartInit = true;
+  new Chart(canvas, {
+    type: 'line',
+    data: {
+      labels: {{ chart_labels | tojson }},
+      datasets: [{
+        label: 'TRS (%)',
+        data:  {{ chart_trs | tojson }},
+        borderColor: '#1F5C3D',
+        backgroundColor: 'rgba(31,92,61,0.08)',
+        fill: true,
+        tension: 0.35,
+        pointRadius: 4,
+        pointBackgroundColor: '#1F5C3D',
+      }]
+    },
+    options: {
+      scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' } } },
+      plugins: { legend: { display: false } }
+    }
+  });
+}
+document.getElementById('acc-analyse').addEventListener('show.bs.collapse', initChartTRS);
 {% endif %}
+
+{# Animation chevrons sur les accordéons #}
+document.querySelectorAll('[data-bs-toggle="collapse"]').forEach(function(btn) {
+  var targetId = btn.getAttribute('data-bs-target');
+  if (!targetId) return;
+  var panel = document.querySelector(targetId);
+  var chevron = btn.querySelector('.acc-chevron');
+  if (!panel || !chevron) return;
+  panel.addEventListener('show.bs.collapse', function() {
+    chevron.classList.replace('bi-chevron-right', 'bi-chevron-down');
+  });
+  panel.addEventListener('hide.bs.collapse', function() {
+    chevron.classList.replace('bi-chevron-down', 'bi-chevron-right');
+  });
+});
 {% endblock %}

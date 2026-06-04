@@ -55,6 +55,79 @@ python .claude/skills/run-cuf-pilotage/screenshot.py chef
 
 ---
 
+## 0bis. PLAN D'EXÉCUTION P2 — 4 signaux de pilotage (design validé 2026-06-03)
+
+### Contexte
+
+Les P0 (bug objectif, traçabilité, message vide, prix, paramètres) et P1 (cockpit décisionnel : verdict global, signaux critiques, alertes, manque à gagner remonté, boucle Lean) sont livrés et validés sur Windows. P2 ajoute **quatre signaux de pilotage** qui répondent à des angles morts identifiés en section 6 du présent audit. L'utilisateur a validé les 4 décisions de conception le 2026-06-03 : cockpit compact (résumé + clic vers atelier), alerte « soir décroche » à **un seul critère**, et périmètre P2 limité à ces 4 signaux. Aucune nouvelle table, aucun changement de modèle, aucune migration (règle R7). Tout se calcule sur des données déjà présentes.
+
+**Décision de périmètre assumée :** P2 livre les 4 signaux en **ajout additif** sur le cockpit P1 existant, en suivant le principe « résumé sur le cockpit + clic pour creuser » (la carte « Signaux critiques » de P1, `dashboard.html:378`, en est déjà l'amorce). Le **rebuild visuel complet en 2 colonnes** (décision 1, version radicale) est volontairement **différé** : refondre `dashboard.html` d'un bloc romprait le cockpit P1 qui fonctionne et dépasserait l'estimation de ~2 jours. Cette mise en page sera une passe éditoriale P3 séparée. Ce choix est soumis à l'approbation via ExitPlanMode.
+
+### Principe métier verrouillé à respecter
+
+- Les deux postes sont `'Matin'` et `'Apres-midi'` (constante `_SHIFTS_JOUR`, dashboard.py:565). Le « soir 14h–23h » **est** le poste `Apres-midi`. L'alerte cible `Apres-midi`, étiquetée « équipe du soir (Après-midi) ».
+- Les KPI ne comptent que les fiches `STATUTS_ANALYSES` (valide_chef + verrouille). Les helpers P2 utilisent le même filtre.
+- Le seuil de déclassement réel est `seuil_declass_pct` (défaut **30 %**, pas 15 %). Ne pas inventer de seuil.
+- Cadence normale = `capacite_equipe_h` (défaut 1,5625 m³/h, Parametre vivant).
+
+### P2-A — Projection fin de poste enrichie sur le cockpit
+
+**Existant à réutiliser** : `_projection_production_active()` (dashboard.py:1822) renvoie déjà `volume_actuel`, `projection`, `objectif`, `pct`, `couleur`. Affichée sur `/chef/production` (production.html:57) mais **pas** sur le cockpit `/chef`. Le cockpit n'a qu'une sous-ligne allégée (`kpi_jour.objectif.projection`, dashboard.py:790 → _aujourdhui.html:152).
+
+**Modification** :
+1. `dashboard.py` — enrichir le dict de `_projection_production_active()` avec `ecart_objectif = round(objectif - projection, 2)` et, si positif, `rattrapage_min = round(ecart_objectif / capacite_h * 60)`. Réutiliser `capacite_equipe_h` via `Parametre.get`.
+2. `dashboard.py` `vue_chef()` — appeler `_projection_production_active()` et l'injecter (`projection_active=...`) dans les deux `render_template` (cas vide et cas peuplé).
+3. `app/templates/chef/_aujourdhui.html` — remplacer la sous-ligne 152-153 par un encart lisible : « À ce rythme : {volume_actuel} m³ → fin de poste {projection} m³ · objectif {objectif} m³ · il manque {ecart_objectif} m³ (~{rattrapage_min} min à cadence normale) ». Masqué si pas de poste actif.
+
+### P2-B — Alerte « équipe du soir décroche » (un seul critère)
+
+**Nouveau helper** `_alerte_soir_decroche(aujourd_hui, jours=3, seuil_pts=15)` dans dashboard.py :
+- Pour chacun des `jours` derniers jours, calculer TRS moyen `Matin` et TRS moyen `Apres-midi` sur les fiches `STATUTS_ANALYSES`.
+- Ne considérer que les jours où les **deux** postes existent. Si sur tous ces jours `trs_apresmidi < trs_matin - seuil_pts` (et au moins 3 jours qualifiants) → renvoyer `{trs_soir_moy, trs_matin_moy, ecart, jours_consecutifs}`. Sinon `None`.
+- Réutiliser le pattern de moyenne de `trs_moyen_groupe` (vue_chef:2149).
+
+**Injection + rendu** : injecter `alerte_soir` dans `vue_chef`, rendre une carte d'alerte sur le cockpit (nouveau partial `chef/_signaux_p2.html`, inclus après `_alertes.html`).
+
+### P2-C — Alerte déclassement par essence
+
+**Existant à réutiliser** : `_qualite_par_essence(equipes)` (dashboard.py:1883) calcule déjà `declass_pct` par essence + `seuil_declass`.
+
+**Nouveau helper** `_alerte_declassement_essence(equipes)` : appelle `_qualite_par_essence`, filtre les essences où `declass_pct > seuil_declass`, trie par dépassement décroissant, renvoie la liste (vide = pas d'alerte). Rendu dans `chef/_signaux_p2.html` : « {essence} : {declass_pct} % déclassé (seuil {seuil} %) » avec lien vers `/chef/qualite`.
+
+### P2-D — Taux de disponibilité machine sur le cockpit
+
+**Existant à réutiliser** : `_machine_prioritaire_recent(aujourd_hui, jours=7)` (dashboard.py:972) itère déjà les arrêts sur 7 j et somme `duree_min`.
+
+**Modification** : enrichir ce helper pour sommer aussi `arret.duree_impact_min` et compter `nb_postes` (fiches distinctes de la fenêtre). Calculer `disponibilite_pct = round((1 - impact_total / (nb_postes * 480)) * 100, 1)` (480 = `duree_poste`). Ajouter `disponibilite_pct` au dict renvoyé. Afficher dans la carte « Signaux critiques » existante (dashboard.html:387-390) : « {machine} : {disponibilite_pct} % de disponibilité (7 j) ».
+
+### Fichiers touchés
+
+- `cuf-pilotage/app/routes/dashboard.py` — 2 helpers enrichis (`_projection_production_active`, `_machine_prioritaire_recent`), 2 helpers nouveaux (`_alerte_soir_decroche`, `_alerte_declassement_essence`), injections dans `vue_chef`.
+- `cuf-pilotage/app/templates/chef/_aujourdhui.html` — projection enrichie.
+- `cuf-pilotage/app/templates/chef/_signaux_p2.html` — **nouveau** partial (soir décroche + déclassement essence).
+- `cuf-pilotage/app/templates/chef/dashboard.html` — `{% include 'chef/_signaux_p2.html' %}` + disponibilité dans la carte signaux critiques.
+
+**Hors périmètre P2 (différé, conformément à la décision 4)** : table Machine, FK opérateur, prédiction maintenance, mode « Soutenance », rebuild 2 colonnes complet.
+
+### Vérification de bout en bout
+
+```bash
+cd cuf-pilotage
+bash .claude/skills/run-cuf-pilotage/smoke.sh        # 16/16 doivent rester verts
+python .claude/skills/run-cuf-pilotage/screenshot.py chef
+# Contrôler sur la capture cockpit chef :
+#   · projection fin de poste lisible (si poste actif) avec manque + rattrapage
+#   · alerte « soir décroche » présente si l'écart TRS le justifie sur 3 j
+#   · alerte déclassement essence si une essence dépasse le seuil
+#   · disponibilité machine affichée dans la carte Signaux critiques
+```
+
+### Livrable documentaire
+
+Note d'impact 9 sections `documents/notes-impact/P56-feat-signaux-pilotage-p2.md` avant commit. Commit sur `claude/install-claude-excel-6MGzv`, jamais sur main.
+
+---
+
 ## 1. Résumé exécutif
 
 Le profil Chef de Production dispose d'un **moteur analytique solide et réel** : TRS D×P×Q calculé sur données terrain, attribution financière des pertes en FCFA, Pareto des arrêts, Ishikawa 6M + 5 Pourquoi complet, recommandations déterministes + IA. Ce n'est ni un tableau de bord vide ni une maquette.

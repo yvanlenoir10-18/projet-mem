@@ -979,7 +979,8 @@ def _machine_prioritaire_recent(aujourd_hui, jours=7):
         Equipe.statut.in_(statuts),
     ).all()
 
-    machines = defaultdict(lambda: {'duree': 0, 'count': 0, 'causes': defaultdict(int)})
+    nb_postes = len(equipes)
+    machines = defaultdict(lambda: {'duree': 0, 'count': 0, 'impact': 0, 'causes': defaultdict(int)})
     for equipe in equipes:
         for arret in equipe.arrets:
             duree = arret.duree_min or 0
@@ -988,6 +989,7 @@ def _machine_prioritaire_recent(aujourd_hui, jours=7):
             stats = machines[arret.machine]
             stats['duree'] += duree
             stats['count'] += 1
+            stats['impact'] += arret.duree_impact_min or 0
             stats['causes'][arret.cause or arret.categorie or 'Cause non précisée'] += duree
 
     if not machines:
@@ -1000,6 +1002,10 @@ def _machine_prioritaire_recent(aujourd_hui, jours=7):
     else:
         cause_duree = 0
 
+    duree_poste = float(Parametre.get('duree_poste', 480))
+    capacite_totale = nb_postes * duree_poste
+    disponibilite_pct = round((1 - stats['impact'] / capacite_totale) * 100, 1) if capacite_totale > 0 else None
+
     return {
         'machine': machine,
         'duree': stats['duree'],
@@ -1008,7 +1014,66 @@ def _machine_prioritaire_recent(aujourd_hui, jours=7):
         'cause': cause,
         'cause_duree': cause_duree,
         'jours': jours,
+        'disponibilite_pct': disponibilite_pct,
     }
+
+
+def _alerte_soir_decroche(aujourd_hui, jours=3, seuil_pts=15):
+    """Renvoie un dict si l'équipe Apres-midi décroche systématiquement sur `jours` jours."""
+    depuis = aujourd_hui - timedelta(days=jours - 1)
+    equipes = Equipe.query.filter(
+        Equipe.date >= depuis,
+        Equipe.date <= aujourd_hui,
+        Equipe.statut.in_(tuple(STATUTS_ANALYSES)),
+    ).all()
+
+    par_jour = defaultdict(lambda: {'Matin': [], 'Apres-midi': []})
+    for e in equipes:
+        if e.trs_global is not None and e.numero_equipe in ('Matin', 'Apres-midi'):
+            par_jour[e.date][e.numero_equipe].append(e.trs_global)
+
+    jours_valides = []
+    for d, shifts in par_jour.items():
+        if shifts['Matin'] and shifts['Apres-midi']:
+            trs_matin = sum(shifts['Matin']) / len(shifts['Matin'])
+            trs_soir = sum(shifts['Apres-midi']) / len(shifts['Apres-midi'])
+            jours_valides.append({'date': d, 'matin': trs_matin, 'soir': trs_soir})
+
+    if len(jours_valides) < jours:
+        return None
+
+    decrochages = [j for j in jours_valides if j['soir'] < j['matin'] - seuil_pts]
+    if len(decrochages) < jours:
+        return None
+
+    trs_matin_moy = round(sum(j['matin'] for j in jours_valides) / len(jours_valides), 1)
+    trs_soir_moy = round(sum(j['soir'] for j in jours_valides) / len(jours_valides), 1)
+    return {
+        'trs_matin_moy': trs_matin_moy,
+        'trs_soir_moy': trs_soir_moy,
+        'ecart': round(trs_matin_moy - trs_soir_moy, 1),
+        'jours': jours,
+    }
+
+
+def _alerte_declassement_essence(equipes):
+    """Renvoie la liste des essences dont le taux de déclassement dépasse le seuil."""
+    if not equipes:
+        return []
+    lignes = _qualite_par_essence(equipes)
+    seuil = _safe_float_param('seuil_declass_pct', 30)
+    alertes = [
+        {
+            'essence': l['essence'],
+            'declass_pct': l['declass_pct'],
+            'seuil': seuil,
+            'depassement': round(l['declass_pct'] - seuil, 1),
+        }
+        for l in lignes
+        if l['declass_pct'] > seuil
+    ]
+    alertes.sort(key=lambda a: a['depassement'], reverse=True)
+    return alertes
 
 
 def _action_ouverte_similaire(origine_type=None, origine_label=None, machine=None):
@@ -1834,6 +1899,9 @@ def _projection_production_active():
     projection = volume * (480 / max(1, minutes_ecoulees))
     objectif_poste = _safe_float_param('objectif_m3', 12.5)
     pct = round((projection / objectif_poste) * 100, 1) if objectif_poste else 0
+    ecart = round(objectif_poste - projection, 2)
+    capacite_h = float(Parametre.get('capacite_equipe_h', 1.5625))
+    rattrapage_min = round(ecart / capacite_h * 60) if ecart > 0 and capacite_h > 0 else 0
     return {
         'shift': shift_actif,
         'minutes_ecoulees': minutes_ecoulees,
@@ -1842,6 +1910,8 @@ def _projection_production_active():
         'objectif': round(objectif_poste, 2),
         'pct': pct,
         'couleur': _couleur_atteinte(pct),
+        'ecart_objectif': ecart,
+        'rattrapage_min': rattrapage_min,
     }
 
 
@@ -2086,6 +2156,8 @@ def vue_chef():
         aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_actions_chef
     )
     machine_top = _machine_prioritaire_recent(aujourd_hui, jours=7)
+    alerte_soir = _alerte_soir_decroche(aujourd_hui)
+    projection_active = _projection_production_active()
 
     try:
         mois_sel  = int(request.args.get('mois',  0))

@@ -1,3 +1,307 @@
+# P4 — Refonte Ishikawa + Recommandations (plan actif)
+
+> Branche `claude/install-claude-excel-6MGzv` · P3 livré et validé le 2026-06-04
+> Feu vert requis avant toute modification de code
+
+---
+
+## CONTEXTE
+
+P3 a restructuré le cockpit en 2 colonnes avec accordéons. P4 s'attaque au cœur analytique de l'outil : la logique de solidité des analyses Ishikawa et le moteur de recommandations. Les deux ont des faiblesses fondamentales identifiées lors de l'audit P0 :
+
+- **Solidité Ishikawa** : `_solidite_analyse()` récompense la quantité, pas la qualité. Trois causes dans la même famille "Machine" suffisent pour atteindre "Solide". Aucun critère de diversité 6M, aucun critère d'ancrage aux données réelles CUF.
+- **Recommandations** : les 7 règles génèrent du texte statique identique quel que soit le TRS réel, la machine critique, l'essence problématique. Le champ `contexte` est passé mais jamais utilisé dans le texte des solutions.
+- **Couche 2 IA** : `reco_ai.py` appelle Anthropic/Groq/Tavily — viole la règle verrouillée "100 % hors ligne". À supprimer sur accord explicite.
+- **Lien Reco → Analyse** : seuls 3 codes (`TRS_CRITIQUE`, `ARRETS_NON_DOCUMENTES`, `DECLASS_EXCESSIF`) ont un bouton "Lancer une analyse". Les 4 autres recommandations n'ont aucun chemin direct vers Ishikawa.
+
+**Périmètre validé par l'utilisateur** : repenser toute la fonctionnalité — logique Ishikawa, logique Recommandations, lien entre les deux. Enrichir Couche 1, abandonner Couche 2 IA.
+
+---
+
+## DESIGN 1 — SYSTÈME GEMBA-SCORE (nouvelle logique Ishikawa)
+
+### Inspiration monde réel
+
+Le Toyota Production System exige que les "5 Pourquoi" atteignent une **cause systémique** (processus/organisation) et non une cause symptomatique ("erreur humaine"). Six Sigma impose des **quality gates** : une analyse ne peut pas progresser si certains critères bloquants ne sont pas satisfaits. La méthode FTA (Fault Tree Analysis, industrie nucléaire) évalue la **complétude des chaînes causales** : un trou dans la chaîne invalide le raisonnement entier.
+
+### Principe adapté à CUF
+
+Un Ishikawa de qualité n'est pas un inventaire de causes possibles. C'est une **démarche de convergence vers une cause racine systémique actionnable**, ancrée dans les données terrain de la chaîne 4. Le GEMBA-SCORE mesure cette convergence sur 4 axes.
+
+### Schéma GEMBA-SCORE
+
+```
+╔══════════════════════════════════════════════════════════════════╗
+║           SYSTÈME GEMBA-SCORE — 12 points maximum              ║
+╠══════════════════════════════════════════════════════════════════╣
+║                                                                  ║
+║  AXE 1 — SPECTRE 6M                                [0–3 pts]    ║
+║  ┌──────────────────────────────────────────────────────────┐   ║
+║  │  1 famille 6M explorée  →  0 pt  (analyse en silo)       │   ║
+║  │  2 familles             →  1 pt  (angle limité)           │   ║
+║  │  3–4 familles           →  2 pts (analyse multi-angle)    │   ║
+║  │  5–6 familles           →  3 pts (spectre complet)        │   ║
+║  └──────────────────────────────────────────────────────────┘   ║
+║  ⚠ BLOQUANT : si Axe 1 = 0 → score plafonné à 5/12 max        ║
+║    (mono-catégorie = biais de confirmation, Toyota Principle)    ║
+║                                                                  ║
+║  AXE 2 — PROFONDEUR CHAÎNE                         [0–4 pts]    ║
+║  ┌──────────────────────────────────────────────────────────┐   ║
+║  │  Max profondeur = 1  →  0 pt  (niveau symptôme)          │   ║
+║  │  Max profondeur = 2  →  1 pt  (cause intermédiaire)      │   ║
+║  │  Max profondeur = 3  →  2 pts (cause proximale)          │   ║
+║  │  Max profondeur = 4  →  3 pts (approche systémique)      │   ║
+║  │  Max profondeur = 5  →  4 pts (cause racine TPS-grade)   │   ║
+║  └──────────────────────────────────────────────────────────┘   ║
+║  Basé sur max(depth) car une seule chaîne complète vaut         ║
+║  plus que cinq chaînes superficielles (Ohno, Toyota)            ║
+║                                                                  ║
+║  AXE 3 — COMPLÉTUDE CHAÎNE                         [0–2 pts]    ║
+║  ┌──────────────────────────────────────────────────────────┐   ║
+║  │  ≥ 75% des causes ont ≥ 1 pourquoi renseigné  →  2 pts  │   ║
+║  │  ≥ 40%                                         →  1 pt   │   ║
+║  │  < 40%                                         →  0 pt   │   ║
+║  └──────────────────────────────────────────────────────────┘   ║
+║  Une cause sans aucun pourquoi = hypothèse non explorée         ║
+║                                                                  ║
+║  AXE 4 — ANCRAGE DONNÉES CUF                       [0–3 pts]    ║
+║  ┌──────────────────────────────────────────────────────────┐   ║
+║  │  Origine Pareto / fiche anomalie     → +1 pt             │   ║
+║  │  Machine spécifiée dans le problème  → +1 pt             │   ║
+║  │  ≥ 1 cause cite essence/machine CUF → +1 pt             │   ║
+║  │  (Ayous, Azobé, Iroko, Movingui, Bicoupe, Scie…)        │   ║
+║  └──────────────────────────────────────────────────────────┘   ║
+║  Innovation : lie l'analyse au terrain, pas aux généralités     ║
+║                                                                  ║
+╠══════════════════════════════════════════════════════════════════╣
+║  NIVEAUX DE MATURITÉ                                            ║
+║  ┌────────┬─────────────┬────────────────────────────────────┐  ║
+║  │  0–4   │  Ébauche    │ Insuffisant pour toute décision    │  ║
+║  │  5–6   │  Interméd.  │ Structure présente, manque ancrage │  ║
+║  │  7–8   │  Structuré  │ Bonne rigueur, exploitable         │  ║
+║  │  9–10  │  Solide     │ Analyse fiable, prête pour action  │  ║
+║  │ 11–12  │  Expert     │ Niveau TPS — cause systémique CUF  │  ║
+║  └────────┴─────────────┴────────────────────────────────────┘  ║
+╚══════════════════════════════════════════════════════════════════╝
+```
+
+### Exemple concret — avant vs après
+
+```
+AVANT (scoring actuel — résultat trompeur)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Problème : "Arrêts fréquents bicoupe"
+→ Cause 1 (Machine) : "Lame usée"             pourquoi 1 rempli
+→ Cause 2 (Machine) : "Vibrations moteur"     pourquoi 1 rempli
+→ Cause 3 (Machine) : "Roulement défectueux"  pourquoi 1-2 remplis
+Score actuel : "Solide" ✓   (3 causes + max depth 2)
+Problème réel : mono-catégorie, profondeur 2, aucune donnée terrain.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+APRÈS (GEMBA-SCORE — règle bloquante activée)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Axe 1 Spectre 6M     : 1 famille → 0/3 pts ← BLOQUANT
+Score total plafonné : 3/12 → Ébauche
+Guidage affiché : "Analyse mono-catégorie. Explorez Main d'œuvre
+                   et Méthode pour dépasser ce niveau."
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+MÊME PROBLÈME analysé avec rigueur (GEMBA-SCORE Expert)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Origine : Pareto (cause = "Arrêts mécaniques Bicoupe")
+Machine : Bicoupe
+Causes :
+  Machine      → "Lame Azobé usée avant 2 h"        P1–P5 remplis
+  Méthode      → "Pas de check lame début poste"     P1–P3 remplis
+  Main d'œuvre → "Opérateur non formé sur Azobé"    P1–P2 remplis
+  Milieu       → "Copeaux non évacués"               P1 rempli
+Axe 1 : 4 familles → 2/3
+Axe 2 : max depth 5 → 4/4
+Axe 3 : 4/4 causes avec P1 renseigné → 2/2
+Axe 4 : origine Pareto(+1) + machine(+1) + "Azobé"(+1) → 3/3
+Total : 11/12 → Expert
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+### Affichage dans les templates (objet solidite enrichi)
+
+```python
+# Objet renvoyé par l'API solidite (enrichi, rétro-compatible)
+{
+    "label": "Solide",
+    "couleur": "success",
+    "detail": "9/12",
+    "score": 9,
+    "score_max": 12,
+    "axes": [
+        {"nom": "Spectre 6M",        "pts": 2, "max": 3,
+         "commentaire": "3 familles explorées"},
+        {"nom": "Profondeur chaîne", "pts": 3, "max": 4,
+         "commentaire": "Niveau 4 atteint"},
+        {"nom": "Complétude",        "pts": 2, "max": 2,
+         "commentaire": "100 % des causes avec P1"},
+        {"nom": "Ancrage CUF",       "pts": 2, "max": 3,
+         "commentaire": "Origine Pareto + machine OK"}
+    ],
+    "bloquant": None   # ou {"axe": "Spectre 6M", "message": "..."}
+}
+```
+
+La fonction `majSolidite()` dans `ishikawa.html` et `pourquoi.html` est enrichie pour afficher 4 mini-barres de progression sous le badge principal — mise à jour en temps réel à chaque sauvegarde de cause/pourquoi.
+
+---
+
+## DESIGN 2 — RECOMMANDATIONS COUCHE 1 ENRICHIE
+
+### Enrichissement du dict contexte
+
+```python
+# Nouvelles clés ajoutées dans vue_recommandations() / analyse_recommandations()
+contexte = {
+    # --- Existant ---
+    "trs_moyen": 52.3,
+    "manque": 2_450_000,
+    "nb_postes": 14,
+    "pct_r2": 18.5,
+    "pct_r3": 12.0,
+    # --- Nouveau ---
+    "machine_critique": "Bicoupe",          # top-1 Pareto sur la période
+    "machine_arrets_h": 8.5,               # durée cumulée en heures
+    "essence_declass": "Azobé",            # essence avec plus haut déclassement
+    "declass_pct_essence": 38.2,           # son taux de déclassement %
+    "objectif_m3": 25.0,                   # objectif journalier configuré
+    "production_reelle_moy": 15.6,         # moyenne réelle sur la période
+    "gain_potentiel_fcfa": 1_200_000,      # gain si TRS revient à 60 %
+}
+```
+
+Ces données sont calculées à partir de helpers déjà présents : `_machine_prioritaire_recent()`, `_qualite_par_essence()`, `Parametre.get()`.
+
+### Avant / Après une solution TRS_CRITIQUE
+
+```
+AVANT (statique — identique quelles que soient les données)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Solution 1 :
+  titre  : "Cartographier les arrêts machine"
+  detail : "Identifier les machines les plus impactantes.
+            Mettre en place un relevé structuré des durées et causes."
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+APRÈS (dynamique — données CUF réelles injectées)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Solution 1 :
+  titre  : "Analyser les arrêts Bicoupe (8,5 h cumulées)"
+  detail : "La Bicoupe concentre l'essentiel des arrêts sur la période.
+            Avec un TRS actuel de 52,3 % (objectif 60 %), chaque heure
+            d'arrêt non documenté représente ~288 000 FCFA de manque
+            à gagner. Action immédiate : lancer une analyse Ishikawa
+            sur la cause racine Bicoupe → gain estimé 1 200 000 FCFA/
+            semaine si TRS remonte à 60 %."
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+### Priorité dynamique
+
+```python
+# AVANT : priorite = 3 (hardcodé dans _REGLES)
+
+# APRÈS : calculée selon l'écart réel au seuil
+def _priorite_dynamique(trs_actuel, seuil_critique, seuil_moyen):
+    if trs_actuel is None:
+        return 2
+    if trs_actuel < seuil_critique:     # ex: 45 < 50
+        return 3   # haute
+    elif trs_actuel < seuil_moyen:      # ex: 55 < 60
+        return 2   # moyenne
+    return 1       # basse
+```
+
+### Correction seuil hardcodé
+
+`SAISIES_INCOHERENTES` utilise `>20.0` hardcodé. Remplacé par `Parametre.get('seuil_saisies_incoherentes', 20.0)` — cohérent avec tous les autres seuils du moteur.
+
+---
+
+## DESIGN 3 — BOUCLE D'AMÉLIORATION TRACÉE
+
+```
+RECOMMANDATIONS                        ISHIKAWA
+┌─────────────────────────────┐        ┌─────────────────────────────┐
+│ TRS Critique (52.3%)        │        │ "Analyse TRS Critique"      │
+│ Bicoupe · 8.5h · 1.2M FCFA │        │                             │
+│                             │        │ GEMBA-SCORE : 7/12          │
+│ [Créer analyse Ishikawa] ───┼───────►│ ████████░░░░                │
+│ (tous les codes, pas 3)     │        │ Axe1:2 Axe2:3 Axe3:1 Axe4:1│
+│                             │        │ "Issu de : TRS_CRITIQUE"    │
+│ Si analyse existante :      │        │                             │
+│ [Voir l'analyse #12]        │        │ [Créer action] ─────────┐   │
+└─────────────────────────────┘        └─────────────────────────┼───┘
+                                                                  │
+                                       ACTION CHEF               │
+                                       ┌──────────────────────── ▼───┐
+                                       │ "Réduire arrêts Bicoupe"    │
+                                       │ Issu de : Analyse #12       │
+                                       │ → Reco TRS_CRITIQUE         │
+                                       │ Bilan d'efficacité à J+7    │
+                                       └─────────────────────────────┘
+```
+
+**Implémentation** : le bouton "Créer analyse Ishikawa" pré-remplit `origine_type='recommandation'` et `reco_code=reco.code` — déjà supporté par la route `problemes.nouveau` existante (cf. template index.html lignes 130-136 qui le fait déjà pour 3 codes). P4 étend ce mécanisme à tous les codes.
+
+Pour afficher "Voir l'analyse" si une analyse existe, la route `recommandations.index()` injecte un dict `problemes_par_reco` : `{code: probleme_id}` construit par une requête sur `Probleme.query.filter_by(origine_type='recommandation').all()`.
+
+---
+
+## DESIGN 4 — SUPPRESSION COUCHE 2 IA
+
+Fichiers et blocs à supprimer (sous confirmation utilisateur) :
+
+1. `app/services/reco_ai.py` — fichier entier
+2. `app/templates/recommandations/index.html` — bloc `wp-reco-ai-zone` (~lignes 141-156) + script AJAX `analyserIA()` (~lignes 164-220)
+3. `app/routes/recommandations.py` — route `/ai/<code>` (POST)
+4. Import de `reco_ai` dans les fichiers qui l'utilisent
+
+Le bandeau "enrichissement IA" (index.html ligne 53) est remplacé par : "Recommandations calculées sur les données réelles des {{ nb_postes }} postes · TRS actuel {{ trs }}% · 100 % hors ligne."
+
+---
+
+## FICHIERS À MODIFIER
+
+| Fichier | Modification |
+|---|---|
+| `app/routes/problemes.py` | Réécrire `_solidite_analyse()` (lignes 98-118) avec GEMBA-SCORE · Ajouter helper `_gemba_axes()` |
+| `app/services/recommandations.py` | Enrichir contexte dict · Réécrire 7 solutions dynamiques · Ajouter `_priorite_dynamique()` · Corriger seuil hardcodé |
+| `app/routes/recommandations.py` | Injecter nouvelles clés contexte · Injecter `problemes_par_reco` · Supprimer route AI |
+| `app/templates/problemes/ishikawa.html` | Enrichir `majSolidite()` — afficher 4 mini-barres GEMBA |
+| `app/templates/problemes/pourquoi.html` | Même enrichissement `majSolidite()` |
+| `app/templates/recommandations/index.html` | Supprimer Couche 2 · Bouton "Créer analyse" sur tous codes · "Voir l'analyse" si existe |
+| `app/templates/problemes/rapport.html` | Afficher "Issu de la recommandation [titre]" si `origine_type == 'recommandation'` |
+| `app/services/reco_ai.py` | **SUPPRIMER** (accord utilisateur requis) |
+| `documents/notes-impact/P58-feat-ishikawa-reco-p4.md` | Note d'impact 9 sections avant commit |
+
+---
+
+## VÉRIFICATION
+
+```bash
+cd cuf-pilotage && python seed_data.py
+bash .claude/skills/run-cuf-pilotage/smoke.sh       # 16/16 doivent rester verts
+python .claude/skills/run-cuf-pilotage/screenshot.py chef
+# Contrôler :
+# · GEMBA-SCORE avec 4 mini-barres dans ishikawa + pourquoi templates
+# · Score "Ébauche" si analyse mono-catégorie (règle bloquante active)
+# · Score "Expert" si 4+ familles × depth 5 × données CUF
+# · Recommandations citent TRS%, FCFA, machine et essence réels
+# · Bouton "Créer analyse Ishikawa" présent sur TOUS les codes
+# · Aucun bouton "Analyser avec l'IA" visible
+# · Message "100 % hors ligne" à la place du bandeau IA
+```
+
+---
+
+---
+
 # Audit critique — Profil Chef de Production (wood_pilot / CUF Chaîne 4)
 
 > Produit le 2026-06-02 · Branche `claude/install-claude-excel-6MGzv`

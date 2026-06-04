@@ -2205,7 +2205,10 @@ def vue_chef():
                                priorites_chef=priorites_chef,
                                statut_global=None,
                                machine_top=machine_top,
-                               pareto_chef=[])
+                               pareto_chef=[],
+                               alerte_soir=alerte_soir,
+                               alerte_declass=[],
+                               projection_active=projection_active)
 
     trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen    = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
@@ -2455,7 +2458,10 @@ def vue_chef():
                            priorites_chef=priorites_chef,
                            statut_global=statut_global,
                            machine_top=machine_top,
-                           pareto_chef=pareto_chef)
+                           pareto_chef=pareto_chef,
+                           alerte_soir=alerte_soir,
+                           alerte_declass=_alerte_declassement_essence(equipes),
+                           projection_active=projection_active)
 
 
 @dashboard_bp.route('/chef/fiches')

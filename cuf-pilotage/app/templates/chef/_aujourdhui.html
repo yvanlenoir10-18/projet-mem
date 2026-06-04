@@ -149,7 +149,22 @@
       {% if objectif.volume_attente|default(0) > 0 %}
       <div class="wp-kpi-sub">Inclut {{ objectif.volume_attente }} m³ en attente chef.</div>
       {% endif %}
-      {% if objectif.projection|default(none) %}
+      {% if projection_active %}
+      {% set pr = projection_active %}
+      <div class="mt-2 p-2" style="background:#f7f3ec;border-radius:6px;font-size:.82rem;">
+        <i class="bi bi-graph-up-arrow" style="color:var(--wp-leaf);"></i>
+        <strong>À ce rythme</strong> → fin poste
+        <strong style="color:var(--wp-ink);">~{{ pr.projection }} m³</strong>
+        <span style="color:var(--wp-muted);">· objectif {{ pr.objectif }} m³</span>
+        {% if pr.ecart_objectif > 0 %}
+        <span style="color:var(--wp-terracotta);">
+          · il manque {{ pr.ecart_objectif }} m³{% if pr.rattrapage_min > 0 %} (~{{ pr.rattrapage_min }} min à cadence normale){% endif %}
+        </span>
+        {% else %}
+        <span style="color:var(--wp-leaf);">· objectif en bonne voie</span>
+        {% endif %}
+      </div>
+      {% elif objectif.projection|default(none) %}
       <div class="wp-kpi-sub">Projection {{ objectif.projection.shift }} : ~{{ objectif.projection.volume }} m³.</div>
       {% endif %}
       <div class="mt-2">

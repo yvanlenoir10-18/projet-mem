@@ -6,6 +6,7 @@
 
 {% include 'chef/_aujourdhui.html' %}
 {% include 'chef/_alertes.html' %}
+{% include 'chef/_signaux_p2.html' %}
 
 {# ── Barre d'actions ── #}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
@@ -386,6 +387,12 @@
       <div style="font-size:.74rem;color:var(--wp-muted);margin-bottom:2px;">Machine critique</div>
       <div style="font-weight:900;color:var(--wp-terracotta);font-size:.95rem;">{{ machine_top.machine }}</div>
       <div style="font-size:.82rem;color:var(--wp-ink);">{{ machine_top.duree_fmt }} d'arrêts · {{ machine_top.count }} événement{{ 's' if machine_top.count > 1 }}</div>
+      {% if machine_top.disponibilite_pct is not none %}
+      <div style="font-size:.74rem;color:var(--wp-muted);margin-top:2px;">
+        Disponibilité : <strong style="color:{% if machine_top.disponibilite_pct >= 90 %}var(--wp-leaf){% elif machine_top.disponibilite_pct >= 75 %}var(--wp-ochre){% else %}var(--wp-terracotta){% endif %};">{{ machine_top.disponibilite_pct }}%</strong>
+        <span style="color:var(--wp-muted);">(7 j)</span>
+      </div>
+      {% endif %}
       {% if machine_top.cause %}<div style="font-size:.74rem;color:var(--wp-muted);margin-top:2px;">Cause : {{ machine_top.cause }}</div>{% endif %}
       <a href="{{ url_for('dashboard.machines_chef', jours=7) }}" class="btn btn-sm btn-outline-secondary mt-2" style="font-size:.72rem;">Détail machines →</a>
     </div>

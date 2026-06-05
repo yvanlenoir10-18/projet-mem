@@ -1,268 +1,706 @@
-# P4 — Refonte Ishikawa + Recommandations (plan actif)
+# P4 — Recommandations métier + Actions FCFA + Signaux machines (plan actif)
 
 > Branche `claude/install-claude-excel-6MGzv` · P3 livré et validé le 2026-06-04
-> Feu vert requis avant toute modification de code
+> **Feu vert utilisateur requis avant toute modification de code**
 
 ---
 
 ## CONTEXTE
 
-P3 a restructuré le cockpit en 2 colonnes avec accordéons. P4 s'attaque au cœur analytique de l'outil : la logique de solidité des analyses Ishikawa et le moteur de recommandations. Les deux ont des faiblesses fondamentales identifiées lors de l'audit P0 :
+P3 a livré le cockpit 2 colonnes avec accordéons, verdict global, colonne gauche sticky. P4 est le résultat d'une analyse approfondie des 7 rubriques du profil Chef (Tableau de bord, Fiches Chef, Machines, Qualité, Pertes, Actions, Recommandations), conduite rubrique par rubrique avec l'utilisateur via QCM les 2026-06-04 et 2026-06-05.
 
-- **Solidité Ishikawa** : `_solidite_analyse()` récompense la quantité, pas la qualité. Trois causes dans la même famille "Machine" suffisent pour atteindre "Solide". Aucun critère de diversité 6M, aucun critère d'ancrage aux données réelles CUF.
-- **Recommandations** : les 7 règles génèrent du texte statique identique quel que soit le TRS réel, la machine critique, l'essence problématique. Le champ `contexte` est passé mais jamais utilisé dans le texte des solutions.
-- **Couche 2 IA** : `reco_ai.py` appelle Anthropic/Groq/Tavily — viole la règle verrouillée "100 % hors ligne". À supprimer sur accord explicite.
-- **Lien Reco → Analyse** : seuls 3 codes (`TRS_CRITIQUE`, `ARRETS_NON_DOCUMENTES`, `DECLASS_EXCESSIF`) ont un bouton "Lancer une analyse". Les 4 autres recommandations n'ont aucun chemin direct vers Ishikawa.
+### Problèmes identifiés qui justifient P4
 
-**Périmètre validé par l'utilisateur** : repenser toute la fonctionnalité — logique Ishikawa, logique Recommandations, lien entre les deux. Enrichir Couche 1, abandonner Couche 2 IA.
+1. **Recommandations — texte générique** : les 7 règles génèrent un texte identique quel que soit le TRS réel, la machine critique, la catégorie d'arrêt dominante ou l'essence problématique. Le `contexte` dict est passé aux règles mais jamais utilisé dans le texte des solutions. Résultat : un conseil de manuel, pas une décision terrain.
+2. **Couche 2 IA** : `app/services/reco_ai.py` appelle Anthropic/Groq/Tavily — viole la règle verrouillée « 100 % hors ligne ». À supprimer (accord utilisateur obtenu le 2026-06-05 : « Supprimer simplement »).
+3. **Lien Reco → action incomplet** : seuls 3 codes sur 7 ont un bouton « Lancer une analyse ». Les 4 autres n'ont aucun chemin vers l'action.
+4. **Actions Chef — bilan en arrêts seulement** : `_bilan_efficacite_action_chef()` compare les arrêts avant/après, mais l'utilisateur veut le bilan en **FCFA évité**.
+5. **Prix chef invisible** : le chef voit le manque à gagner en FCFA mais ne peut pas consulter les prix par essence (admin-only) pour valider les calculs.
+6. **Récurrences machines non remontées** : `_recurrences_machines()` détecte les patterns mais ils ne déclenchent aucune alerte sur le cockpit.
+
+### Ce que l'utilisateur veut (verbatim QCM 2026-06-05)
+
+> « Une bonne recommandation doit dire : quoi faire, pourquoi c'est prioritaire, combien cela coûte actuellement, combien de manque à gagner on peut espérer réduire, et comment vérifier le résultat. »
+
+> « Une recommandation utile ne doit pas être un conseil général. Elle doit être une contre-mesure terrain, déclenchée par un signal mesurable, liée à une cause probable, accompagnée d'un gain attendu et vérifiable après action. »
+
+Format validé — **6 sections obligatoires** par recommandation :
+```
+1. Signal détecté    — ce que l'outil a vu (TRS%, FCFA, heures arrêts, % Pareto)
+2. Lecture terrain   — ce que ça signifie concrètement dans la scierie CUF
+3. Ce que ça coûte   — manque à gagner en FCFA sur la période
+4. Action concrète   — contre-mesure terrain précise (jamais un conseil général)
+5. Gain attendu      — FCFA récupérables si l'action réussit
+6. Vérification      — indicateur avant/après pour confirmer l'effet
+```
+
+L'utilisateur a aussi demandé que les recommandations forment une **bibliothèque de contre-mesures métier organisée par famille de problème**, et non un simple commentaire d'indicateur. Exemple fourni : arrêts d'approvisionnement à la Scie de tête → « mettre le parc bois en avance de 3 contrats + zone tampon par contrat ».
 
 ---
 
-## DESIGN 1 — SYSTÈME GEMBA-SCORE (nouvelle logique Ishikawa)
+## DESIGN 1 — MOTEUR DE RECOMMANDATIONS MÉTIER (6 sections + bibliothèque)
 
-### Inspiration monde réel
+### Principe
 
-Le Toyota Production System exige que les "5 Pourquoi" atteignent une **cause systémique** (processus/organisation) et non une cause symptomatique ("erreur humaine"). Six Sigma impose des **quality gates** : une analyse ne peut pas progresser si certains critères bloquants ne sont pas satisfaits. La méthode FTA (Fault Tree Analysis, industrie nucléaire) évalue la **complétude des chaînes causales** : un trou dans la chaîne invalide le raisonnement entier.
+Une recommandation = une contre-mesure terrain déclenchée par un signal mesurable. Le moteur a **deux sources** qui produisent toutes deux des fiches au format 6 sections :
 
-### Principe adapté à CUF
+- **Source A — règles indicateur (les 7 existantes, réécrites)** : TRS, déclassement, rendement, objectif, saisies, tendance, arrêts non documentés. Le texte est reconstruit dynamiquement avec les vraies données.
+- **Source B — bibliothèque par famille de cause (NOUVEAU)** : le moteur lit la **catégorie d'arrêt dominante** du Pareto et émet une contre-mesure métier ciblée. C'est ce que l'utilisateur a décrit avec l'exemple approvisionnement.
 
-Un Ishikawa de qualité n'est pas un inventaire de causes possibles. C'est une **démarche de convergence vers une cause racine systémique actionnable**, ancrée dans les données terrain de la chaîne 4. Le GEMBA-SCORE mesure cette convergence sur 4 axes.
+### Source B — Bibliothèque de contre-mesures (ancrée sur `CATEGORIES_ARRET`)
 
-### Schéma GEMBA-SCORE
+La taxonomie existe déjà : `config.py:40` `CATEGORIES_ARRET` (9 catégories), causes rangées automatiquement par `saisie.py:536` `_categorie_arret_depuis_cause()`. Le Pareto par catégorie est déjà calculé (`dashboard.py:2399`).
 
-```
-╔══════════════════════════════════════════════════════════════════╗
-║           SYSTÈME GEMBA-SCORE — 12 points maximum              ║
-╠══════════════════════════════════════════════════════════════════╣
-║                                                                  ║
-║  AXE 1 — SPECTRE 6M                                [0–3 pts]    ║
-║  ┌──────────────────────────────────────────────────────────┐   ║
-║  │  1 famille 6M explorée  →  0 pt  (analyse en silo)       │   ║
-║  │  2 familles             →  1 pt  (angle limité)           │   ║
-║  │  3–4 familles           →  2 pts (analyse multi-angle)    │   ║
-║  │  5–6 familles           →  3 pts (spectre complet)        │   ║
-║  └──────────────────────────────────────────────────────────┘   ║
-║  ⚠ BLOQUANT : si Axe 1 = 0 → score plafonné à 5/12 max        ║
-║    (mono-catégorie = biais de confirmation, Toyota Principle)    ║
-║                                                                  ║
-║  AXE 2 — PROFONDEUR CHAÎNE                         [0–4 pts]    ║
-║  ┌──────────────────────────────────────────────────────────┐   ║
-║  │  Max profondeur = 1  →  0 pt  (niveau symptôme)          │   ║
-║  │  Max profondeur = 2  →  1 pt  (cause intermédiaire)      │   ║
-║  │  Max profondeur = 3  →  2 pts (cause proximale)          │   ║
-║  │  Max profondeur = 4  →  3 pts (approche systémique)      │   ║
-║  │  Max profondeur = 5  →  4 pts (cause racine TPS-grade)   │   ║
-║  └──────────────────────────────────────────────────────────┘   ║
-║  Basé sur max(depth) car une seule chaîne complète vaut         ║
-║  plus que cinq chaînes superficielles (Ohno, Toyota)            ║
-║                                                                  ║
-║  AXE 3 — COMPLÉTUDE CHAÎNE                         [0–2 pts]    ║
-║  ┌──────────────────────────────────────────────────────────┐   ║
-║  │  ≥ 75% des causes ont ≥ 1 pourquoi renseigné  →  2 pts  │   ║
-║  │  ≥ 40%                                         →  1 pt   │   ║
-║  │  < 40%                                         →  0 pt   │   ║
-║  └──────────────────────────────────────────────────────────┘   ║
-║  Une cause sans aucun pourquoi = hypothèse non explorée         ║
-║                                                                  ║
-║  AXE 4 — ANCRAGE DONNÉES CUF                       [0–3 pts]    ║
-║  ┌──────────────────────────────────────────────────────────┐   ║
-║  │  Origine Pareto / fiche anomalie     → +1 pt             │   ║
-║  │  Machine spécifiée dans le problème  → +1 pt             │   ║
-║  │  ≥ 1 cause cite essence/machine CUF → +1 pt             │   ║
-║  │  (Ayous, Azobé, Iroko, Movingui, Bicoupe, Scie…)        │   ║
-║  └──────────────────────────────────────────────────────────┘   ║
-║  Innovation : lie l'analyse au terrain, pas aux généralités     ║
-║                                                                  ║
-╠══════════════════════════════════════════════════════════════════╣
-║  NIVEAUX DE MATURITÉ                                            ║
-║  ┌────────┬─────────────┬────────────────────────────────────┐  ║
-║  │  0–4   │  Ébauche    │ Insuffisant pour toute décision    │  ║
-║  │  5–6   │  Interméd.  │ Structure présente, manque ancrage │  ║
-║  │  7–8   │  Structuré  │ Bonne rigueur, exploitable         │  ║
-║  │  9–10  │  Solide     │ Analyse fiable, prête pour action  │  ║
-║  │ 11–12  │  Expert     │ Niveau TPS — cause systémique CUF  │  ║
-║  └────────┴─────────────┴────────────────────────────────────┘  ║
-╚══════════════════════════════════════════════════════════════════╝
-```
+**Structure retenue (décision 2026-06-05)** : 5 contre-mesures par catégorie. L'app sélectionne la plus pertinente via un **score multicritère** (pas une simple lambda), avec 2 alternatives accessibles en accordéon.
 
-### Exemple concret — avant vs après
+#### Mécanisme de sélection multicritère
 
-```
-AVANT (scoring actuel — résultat trompeur)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Problème : "Arrêts fréquents bicoupe"
-→ Cause 1 (Machine) : "Lame usée"             pourquoi 1 rempli
-→ Cause 2 (Machine) : "Vibrations moteur"     pourquoi 1 rempli
-→ Cause 3 (Machine) : "Roulement défectueux"  pourquoi 1-2 remplis
-Score actuel : "Solide" ✓   (3 causes + max depth 2)
-Problème réel : mono-catégorie, profondeur 2, aucune donnée terrain.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-APRÈS (GEMBA-SCORE — règle bloquante activée)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Axe 1 Spectre 6M     : 1 famille → 0/3 pts ← BLOQUANT
-Score total plafonné : 3/12 → Ébauche
-Guidage affiché : "Analyse mono-catégorie. Explorez Main d'œuvre
-                   et Méthode pour dépasser ce niveau."
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-MÊME PROBLÈME analysé avec rigueur (GEMBA-SCORE Expert)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Origine : Pareto (cause = "Arrêts mécaniques Bicoupe")
-Machine : Bicoupe
-Causes :
-  Machine      → "Lame Azobé usée avant 2 h"        P1–P5 remplis
-  Méthode      → "Pas de check lame début poste"     P1–P3 remplis
-  Main d'œuvre → "Opérateur non formé sur Azobé"    P1–P2 remplis
-  Milieu       → "Copeaux non évacués"               P1 rempli
-Axe 1 : 4 familles → 2/3
-Axe 2 : max depth 5 → 4/4
-Axe 3 : 4/4 causes avec P1 renseigné → 2/2
-Axe 4 : origine Pareto(+1) + machine(+1) + "Azobé"(+1) → 3/3
-Total : 11/12 → Expert
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
-### Affichage dans les templates (objet solidite enrichi)
+Chaque contre-mesure porte des métadonnées de scoring. La fonction `_selectionner_contre_mesure(categorie, contexte)` note chaque candidat et retourne le meilleur + 2 alternatives :
 
 ```python
-# Objet renvoyé par l'API solidite (enrichi, rétro-compatible)
-{
-    "label": "Solide",
-    "couleur": "success",
-    "detail": "9/12",
-    "score": 9,
-    "score_max": 12,
-    "axes": [
-        {"nom": "Spectre 6M",        "pts": 2, "max": 3,
-         "commentaire": "3 familles explorées"},
-        {"nom": "Profondeur chaîne", "pts": 3, "max": 4,
-         "commentaire": "Niveau 4 atteint"},
-        {"nom": "Complétude",        "pts": 2, "max": 2,
-         "commentaire": "100 % des causes avec P1"},
-        {"nom": "Ancrage CUF",       "pts": 2, "max": 3,
-         "commentaire": "Origine Pareto + machine OK"}
+def _selectionner_contre_mesure(categorie, contexte):
+    """Score multicritère : machine (+30), récurrence (+20), durée longue (+15),
+    coût élevé (+15), éviter doublon avec action déjà ouverte (-20)."""
+    candidates = BIBLIOTHEQUE_CONTRE_MESURES.get(categorie, [])
+    if not candidates:
+        return None, []
+
+    # Actions déjà ouvertes pour ce code → pénalité doublon
+    actions_types_ouverts = {
+        a.origine_detail for a in ActionChef.query.filter(
+            ActionChef.reco_code.isnot(None),
+            ActionChef.statut.in_(['a_faire', 'en_cours'])
+        ).all() if a.origine_detail
+    }
+
+    def _score(cm):
+        s = 0
+        if cm.get('prioritaire_si_machine') == contexte.get('machine_critique'):    s += 30
+        if cm.get('prioritaire_si_recurrence') and contexte.get('facteur_recurrence', 1.0) > 1.0: s += 20
+        if cm.get('prioritaire_si_duree_longue') and contexte.get('machine_arrets_h', 0) >= 4:    s += 15
+        if cm.get('prioritaire_si_cout_eleve')  and contexte.get('cause_dominante_fcfa', 0) >= 1_000_000: s += 15
+        if cm.get('action_type') in actions_types_ouverts:  s -= 20  # éviter doublon
+        return s
+
+    scored = sorted(candidates, key=_score, reverse=True)
+    return scored[0], scored[1:3]   # meilleure + 2 alternatives
+```
+
+**Champs de métadonnées par contre-mesure** :
+
+| Champ | Rôle |
+|---|---|
+| `action` | Texte affiché section 4 (contre-mesure principale) |
+| `detail` | Explication terrain (affiché en dessous) |
+| `type` | `structurelle` / `process` / `quick_win` / `preventive` |
+| `prioritaire_si_machine` | Bonus machine (str, optionnel) |
+| `prioritaire_si_recurrence` | Bonus si facteur récurrence > 1 (bool) |
+| `prioritaire_si_duree_longue` | Bonus si arrêts ≥ 4h sur la période (bool) |
+| `prioritaire_si_cout_eleve` | Bonus si FCFA cause ≥ 1 M (bool) |
+| `action_type` | Clé unique pour détecter les doublons avec actions ouvertes (str) |
+| `taux_reussite` | Tuple (min%, max%) utilisé pour calculer le gain attendu |
+
+```python
+# Structure dans recommandations.py
+BIBLIOTHEQUE_CONTRE_MESURES = {
+    'Approvisionnement': [
+        # CM-1 : structurelle, ciblée Scie de tête, très efficace si récurrente
+        {'type': 'structurelle', 'prioritaire_si_machine': 'Scie de tête',
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'appro_avance_contrats',
+         'taux_reussite': (40, 70),
+         'action': "Mettre le parc bois en avance de 3 contrats par rapport à la scierie.",
+         'detail': "Dès qu'un contrat est terminé, le bois du suivant est déjà à portée de la Scie de tête. Règle : stock parc ≥ 3 × volume contrat moyen."},
+        # CM-2 : structurelle, zone tampon, efficace si coût élevé
+        {'type': 'structurelle', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': True,
+         'prioritaire_si_cout_eleve': True, 'action_type': 'appro_zone_tampon',
+         'taux_reussite': (35, 65),
+         'action': "Créer une zone tampon identifiée et dédiée par contrat à l'entrée du parc.",
+         'detail': "Chaque zone tampon porte le numéro de contrat peint au sol. Interdit de mélanger les contrats."},
+        # CM-3 : process, ciblée poste Apres-midi (passation)
+        {'type': 'process', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'appro_passation_13h',
+         'taux_reussite': (30, 55),
+         'action': "Déclencher la préparation du prochain contrat avant 13h (passation Matin → Soir).",
+         'detail': "Le poste du soir hérite d'un parc préparé. Responsable : chef poste Matin."},
+        # CM-4 : quick_win, synchronisation parc-scierie
+        {'type': 'quick_win', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'appro_reunion_synchro',
+         'taux_reussite': (20, 45),
+         'action': "Réunion de synchronisation parc-scierie de 10 min chaque matin avant démarrage.",
+         'detail': "Chef parc + Chef scierie confirment stock disponible pour les 2 prochains contrats."},
+        # CM-5 : process, évacuation produits finis (fallback)
+        {'type': 'process', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'appro_evacuation',
+         'taux_reussite': (20, 40),
+         'action': "Fluidifier l'évacuation des produits finis pour libérer la voie d'approvisionnement.",
+         'detail': "Un couloir obstrué par des planches bloque aussi l'entrée des grumes."},
     ],
-    "bloquant": None   # ou {"axe": "Spectre 6M", "message": "..."}
+    'Panne machine': [
+        # CM-1 : preventive, ciblée Bicoupe, levier maximal
+        {'type': 'preventive', 'prioritaire_si_machine': 'Bicoupe',
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': True,
+         'prioritaire_si_cout_eleve': True, 'action_type': 'panne_preventif_bicoupe',
+         'taux_reussite': (35, 65),
+         'action': "Planifier une maintenance préventive Bicoupe chaque lundi 6h–7h.",
+         'detail': "La Bicoupe traite 100 % du bois. Un arrêt Bicoupe = arrêt total de la chaîne 4."},
+        # CM-2 : preventive, ciblée Scie de tronçonnage
+        {'type': 'preventive', 'prioritaire_si_machine': 'Scie de tronçonnage',
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'panne_preventif_tronconnage',
+         'taux_reussite': (30, 55),
+         'action': "Vérifier serrage des galets et courroies de la Scie de tronçonnage chaque début de poste.",
+         'detail': "Les pannes sur la scie de tronçonnage sont souvent dues à des desserrages progressifs non détectés."},
+        # CM-3 : structurelle, stock pièces critiques
+        {'type': 'structurelle', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': True,
+         'prioritaire_si_cout_eleve': True, 'action_type': 'panne_stock_pieces',
+         'taux_reussite': (25, 50),
+         'action': "Constituer un stock de pièces critiques sur site (courroies, galets, fusibles, lames de rechange).",
+         'detail': "Les délais d'approvisionnement pièces allongent les pannes de 2 h en moyenne. Coût stock < 1 arrêt."},
+        # CM-4 : structurelle, fiche de vie machine
+        {'type': 'structurelle', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'panne_fiche_vie',
+         'taux_reussite': (20, 45),
+         'action': "Créer une fiche de vie machine : date panne, cause, durée, pièce changée.",
+         'detail': "Sans historique, impossible d'identifier les pannes récurrentes ni d'anticiper les prochaines."},
+        # CM-5 : process, formation diagnostic niveau 1
+        {'type': 'process', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'panne_formation_diagnostic',
+         'taux_reussite': (15, 35),
+         'action': "Former un opérateur par poste au diagnostic de premier niveau.",
+         'detail': "Un opérateur formé réduit le temps d'attente du mécanicien de 30 à 60 min par incident."},
+    ],
+    'Mécanique': [
+        # CM-1 : preventive, inspection début de poste, efficace si durée longue
+        {'type': 'preventive', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': True,
+         'prioritaire_si_cout_eleve': True, 'action_type': 'meca_inspection_debut_poste',
+         'taux_reussite': (35, 65),
+         'action': "Inspection préventive début de poste : 10 points de contrôle par machine en 5 min.",
+         'detail': "Serrage visible, niveau huile, courroie, vibration anormale, démarrage à vide. Cocher sur fiche."},
+        # CM-2 : preventive, graissage programmé
+        {'type': 'preventive', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'meca_graissage_prog',
+         'taux_reussite': (30, 55),
+         'action': "Planifier le graissage des machines chaque vendredi fin de poste du soir.",
+         'detail': "Le vendredi laisse le week-end pour les ajustements sans impact sur la production courante."},
+        # CM-3 : structurelle, tableau de bord maintenance visible
+        {'type': 'structurelle', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'meca_tableau_maintenance',
+         'taux_reussite': (20, 40),
+         'action': "Afficher un tableau de bord de maintenance visible dans l'atelier.",
+         'detail': "Dernière révision + prochaine + responsable. La visibilité crée la responsabilisation."},
+        # CM-4 : process, réglage tension courroies
+        {'type': 'process', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': True,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'meca_tension_courroies',
+         'taux_reussite': (25, 45),
+         'action': "Revoir les réglages de tension des courroies selon les recommandations constructeur.",
+         'detail': "Courroie trop tendue → fatigue roulements. Trop lâche → glisse sous charge."},
+        # CM-5 : process, carnet de bord arrêts
+        {'type': 'process', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'meca_carnet_bord',
+         'taux_reussite': (15, 35),
+         'action': "Instaurer un carnet de bord machine rempli à chaque arrêt par le mécanicien.",
+         'detail': "Permet de détecter les patterns : même organe, même poste, même essence ?"},
+    ],
+    'Réglage / outil': [
+        # CM-1 : process, standard lames (règle verrouillée CUF)
+        {'type': 'process', 'prioritaire_si_machine': 'Bicoupe',
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'reglage_standard_lames',
+         'taux_reussite': (50, 80),
+         'action': "Appliquer le standard lames : préventif toutes les 2 h + immédiat au changement tendre↔dure.",
+         'detail': "Ayous/Iroko = tendres. Azobé/Movingui = dures. Un changement de lame non fait coûte en déclassé."},
+        # CM-2 : structurelle, fiche réglage par essence
+        {'type': 'structurelle', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': True, 'action_type': 'reglage_fiche_par_essence',
+         'taux_reussite': (40, 70),
+         'action': "Créer une fiche de réglage par essence affichée au poste (paramètres bicoupe, vitesse, pression).",
+         'detail': "L'opérateur n'a pas à mémoriser les réglages. Il lit, il applique, il démarre."},
+        # CM-3 : process, séquence démarrage standardisée
+        {'type': 'process', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'reglage_sequence_demarrage',
+         'taux_reussite': (35, 60),
+         'action': "Standardiser la séquence de démarrage : réglage bicoupe → vérification lame → test à vide.",
+         'detail': "Démarrer sans séquence = risque de mauvais réglage non détecté avant la première coupe."},
+        # CM-4 : process, regroupement par essence
+        {'type': 'process', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': True,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'reglage_regroupement_essence',
+         'taux_reussite': (30, 55),
+         'action': "Regrouper les contrats par essence (toutes les grumes d'une même essence traitées ensemble).",
+         'detail': "Moins de changements d'essence = moins de changements de lame = moins de temps perdu."},
+        # CM-5 : structurelle, mesure temps réglage
+        {'type': 'structurelle', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'reglage_chrono_objectif',
+         'taux_reussite': (20, 40),
+         'action': "Chronométrer les temps de réglage actuels et fixer un objectif réaliste (objectif cible : < 8 min).",
+         'detail': "Sans mesure de référence, impossible de savoir si une amélioration a eu lieu."},
+    ],
+    'Qualité matière': [
+        # CM-1 : preventive, contrôle réception, ciblée si essence problématique connue
+        {'type': 'preventive', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': True, 'action_type': 'qualite_controle_reception',
+         'taux_reussite': (30, 60),
+         'action': "Instaurer un contrôle visuel des grumes à réception : nœuds, fentes, pourri visible.",
+         'detail': "Les grumes défectueuses découvertes à la scierie ont déjà mobilisé du temps de transport inutile."},
+        # CM-2 : structurelle, tri amont parc
+        {'type': 'structurelle', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': True,
+         'prioritaire_si_cout_eleve': True, 'action_type': 'qualite_tri_parc',
+         'taux_reussite': (25, 55),
+         'action': "Trier les grumes au parc : lot A (conforme), lot B (à déclasser), lot C (à refuser).",
+         'detail': "Traiter B et C en fin de poste ou en période creuse évite de polluer le flux principal."},
+        # CM-3 : structurelle, pénalité fournisseur
+        {'type': 'structurelle', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': True, 'action_type': 'qualite_penalite_fournisseur',
+         'taux_reussite': (20, 50),
+         'action': "Négocier un droit de retour ou une pénalité avec les fournisseurs de grumes défectueuses.",
+         'detail': "Rend le coût de la mauvaise qualité visible côté fournisseur, pas seulement côté scierie."},
+        # CM-4 : process, tableau taux déclassement par fournisseur
+        {'type': 'process', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'qualite_tableau_fournisseur',
+         'taux_reussite': (15, 35),
+         'action': "Mesurer le taux de déclassement par fournisseur et afficher le classement chaque semaine.",
+         'detail': "La transparence crée une pression naturelle. Le fournisseur en bas du tableau cherche à remonter."},
+        # CM-5 : process, formation tri précoce opérateurs
+        {'type': 'process', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'qualite_formation_tri',
+         'taux_reussite': (15, 30),
+         'action': "Former les opérateurs au tri précoce : défauts traitables vs rédhibitoires.",
+         'detail': "Un bois nœudeux peut être débité différemment. Un bois pourri ne peut pas être sauvé."},
+    ],
+    'Organisationnelle': [
+        # CM-1 : process, passation Matin↔Soir standardisée
+        {'type': 'process', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'org_passation_standardisee',
+         'taux_reussite': (40, 70),
+         'action': "Standardiser la passation Matin↔Après-midi : fiche signée par les deux chefs de poste.",
+         'detail': "5 min max : volumes du matin, problèmes non résolus, état machines, consignes spéciales."},
+        # CM-2 : process, 5S fin de poste
+        {'type': 'process', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': True,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'org_5s_fin_poste',
+         'taux_reussite': (30, 55),
+         'action': "Appliquer un 5S de fin de poste : chaque opérateur range son poste avant de partir.",
+         'detail': "Un poste rangé = démarrage rapide du poste suivant = moins de temps cherché sur les outils."},
+        # CM-3 : process, planning journalier affiché
+        {'type': 'process', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'org_planning_affiche',
+         'taux_reussite': (25, 45),
+         'action': "Afficher le planning du jour (essence, objectif volume, ordre des contrats) au démarrage.",
+         'detail': "Les 5 premières minutes d'un poste définissent souvent sa dynamique entière."},
+        # CM-4 : process, nettoyages planifiés hors production
+        {'type': 'process', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'org_nettoyage_planifie',
+         'taux_reussite': (20, 40),
+         'action': "Planifier les nettoyages en fin de poste, pas pendant la production.",
+         'detail': "Un nettoyage non planifié pendant la production = arrêt non documenté = Pareto faussé."},
+        # CM-5 : quick_win, réunion flash 5 min
+        {'type': 'quick_win', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'org_reunion_flash',
+         'taux_reussite': (15, 35),
+         'action': "Instaurer une réunion flash de 5 min en début de poste pour les écarts du poste précédent.",
+         'detail': "Transmet les informations critiques sans réunion longue ni email."},
+    ],
+    'Énergie / réseau': [
+        # CM-1 : structurelle, groupe électrogène de secours
+        {'type': 'structurelle', 'prioritaire_si_machine': 'Bicoupe',
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': True,
+         'prioritaire_si_cout_eleve': True, 'action_type': 'energie_groupe_secours',
+         'taux_reussite': (25, 50),
+         'action': "Installer un groupe électrogène de secours dimensionné pour les machines critiques.",
+         'detail': "Priorité : Bicoupe + éclairage atelier. Coût groupe < coût d'un arrêt de 2 semaines."},
+        # CM-2 : process, déclaration coupures à l'exploitant réseau
+        {'type': 'process', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'energie_declaration_exploitant',
+         'taux_reussite': (10, 30),
+         'action': "Déclarer chaque coupure à l'exploitant réseau avec horodatage et durée exacte.",
+         'detail': "Sans historique documenté, aucune pression possible sur le gestionnaire réseau."},
+        # CM-3 : preventive, onduleur automates
+        {'type': 'preventive', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': False, 'prioritaire_si_duree_longue': True,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'energie_onduleur_automates',
+         'taux_reussite': (15, 35),
+         'action': "Installer un onduleur ou protection surtension sur les automates de commande.",
+         'detail': "Les redémarrages après coupure abîment les automates et allongent les arrêts de 20-40 min."},
+        # CM-4 : process, tâches non-machines pendant coupures récurrentes
+        {'type': 'process', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': False, 'action_type': 'energie_planif_creuses',
+         'taux_reussite': (10, 25),
+         'action': "Planifier les tâches non-machines (inventaire, maintenance légère) pendant les coupures récurrentes.",
+         'detail': "Si les coupures surviennent régulièrement, ne pas subir : planifier autour."},
+        # CM-5 : structurelle, contrat délestage prioritaire
+        {'type': 'structurelle', 'prioritaire_si_machine': None,
+         'prioritaire_si_recurrence': True, 'prioritaire_si_duree_longue': False,
+         'prioritaire_si_cout_eleve': True, 'action_type': 'energie_contrat_prioritaire',
+         'taux_reussite': (10, 40),
+         'action': "Négocier un contrat de délestage prioritaire avec le fournisseur d'énergie.",
+         'detail': "Les industries prioritaires sont délestées en dernier. CUF peut en faire partie."},
+    ],
 }
 ```
 
-La fonction `majSolidite()` dans `ishikawa.html` et `pourquoi.html` est enrichie pour afficher 4 mini-barres de progression sous le badge principal — mise à jour en temps réel à chaque sauvegarde de cause/pourquoi.
+**Affichage** : contre-mesure n°1 en texte principal de la section 4 de la fiche. Un bouton « Voir 2 alternatives » déroule les options n°2 et n°3 sous forme compacte.
 
----
+Déclencheur Source B inchangé : catégorie d'arrêt n°1 du Pareto ≥ 30 % du temps d'arrêt. Seuil `Parametre.get('seuil_part_cause_dominante', 30.0)`.
 
-## DESIGN 2 — RECOMMANDATIONS COUCHE 1 ENRICHIE
+### Exemple complet — fiche approvisionnement (cas utilisateur)
+
+```
+Signal détecté :
+  Les arrêts « Approvisionnement bois » à la Scie de tête représentent
+  38 % du temps d'arrêt de la semaine (5h10 cumulées sur 13h30).
+
+Lecture terrain :
+  Le parc bois livre les contrats trop tard car le triage est fait au
+  dernier moment. La Scie de tête attend les grumes entre deux contrats.
+
+Ce que ça coûte :
+  Manque à gagner estimé sur ces arrêts : 1 450 000 FCFA cette semaine.
+
+Action recommandée :
+  Mettre le parc bois en avance de 3 contrats par rapport à la scierie
+  et créer une zone tampon identifiée pour chaque contrat. Ainsi, dès
+  qu'un contrat est fini, le bois du suivant est déjà disponible.
+
+Gain attendu :
+  Si les arrêts d'approvisionnement baissent de 50 %, récupération
+  estimée à ~725 000 FCFA/semaine.
+
+Vérification :
+  Comparer le temps d'arrêt « Approvisionnement » de la Scie de tête
+  avant/après sur 7 jours.
+```
+
+### Avant / Après — règle indicateur TRS_CRITIQUE (Source A)
+
+```
+AVANT (texte statique — identique quelle que soit la réalité)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+"Cartographier les arrêts machine. Identifier les machines les plus
+ impactantes. Mettre en place un relevé structuré des durées et causes."
+
+APRÈS (6 sections, données réelles CUF)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Signal détecté : TRS moyen 52 % (seuil critique 50 %, objectif 60 %).
+Lecture terrain : la Bicoupe concentre 8h30 d'arrêts ; le poste
+  Après-midi affiche 44 % contre 58 % le matin.
+Ce que ça coûte : manque à gagner estimé 1 200 000 FCFA cette semaine.
+Action : analyser la cause racine des arrêts Bicoupe (Après-midi).
+Gain attendu : si TRS remonte à 60 %, ~900 000 FCFA/semaine récupérés.
+Vérification : comparer TRS Bicoupe Après-midi avant/après sur 7 jours.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
 
 ### Enrichissement du dict contexte
 
 ```python
-# Nouvelles clés ajoutées dans vue_recommandations() / analyse_recommandations()
+# Nouvelles clés dans vue_recommandations() / analyse_recommandations()
 contexte = {
     # --- Existant ---
-    "trs_moyen": 52.3,
-    "manque": 2_450_000,
-    "nb_postes": 14,
-    "pct_r2": 18.5,
-    "pct_r3": 12.0,
+    "trs_moyen": 52.3, "manque": 2_450_000, "nb_postes": 14,
+    "pct_r2": 18.5, "pct_r3": 12.0,
     # --- Nouveau ---
-    "machine_critique": "Bicoupe",          # top-1 Pareto sur la période
-    "machine_arrets_h": 8.5,               # durée cumulée en heures
-    "essence_declass": "Azobé",            # essence avec plus haut déclassement
-    "declass_pct_essence": 38.2,           # son taux de déclassement %
-    "objectif_m3": 25.0,                   # objectif journalier configuré
-    "production_reelle_moy": 15.6,         # moyenne réelle sur la période
-    "gain_potentiel_fcfa": 1_200_000,      # gain si TRS revient à 60 %
+    "machine_critique": "Bicoupe",           # _machine_prioritaire_recent()
+    "machine_arrets_h": 8.5,                 # durée cumulée heures
+    "cause_dominante": "Approvisionnement",   # top catégorie Pareto
+    "cause_dominante_pct": 38.0,             # sa part du temps d'arrêt
+    "cause_dominante_fcfa": 1_450_000,       # son coût estimé
+    "essence_declass": "Azobé",              # _qualite_par_essence()
+    "declass_pct_essence": 38.2,
+    "gain_potentiel_fcfa": 900_000,          # gain si TRS → 60 %
+    "trs_objectif": 60.0,                    # Parametre.get('trs_objectif_pct', 60.0)
 }
 ```
 
-Ces données sont calculées à partir de helpers déjà présents : `_machine_prioritaire_recent()`, `_qualite_par_essence()`, `Parametre.get()`.
+Helpers déjà présents à réutiliser : `_machine_prioritaire_recent()` (dashboard.py), Pareto par catégorie (dashboard.py:2399), `_qualite_par_essence()`, `calcule_manque_gagner()` (trs.py), `Parametre.get()`.
 
-### Avant / Après une solution TRS_CRITIQUE
+### Score de priorité : FCFA × récurrence (décision 2026-06-05)
 
-```
-AVANT (statique — identique quelles que soient les données)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Solution 1 :
-  titre  : "Cartographier les arrêts machine"
-  detail : "Identifier les machines les plus impactantes.
-            Mettre en place un relevé structuré des durées et causes."
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-APRÈS (dynamique — données CUF réelles injectées)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Solution 1 :
-  titre  : "Analyser les arrêts Bicoupe (8,5 h cumulées)"
-  detail : "La Bicoupe concentre l'essentiel des arrêts sur la période.
-            Avec un TRS actuel de 52,3 % (objectif 60 %), chaque heure
-            d'arrêt non documenté représente ~288 000 FCFA de manque
-            à gagner. Action immédiate : lancer une analyse Ishikawa
-            sur la cause racine Bicoupe → gain estimé 1 200 000 FCFA/
-            semaine si TRS remonte à 60 %."
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
-### Priorité dynamique
+Remplace la priorité hardcodée et `_priorite_dynamique()`. Chaque recommandation déclenchée reçoit un score calculé :
 
 ```python
-# AVANT : priorite = 3 (hardcodé dans _REGLES)
-
-# APRÈS : calculée selon l'écart réel au seuil
-def _priorite_dynamique(trs_actuel, seuil_critique, seuil_moyen):
-    if trs_actuel is None:
-        return 2
-    if trs_actuel < seuil_critique:     # ex: 45 < 50
-        return 3   # haute
-    elif trs_actuel < seuil_moyen:      # ex: 55 < 60
-        return 2   # moyenne
-    return 1       # basse
+def _score_recommandation(code: str, manque_fcfa: float, date_fin, jours: int = 30) -> int:
+    """Score = FCFA courant × facteur récurrence (nb périodes récentes où la règle a aussi tiré)."""
+    # Vérifier si la règle s'est déclenchée dans la période précédente
+    date_prec_fin = date_fin - timedelta(days=jours)
+    date_prec_debut = date_prec_fin - timedelta(days=jours)
+    recos_prec = analyse_recommandations(date_debut=date_prec_debut, date_fin=date_prec_fin)
+    codes_prec = {r['code'] for r in recos_prec}
+    facteur = 1.5 if code in codes_prec else 1.0   # +50 % si déjà déclenché la période d'avant
+    return round(manque_fcfa * facteur)
 ```
+
+`analyse_recommandations()` retourne la liste triée par `score` décroissant. En cas d'égalité, Source B (cause terrain) passe avant Source A (indicateur). Affichage limité à **5 fiches** maximum (lisibilité terrain).
+
+### Calcul du gain attendu — formule physique (décision 2026-06-05)
+
+Le gain est calculé à partir des paramètres physiques de la chaîne 4, pas en appliquant un % sur le FCFA global. Cela isole la part récupérable imputable à la cause spécifique de la recommandation.
+
+**Source B (cause d'arrêt dominante) :**
+
+```python
+def _calculer_gain_attendu_source_b(contexte, taux_reussite_tuple):
+    """
+    Gain = heures_imputables_cause × taux_reussite × capacite_h × prix_moyen_pondere
+    Formule ancrée dans les paramètres physiques de la chaîne 4 (pas un % sur FCFA global).
+    """
+    taux_min_pct, taux_max_pct = taux_reussite_tuple
+
+    # Proxy heures imputables : inverser le calcul FCFA cause dominante
+    prix_moyen = _prix_moyen_pondere(contexte.get('equipes_periode', []))
+    capacite_h = Parametre.get('capacite_equipe_h', 1.5625)   # m³/h
+    fcfa_cause = contexte.get('cause_dominante_fcfa', 0)
+
+    if fcfa_cause <= 0 or prix_moyen <= 0 or capacite_h <= 0:
+        return 0, 0
+
+    # heures perdues imputables à cette cause (récupération inverse du calcul FCFA)
+    heures_cause = fcfa_cause / (prix_moyen * capacite_h)
+
+    gain_min = round(heures_cause * taux_min_pct / 100 * capacite_h * prix_moyen)
+    gain_max = round(heures_cause * taux_max_pct / 100 * capacite_h * prix_moyen)
+    # Équivalent simplifié : gain_min = fcfa_cause × taux_min / 100
+    # Mais l'écriture via heures × capacite × prix rend la formule explicitement physique
+    return gain_min, gain_max
+```
+
+**Taux de réussite par catégorie** (intégrés dans `BIBLIOTHEQUE_CONTRE_MESURES['taux_reussite']` ci-dessus) :
+
+| Catégorie | Taux min | Taux max | Justification |
+|---|---|---|---|
+| Approvisionnement | 40 % | 70 % | Levier management direct, décision rapide |
+| Panne machine | 30 % | 60 % | Dépend de la qualité du préventif effectué |
+| Mécanique | 35 % | 65 % | Bonne réponse aux inspections régulières |
+| Réglage / outil | 50 % | 80 % | Fort levier : standardisation lames très efficace |
+| Qualité matière | 20 % | 50 % | Dépend du fournisseur, hors contrôle direct CUF |
+| Organisationnelle | 40 % | 70 % | Levier fort mais exige adhésion des équipes |
+| Énergie / réseau | 10 % | 40 % | Facteurs externes, levier limité |
+
+**Source A (règles indicateur) — méthode par type :**
+
+```python
+GAIN_METHODE_SOURCE_A = {
+    # TRS : gain = (TRS_objectif - TRS_actuel)/100 × heures_totales_postes × capacite × prix × taux
+    'TRS_CRITIQUE':         {'taux': (35, 65), 'methode': 'trs_delta'},
+    'TRS_MOYEN':            {'taux': (25, 50), 'methode': 'trs_delta'},
+    # Déclassé : gain = volume_declass_m3 × (prix_conforme - prix_revente_declass) × taux
+    'DECLASS_EXCESSIF':     {'taux': (30, 60), 'methode': 'declass_delta'},
+    # Manque : appliquer taux directement sur manque_a_gagner
+    'MANQUE_ELEVE':         {'taux': (25, 50), 'methode': 'manque_direct'},
+    # Saisies : gain non quantifiable en FCFA direct (problème de données, pas de production)
+    'SAISIES_INCOHERENTES': {'taux': None,     'methode': 'non_quantifiable'},
+    # Tendance : gain = delta_semaine_fcfa × taux
+    'TENDANCE_NEGATIVE':    {'taux': (20, 45), 'methode': 'tendance_delta'},
+}
+```
+
+**Affichage section 5 :** `"Gain attendu : entre {gain_min} et {gain_max} FCFA/semaine si l'action réussit — estimation basée sur {heures_cause:.1f} h perdues × {capacite_h} m³/h × {prix_moyen} FCFA/m³ × taux de réussite {taux_min}–{taux_max} %."` Présenté comme estimation explicite, hypothèses visibles pour défendabilité académique. Pour `SAISIES_INCOHERENTES`, section 5 affiche : `"Gain non chiffrable directement — ce problème fausse les calculs TRS. Le corriger améliore la fiabilité de tous les indicateurs."`
 
 ### Correction seuil hardcodé
 
-`SAISIES_INCOHERENTES` utilise `>20.0` hardcodé. Remplacé par `Parametre.get('seuil_saisies_incoherentes', 20.0)` — cohérent avec tous les autres seuils du moteur.
+`SAISIES_INCOHERENTES` utilise `>20.0` hardcodé. Remplacer par
+`Parametre.get('seuil_saisies_incoherentes', 20.0)` — cohérent avec tous les autres seuils.
+
+### Boutons d'action par recommandation (défaut retenu — utilisateur « aucune idée »)
+
+Chaque fiche reçoit le CTA adapté à sa nature plutôt qu'un bouton uniforme :
+
+| Type de reco | CTA principal |
+|---|---|
+| TRS_CRITIQUE, ARRETS_NON_DOCUMENTES, DECLASS_EXCESSIF, RENDEMENT_FAIBLE, OBJECTIF_NON_ATTEINT, TENDANCE_NEGATIVE | **Créer analyse Ishikawa** (pré-remplit `origine_type='recommandation'`, `reco_code`) |
+| Fiches Source B (approvisionnement, etc.) — contre-mesure déjà connue | **Créer une action Chef** (la contre-mesure est identifiée, on la suit) |
+| SAISIES_INCOHERENTES — problème de données, pas de production | **Voir les fiches à corriger** (lien vers liste filtrée) |
+
+Si une analyse existe déjà pour un code, afficher « Voir l'analyse #N » : la route `recommandations.index()` injecte `problemes_par_reco = {code: probleme_id}` via `Probleme.query.filter_by(origine_type='recommandation')`.
+
+### Boucle vérification — avant/après sur indicateur réel (décision 2026-06-05)
+
+L'objectif P4 : montrer que l'outil ne se limite pas à proposer des actions — il mesure si l'action a produit un effet. La section 6 compare l'indicateur déclenchant avant et après l'action.
+
+**Chaque règle et contre-mesure définit son `indicateur_verification`** :
+
+| Code / Catégorie | Indicateur mesuré | Sens attendu |
+|---|---|---|
+| TRS_CRITIQUE, TRS_MOYEN | TRS moyen (%) | ↑ hausse |
+| DECLASS_EXCESSIF | % volume déclassé | ↓ baisse |
+| ARRETS_NON_DOCUMENTES | % postes avec arrêts non documentés | ↓ baisse |
+| SAISIES_INCOHERENTES | % postes avec anomalies R1+R4 | ↓ baisse |
+| TENDANCE_NEGATIVE | Manque à gagner (FCFA/semaine) | ↓ baisse |
+| Source B (toutes catégories) | Heures d'arrêt de la catégorie dominante | ↓ baisse |
+
+**Calcul avant/après — sans nouvelle table** :
+
+```python
+def _calcul_avant_apres_reco(code, action):
+    """
+    Avant  = indicateur sur les 30 jours AVANT création de l'action.
+    Après  = indicateur sur les 7 jours APRÈS la date de clôture.
+    Clôture = date du dernier ActionChefEvenement avec nouveau_statut='fait'.
+    Pas de nouvelle table : utilise action.cree_le + ActionChefEvenement.
+    """
+    evt_clos = ActionChefEvenement.query.filter_by(
+        action_id=action.id, nouveau_statut='fait'
+    ).order_by(ActionChefEvenement.cree_le.desc()).first()
+
+    if not evt_clos:
+        return {'statut': 'non_close'}
+
+    date_clos = evt_clos.cree_le.date()
+    apres_fin  = date_clos + timedelta(days=7)
+
+    if date.today() < apres_fin:
+        jours_restants = (apres_fin - date.today()).days
+        return {'statut': 'en_attente', 'jours_restants': jours_restants}
+
+    avant_debut = action.cree_le.date() - timedelta(days=30)
+    avant_fin   = action.cree_le.date()
+    apres_debut = date_clos
+
+    return _indicateur_avant_apres(code, avant_debut, avant_fin, apres_debut, apres_fin)
+
+
+def _indicateur_avant_apres(code, avant_debut, avant_fin, apres_debut, apres_fin):
+    """Calcule valeur avant et après sur l'indicateur propre à chaque code."""
+    INDICATEURS = {
+        'TRS_CRITIQUE':         ('trs_moyen',          'hausse'),
+        'TRS_MOYEN':            ('trs_moyen',           'hausse'),
+        'DECLASS_EXCESSIF':     ('pct_declass',         'baisse'),
+        'ARRETS_NON_DOCUMENTES':('pct_r2_anomalies',    'baisse'),
+        'SAISIES_INCOHERENTES': ('pct_anomalies_r1r4',  'baisse'),
+        'TENDANCE_NEGATIVE':    ('manque_fcfa_semaine',  'baisse'),
+    }
+    libelle_map = {
+        'trs_moyen': 'TRS moyen (%)',
+        'pct_declass': '% volume déclassé',
+        'pct_r2_anomalies': '% postes arrêts non documentés',
+        'pct_anomalies_r1r4': '% postes avec anomalies saisie',
+        'manque_fcfa_semaine': 'Manque à gagner FCFA/semaine',
+        'heures_arret_categorie': 'Heures arrêt catégorie dominante',
+    }
+
+    # Source B : indicateur = heures arrêt de la catégorie (code commence par 'B_')
+    if code.startswith('B_'):
+        indicateur, sens = 'heures_arret_categorie', 'baisse'
+    else:
+        indicateur, sens = INDICATEURS.get(code, ('trs_moyen', 'hausse'))
+
+    valeur_avant = _calculer_indicateur(indicateur, avant_debut, avant_fin)
+    valeur_apres = _calculer_indicateur(indicateur, apres_debut, apres_fin)
+
+    if valeur_avant is None or valeur_apres is None:
+        return {'statut': 'donnees_insuffisantes'}
+
+    delta = valeur_apres - valeur_avant
+    delta_pct = round(delta / valeur_avant * 100, 1) if valeur_avant != 0 else 0
+    amelioration = (sens == 'hausse' and delta > 0) or (sens == 'baisse' and delta < 0)
+
+    return {
+        'statut': 'bilan_disponible',
+        'libelle': libelle_map.get(indicateur, indicateur),
+        'avant': valeur_avant, 'apres': valeur_apres,
+        'delta': delta, 'delta_pct': delta_pct,
+        'amelioration': amelioration,
+        'verdict': 'Amélioration confirmée ✓' if amelioration else 'Pas d\'amélioration détectée',
+    }
+```
+
+**Rendu template section 6** selon le `statut` du bilan :
+- `non_close` → texte statique de l'indicateur + CTA (créer action / voir action en cours)
+- `en_attente` → `"Action clôturée — bilan disponible dans {jours_restants} jours (7 j de recul nécessaires)."`
+- `donnees_insuffisantes` → `"Données insuffisantes sur la période de comparaison."`
+- `bilan_disponible` → tableau avant/après : indicateur | Avant | Après | Δ | Verdict vert ou rouge
+
+**P4 simple, P5 enrichi** : en P5, cette boucle sera complétée par l'estimation FCFA évités (Design 3 croisé avec le bilan indicateur). En P4, le verdict est qualitatif (amélioration oui/non) + valeurs réelles de l'indicateur.
+
+**Aucune nouvelle table** : repose sur `ActionChef.reco_code` + `ActionChefEvenement` (table existante pour l'audit trail).
 
 ---
 
-## DESIGN 3 — BOUCLE D'AMÉLIORATION TRACÉE
+## DESIGN 2 — SUPPRESSION COUCHE 2 IA (accord utilisateur 2026-06-05)
 
-```
-RECOMMANDATIONS                        ISHIKAWA
-┌─────────────────────────────┐        ┌─────────────────────────────┐
-│ TRS Critique (52.3%)        │        │ "Analyse TRS Critique"      │
-│ Bicoupe · 8.5h · 1.2M FCFA │        │                             │
-│                             │        │ GEMBA-SCORE : 7/12          │
-│ [Créer analyse Ishikawa] ───┼───────►│ ████████░░░░                │
-│ (tous les codes, pas 3)     │        │ Axe1:2 Axe2:3 Axe3:1 Axe4:1│
-│                             │        │ "Issu de : TRS_CRITIQUE"    │
-│ Si analyse existante :      │        │                             │
-│ [Voir l'analyse #12]        │        │ [Créer action] ─────────┐   │
-└─────────────────────────────┘        └─────────────────────────┼───┘
-                                                                  │
-                                       ACTION CHEF               │
-                                       ┌──────────────────────── ▼───┐
-                                       │ "Réduire arrêts Bicoupe"    │
-                                       │ Issu de : Analyse #12       │
-                                       │ → Reco TRS_CRITIQUE         │
-                                       │ Bilan d'efficacité à J+7    │
-                                       └─────────────────────────────┘
-```
+Fichiers et blocs à supprimer :
 
-**Implémentation** : le bouton "Créer analyse Ishikawa" pré-remplit `origine_type='recommandation'` et `reco_code=reco.code` — déjà supporté par la route `problemes.nouveau` existante (cf. template index.html lignes 130-136 qui le fait déjà pour 3 codes). P4 étend ce mécanisme à tous les codes.
+1. `app/services/reco_ai.py` — fichier entier.
+2. `app/templates/recommandations/index.html` — bloc `wp-reco-ai-zone` (~lignes 141-156) + script AJAX `analyserIA()` (~lignes 164-220).
+3. `app/routes/recommandations.py` — route `/ai/<code>` (POST) + import `reco_ai`.
 
-Pour afficher "Voir l'analyse" si une analyse existe, la route `recommandations.index()` injecte un dict `problemes_par_reco` : `{code: probleme_id}` construit par une requête sur `Probleme.query.filter_by(origine_type='recommandation').all()`.
+Le bandeau « enrichissement IA » (index.html ligne 53) est remplacé par :
+`« Recommandations calculées sur les données réelles des {{ nb_postes }} postes · TRS actuel {{ trs }} % · 100 % hors ligne. »`
 
 ---
 
-## DESIGN 4 — SUPPRESSION COUCHE 2 IA
+## DESIGN 3 — BILAN ACTIONS CHEF EN FCFA ÉVITÉ
 
-Fichiers et blocs à supprimer (sous confirmation utilisateur) :
+### Problème actuel
 
-1. `app/services/reco_ai.py` — fichier entier
-2. `app/templates/recommandations/index.html` — bloc `wp-reco-ai-zone` (~lignes 141-156) + script AJAX `analyserIA()` (~lignes 164-220)
-3. `app/routes/recommandations.py` — route `/ai/<code>` (POST)
-4. Import de `reco_ai` dans les fichiers qui l'utilisent
+`_bilan_efficacite_action_chef()` (dashboard.py:270) compare uniquement les arrêts avant/après (`nb_arrets`, `duree_moy`, seuil 20 % → « Amélioration visible »).
 
-Le bandeau "enrichissement IA" (index.html ligne 53) est remplacé par : "Recommandations calculées sur les données réelles des {{ nb_postes }} postes · TRS actuel {{ trs }}% · 100 % hors ligne."
+### Ce que l'utilisateur veut
+
+Bilan en **FCFA évités** (pas seulement en arrêts) + tri de la liste actions par impact FCFA potentiel.
+
+### Enrichissement
+
+```python
+# Dans _bilan_efficacite_action_chef(), après duree_moy_avant/après :
+capacite_m3_h  = Parametre.get('capacite_equipe_h', 1.5625)
+prix_moyen     = _prix_moyen_pondere(equipes_avant)        # prix snapshot
+duree_reduite_h = (duree_moy_avant - duree_moy_apres) * nb_arrets_apres / 60
+fcfa_evite = round(max(0, duree_reduite_h) * capacite_m3_h * prix_moyen)
+bilan["fcfa_evite"] = fcfa_evite
+```
+
+Template actions : badge vert « X FCFA évités/semaine (estimation) » si `fcfa_evite > 0`.
+
+### Tri par impact FCFA potentiel
+
+Dans la liste `actions_chef`, trier par durée d'arrêts récents de `action.machine_cible` × capacité × prix. Les actions sur la machine critique remontent en premier.
+
+---
+
+## DESIGN 4 — ALERTE COCKPIT DEPUIS RÉCURRENCES MACHINES
+
+`_recurrences_machines()` (dashboard.py:1622) détecte déjà : machine ≥3 occurrences, cause ≥3 occurrences, combo machine+cause ≥2 occurrences et ≥90 min cumulées.
+
+Injecter le résultat dans `vue_chef()` et l'afficher dans la colonne gauche du cockpit via le partial existant `_signaux_p2.html` :
+```
+⚠ Récurrence : Bicoupe × « Changement de lame » — 3 fois, 2h15 cumulées
+  [Analyser (Ishikawa)] →
+```
+
+---
+
+## DESIGN 5 — PRIX VISIBLES PAR LE CHEF (lecture seule)
+
+Dans `app/routes/admin.py`, retirer `prix_ayous`, `prix_iroko`, `prix_azobe`, `prix_movingui` de `PARAMS_ADMIN_ONLY`. Afficher en lecture seule dans un encart de `templates/dashboard/pertes.html` :
+« Prix utilisés dans les calculs : Ayous X · Iroko Y · Azobé Z · Movingui W FCFA/m³ — modifiables dans les paramètres admin. »
+Afficher la **source effectivement utilisée** par `calcule_manque_gagner()` (prix_snapshot figé vs Parametre vivant) pour cohérence avec les montants.
 
 ---
 
@@ -270,15 +708,26 @@ Le bandeau "enrichissement IA" (index.html ligne 53) est remplacé par : "Recomm
 
 | Fichier | Modification |
 |---|---|
-| `app/routes/problemes.py` | Réécrire `_solidite_analyse()` (lignes 98-118) avec GEMBA-SCORE · Ajouter helper `_gemba_axes()` |
-| `app/services/recommandations.py` | Enrichir contexte dict · Réécrire 7 solutions dynamiques · Ajouter `_priorite_dynamique()` · Corriger seuil hardcodé |
-| `app/routes/recommandations.py` | Injecter nouvelles clés contexte · Injecter `problemes_par_reco` · Supprimer route AI |
-| `app/templates/problemes/ishikawa.html` | Enrichir `majSolidite()` — afficher 4 mini-barres GEMBA |
-| `app/templates/problemes/pourquoi.html` | Même enrichissement `majSolidite()` |
-| `app/templates/recommandations/index.html` | Supprimer Couche 2 · Bouton "Créer analyse" sur tous codes · "Voir l'analyse" si existe |
-| `app/templates/problemes/rapport.html` | Afficher "Issu de la recommandation [titre]" si `origine_type == 'recommandation'` |
-| `app/services/reco_ai.py` | **SUPPRIMER** (accord utilisateur requis) |
-| `documents/notes-impact/P58-feat-ishikawa-reco-p4.md` | Note d'impact 9 sections avant commit |
+| `app/services/recommandations.py` | Réécrire les 7 règles en format 6 sections (Source A) · `BIBLIOTHEQUE_CONTRE_MESURES` (5 CM × 7 catégories avec métadonnées scoring) · `_selectionner_contre_mesure()` (score multicritère : machine +30, récurrence +20, durée +15, coût +15, doublon -20) · `_calculer_gain_attendu_source_b()` (heures_cause × taux × capacite × prix) · `GAIN_METHODE_SOURCE_A` (méthode par règle) · `_score_recommandation()` (FCFA × récurrence) · `_calcul_avant_apres_reco()` + `_indicateur_avant_apres()` (boucle avant/après par indicateur) · corriger seuil `SAISIES_INCOHERENTES` |
+| `app/routes/recommandations.py` | Enrichir contexte (machine/cause dominante/FCFA/equipes_periode) · injecter `problemes_par_reco` + `bilans_par_reco` (avant/après indicateur) · supprimer route + import AI |
+| `app/templates/recommandations/index.html` | Supprimer Couche 2 · remplacer bandeau IA · CTA adapté par type de reco |
+| `app/routes/dashboard.py` | Calculer cause d'arrêt dominante (réutiliser Pareto) · enrichir `_bilan_efficacite_action_chef()` (FCFA) · tri actions par impact · injecter récurrences au cockpit |
+| `app/templates/chef/_signaux_p2.html` | Alerte récurrence machine si détectée |
+| `app/templates/chef/actions.html` | Badge FCFA évités sur actions bilantées |
+| `app/routes/admin.py` | Retirer prix_* de `PARAMS_ADMIN_ONLY` |
+| `app/templates/dashboard/pertes.html` | Encart prix lecture seule |
+| `app/services/reco_ai.py` | **SUPPRIMER** |
+| `documents/notes-impact/P58-feat-reco-metier-p4.md` | Note d'impact 9 sections avant commit |
+
+---
+
+## DIFFÉRÉ P5
+
+- Rubrique 2 Fiches : auto-validation admin après X heures si chef absent ; tri fiches anomalie en tête.
+- Rubrique 4 Qualité : flèches tendance par essence + comparaison période sur période.
+- Rubrique 5 Pertes : comparaison multi-période + lien « Créer action corrective » depuis une perte.
+- Rubrique 3 Machines : bouton Ishikawa depuis fiche récurrence sur la page Machines (pas seulement cockpit).
+- Enrichir la bibliothèque Source B avec plusieurs contre-mesures alternatives par catégorie.
 
 ---
 
@@ -289,13 +738,13 @@ cd cuf-pilotage && python seed_data.py
 bash .claude/skills/run-cuf-pilotage/smoke.sh       # 16/16 doivent rester verts
 python .claude/skills/run-cuf-pilotage/screenshot.py chef
 # Contrôler :
-# · GEMBA-SCORE avec 4 mini-barres dans ishikawa + pourquoi templates
-# · Score "Ébauche" si analyse mono-catégorie (règle bloquante active)
-# · Score "Expert" si 4+ familles × depth 5 × données CUF
-# · Recommandations citent TRS%, FCFA, machine et essence réels
-# · Bouton "Créer analyse Ishikawa" présent sur TOUS les codes
-# · Aucun bouton "Analyser avec l'IA" visible
-# · Message "100 % hors ligne" à la place du bandeau IA
+# · Reco TRS_CRITIQUE affiche les 6 sections avec TRS%, machine, FCFA réels
+# · Reco « cause dominante » apparaît si une catégorie ≥ 30 % du temps d'arrêt
+# · Aucun bouton « Analyser avec l'IA » nulle part ; bandeau « 100 % hors ligne »
+# · CTA adapté : Ishikawa / Action Chef / Corriger fiches selon le type
+# · Actions Chef triées par impact FCFA ; badge « FCFA évités » sur action efficace
+# · Prix par essence visibles sur /pertes (lecture seule)
+# · Alerte récurrence machine dans la colonne gauche du cockpit si détectée
 ```
 
 ---

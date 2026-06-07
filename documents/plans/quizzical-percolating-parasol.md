@@ -1,7 +1,377 @@
-# P4 — Recommandations métier + Actions FCFA + Signaux machines (plan actif)
+# P5-A — Diagnostic mixte : Source B + Indice de confiance + Cockpit aiguilleur (PLAN ACTIF)
 
-> Branche `claude/install-claude-excel-6MGzv` · P3 livré et validé le 2026-06-04
+> Branche `claude/install-claude-excel-6MGzv` · P4 livré et validé le 2026-06-05 (commit `aaf65bf`)
 > **Feu vert utilisateur requis avant toute modification de code**
+> Décisions QCM verrouillées le 2026-06-07 : Mode Mixte · Prudent (seuil 70) · Carte + page · Formulaire pré-rempli
+
+---
+
+## CONTEXTE
+
+P4 a livré : Source A (7 règles indicateurs réécrites au format 6 sections), suppression couche IA, bilan FCFA, alertes récurrences, prix visibles chef. Ce que P4 **n'a pas livré** (différé explicitement dans `P58-feat-reco-metier-p4.md §6`) :
+- **Source B** — bibliothèque de contre-mesures par catégorie d'arrêt Pareto
+- **Indice de confiance** — score 0-100 justifiant la prescription
+- **Boucle de vérification avant/après** sur indicateur réel
+- **Cockpit aiguilleur** — carte de diagnostic avec liens vers les bonnes pages
+
+P5-A livre ces 4 éléments dans un cadre durci : l'app **affiche le raisonnement** qui mène à la prescription, pas seulement la prescription elle-même.
+
+---
+
+## VOCABULAIRE VERROUILLÉ (décision 2026-06-07)
+
+| ❌ Interdit | ✅ À utiliser |
+|---|---|
+| "cause principale" / "cause vraie" | "hypothèse prioritaire" / "diagnostic probable" |
+| "la solution" / "solution optimale" | "prescription proposée" / "contre-mesure recommandée" |
+| "preuve" (pour les photos opérateurs) | "élément terrain" / "indice visuel" / "pièce justificative" |
+| "l'outil a trouvé" | "l'outil détecte" / "l'outil propose" |
+| confiance implicite (score non affiché) | niveau de confiance affiché + signaux explicités |
+
+L'application ne donne pas une recommandation magique. Elle affiche le **raisonnement traçable et défendable** qui y mène.
+
+---
+
+## ALGORITHME EN 4 NIVEAUX (décision 2026-06-07)
+
+```
+Niveau 1 — CONTRÔLE         : les données sont-elles fiables ?
+Niveau 2 — DÉTECTION        : y a-t-il une anomalie mesurable ?
+Niveau 3 — DIAGNOSTIC       : quelle est l'hypothèse de cause ?
+Niveau 4 — PRESCRIPTION     : quelle action le chef peut-il prendre maintenant ?
+```
+
+Chaque niveau est **séquentiel** : si le Niveau 1 échoue (SAISIES_INCOHERENTES), on ne calcule pas le Niveau 3.
+
+### Niveau 1 — Contrôle de fiabilité
+
+```python
+def _controle_fiabilite(contexte):
+    """Retourne 'ok' ou un code de problème de données."""
+    pct_incoherences = contexte.get('pct_saisies_incoherentes', 0)
+    nb_postes = contexte.get('nb_postes', 0)
+    seuil = Parametre.get('seuil_saisies_incoherentes', 20.0)
+    if nb_postes < 3:
+        return 'donnees_insuffisantes'   # pas assez de fiches pour un signal fiable
+    if pct_incoherences > seuil:
+        return 'saisies_incoherentes'    # les données sont trop bruitées
+    return 'ok'
+```
+
+Si `controle != 'ok'` → afficher la fiche `SAISIES_INCOHERENTES` uniquement, bloquer les niveaux 2-4.
+
+### Niveau 2 — Détection d'anomalie
+
+Reprend les seuils Source A existants : TRS < seuil critique, déclassement > seuil, manque à gagner > seuil, tendance négative. Si aucun seuil dépassé → afficher « Aucune anomalie détectée — indicateurs dans les normes ».
+
+### Niveau 3 — Diagnostic (hypothèse de cause)
+
+```python
+def _diagnostic_hypothese(contexte):
+    """
+    Retourne l'hypothèse prioritaire avec les signaux qui la justifient.
+    Ne prétend PAS trouver la cause vraie.
+    """
+    signaux = []
+    cause_dom = contexte.get('cause_dominante')
+    cause_pct  = contexte.get('cause_dominante_pct', 0)
+    machine    = contexte.get('machine_critique')
+    recurrence = contexte.get('facteur_recurrence', 1.0)
+    concentration = contexte.get('machine_concentration_pct', 0)
+
+    if cause_pct >= Parametre.get('seuil_part_cause_dominante', 30.0):
+        signaux.append(f"Pareto : '{cause_dom}' représente {cause_pct:.0f}% du temps d'arrêt")
+    if recurrence > 1.0:
+        signaux.append(f"Récurrence : problème déjà présent sur la période précédente")
+    if concentration >= 80:
+        signaux.append(f"Concentration machine : {machine} porte {concentration:.0f}% des arrêts")
+
+    if not signaux:
+        return None   # pas d'hypothèse défendable
+
+    return {
+        'cause':    cause_dom,
+        'machine':  machine,
+        'signaux':  signaux,
+        'nb_signaux': len(signaux),
+    }
+```
+
+### Niveau 4 — Prescription
+
+Déclenche Source B (bibliothèque contre-mesures) ou Source A selon la nature du signal. Calcule l'indice de confiance. Produit la fiche au format 6 items (voir ci-dessous).
+
+---
+
+## FORMAT DE PRESCRIPTION — 6 ITEMS (décision 2026-06-07)
+
+Remplace l'ancien format 6 sections P4. Chaque fiche est une **hypothèse expliquée**, pas une vérité.
+
+```
+Signal détecté :         ← ce que l'outil a mesuré (TRS%, FCFA, heures arrêt, % Pareto)
+Données utilisées :      ← quelles fiches, quelle période, quels arrêts justifient l'hypothèse
+Diagnostic probable :    ← hypothèse de cause (jamais "cause vraie") + niveau de confiance
+Prescription :           ← contre-mesure terrain concrète proposée
+Niveau de confiance :    ← N/100 avec détail des signaux qui l'ont composé
+Indicateur à suivre :    ← comment vérifier que la prescription a eu un effet (avant/après)
+```
+
+### Exemple — fiche Source B Approvisionnement
+
+```
+Signal détecté :
+  Les arrêts catégorie « Approvisionnement » représentent 38 % du temps
+  d'arrêt sur la période (5h10 sur 13h30 d'arrêts totaux).
+
+Données utilisées :
+  14 fiches postes · période du 2026-05-27 au 2026-06-03 · 7 arrêts
+  catégorie Approvisionnement sur la Scie de tête · même pattern
+  détecté sur la période précédente (facteur récurrence : 1.5).
+
+Diagnostic probable :
+  Hypothèse prioritaire : le parc bois ne prépare pas les contrats en
+  avance suffisante, créant des ruptures entre contrats à la Scie de tête.
+  (Ce diagnostic est une hypothèse basée sur les données saisies —
+  une investigation terrain est recommandée pour le confirmer.)
+
+Prescription :
+  Mettre le parc bois en avance de 3 contrats et créer une zone tampon
+  identifiée par contrat. Dès qu'un contrat est terminé, le bois du
+  suivant est déjà disponible à la Scie de tête.
+
+Niveau de confiance : 75/100
+  · Pareto dominant ≥ 30 % : +30 pts
+  · Récurrence confirmée (période précédente) : +20 pts
+  · Concentration machine Scie de tête : +20 pts (proxy)
+  · Catégorie clairement identifiée : +5 pts
+
+Indicateur à suivre :
+  Heures d'arrêt catégorie « Approvisionnement » sur la Scie de tête
+  — comparer 7 jours avant / 7 jours après la mise en place.
+```
+
+### Exemple — fiche Source A TRS_CRITIQUE
+
+```
+Signal détecté :
+  TRS moyen 52 % sur la période — en dessous du seuil critique 55 %
+  (objectif 60 %). Manque à gagner estimé : 1 200 000 FCFA.
+
+Données utilisées :
+  14 fiches postes · TRS calculé poste par poste sur les fiches
+  valide_chef + verrouille uniquement · Bicoupe : 8h30 d'arrêts cumulés.
+
+Diagnostic probable :
+  Hypothèse prioritaire : la Bicoupe concentre la majorité des arrêts,
+  avec un écart poste Matin (58 %) vs Après-midi (44 %) qui suggère
+  un problème de passation ou de fatigue en fin de journée.
+  (Hypothèse — à confirmer par analyse Ishikawa.)
+
+Prescription :
+  Analyser les causes racines des arrêts Bicoupe sur le poste Après-midi
+  via un Ishikawa 6M. Commencer par les branches Machine et Méthode.
+
+Niveau de confiance : 62/100
+  · TRS sous seuil critique : +30 pts (détection forte)
+  · Machine Bicoupe identifiée comme critique : +20 pts
+  · Écart Matin/Après-midi ≥ 10 pts : +12 pts
+
+Indicateur à suivre :
+  TRS moyen Bicoupe poste Après-midi — comparer semaine avant /
+  semaine après l'analyse Ishikawa.
+```
+
+---
+
+## INDICE DE CONFIANCE (décision 2026-06-07)
+
+Score 0–100 calculé par `_indice_confiance(contexte)`. Visible dans chaque fiche.
+
+```python
+def _indice_confiance(contexte):
+    score = 0
+    signaux = {}
+
+    # Signal 1 : récurrence (le problème existait déjà la période précédente)
+    if contexte.get('facteur_recurrence', 1.0) > 1.0:
+        score += 40
+        signaux['recurrence'] = "Problème récurrent (période précédente)"
+
+    # Signal 2 : Pareto dominant ≥ seuil
+    seuil_pareto = Parametre.get('seuil_part_cause_dominante', 30.0)
+    if contexte.get('cause_dominante_pct', 0) >= seuil_pareto:
+        score += 30
+        signaux['pareto'] = f"Pareto dominant {contexte['cause_dominante_pct']:.0f}% ≥ {seuil_pareto:.0f}%"
+
+    # Signal 3 : concentration machine ≥ 80 %
+    if contexte.get('machine_concentration_pct', 0) >= 80:
+        score += 20
+        signaux['concentration'] = f"Machine {contexte.get('machine_critique')} porte ≥ 80% des arrêts"
+
+    # Signal 4 : catégorie clairement identifiée (pas 'Autre')
+    if contexte.get('cause_dominante') not in (None, 'Autre'):
+        score += 10
+        signaux['categorie'] = f"Catégorie identifiée : {contexte['cause_dominante']}"
+
+    # Déterminer le mode selon la bascule Prudent (seuil 70)
+    if score >= 70:
+        mode = 'auto'        # Prescription affichée sans réserve particulière
+    elif score >= 40:
+        mode = 'assiste'     # Prescription proposée avec incitation à vérifier
+    else:
+        mode = 'faible'      # Données insuffisantes pour une prescription défendable
+
+    return {'score': score, 'mode': mode, 'signaux': signaux}
+```
+
+**Affichage selon le mode :**
+
+| Mode | Score | Message affiché | CTA |
+|---|---|---|---|
+| `auto` | ≥ 70 | Badge vert « Confiance élevée » | [Lancer l'action] |
+| `assiste` | 40–69 | Badge orange « À vérifier terrain » + signaux | [Analyser (Ishikawa)] |
+| `faible` | < 40 | Badge gris « Données insuffisantes » | [Ajouter des données] |
+
+---
+
+## SOURCE B — BIBLIOTHÈQUE DE CONTRE-MESURES (spec complète dans archive P4 ci-dessous)
+
+Structure : `BIBLIOTHEQUE_CONTRE_MESURES` dict (9 catégories × 5 contre-mesures). Chaque CM porte les métadonnées de scoring. La fonction `_selectionner_contre_mesure(categorie, contexte)` sélectionne la meilleure + 2 alternatives via score multicritère.
+
+**Déclencheur Source B** : catégorie d'arrêt dominante du Pareto ≥ `seuil_part_cause_dominante` (défaut 30 %).
+
+La prescription retournée par Source B est formatée selon les **6 items** ci-dessus (pas l'ancien format 6 sections P4).
+
+---
+
+## COCKPIT AIGUILLEUR — RÈGLES (décision 2026-06-07)
+
+Le cockpit ne **contient pas** de prescriptions. Il **aiguille** vers la bonne page.
+
+### Règles R-DASH
+
+- **R-DASH-1** : chaque signal = une phrase (verbe d'action + lien). Format : « [Signal court] → [Lien page]»
+- **R-DASH-2** : pas de contenu dupliqué entre cockpit et pages détail
+- **R-DASH-3** : si tous les indicateurs sont dans les normes, la carte est vide (ou absente)
+- **R-DASH-4** : un seul niveau de profondeur sur le cockpit (pas d'accordéon imbriqué)
+
+### Carte diagnostic cockpit — `chef/_diagnostic.html`
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  DIAGNOSTIC PROBABLE          [Confiance 75/100 — Assisté]  │
+├─────────────────────────────────────────────────────────────┤
+│  1. Approvisionnement · Scie de tête · 5h10 → [Prescriptions]│
+│  2. TRS Après-midi 44 % · Bicoupe → [Analyser (Ishikawa)]   │
+│  3. Azobé déclassé 38 % → [Qualité / Matière]               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Maximum 3 priorités**. Chaque ligne = signal court + lien. Aucun texte long.
+
+**Liens par type de signal :**
+
+| Signal | Lien vers |
+|---|---|
+| TRS, arrêts, Pareto | `/analyse/arrets` |
+| Déclassement, essence | `/chef/qualite` |
+| Actions en retard | `/dashboard/chef/actions` |
+| Prescription Source B prête | `/recommandations/` |
+| Ishikawa à créer | route `creer_depuis_diagnostic` |
+
+---
+
+## PRÉCONDITION — REBASE LOCAL (OBLIGATOIRE AVANT TOUT CODE)
+
+Le local est à `31e2167` (pre-P4). Le remote est à `03e2974` (post-P4 + P5 cadrage, 4 commits d'avance).
+
+```bash
+git fetch origin claude/install-claude-excel-6MGzv
+git rebase origin/claude/install-claude-excel-6MGzv
+```
+
+Si conflit → résoudre puis `git rebase --continue`. Aucun code ne doit être écrit avant que cette commande ait réussi.
+
+---
+
+## LOT 1 — SOURCE B + INDICE DE CONFIANCE
+
+**Fichier principal** : `app/services/recommandations.py`
+
+1. Ajouter `BIBLIOTHEQUE_CONTRE_MESURES` (spec complète dans archive P4 ci-dessous, section DESIGN 1).
+2. Ajouter `_indice_confiance(contexte)` → `{'score', 'mode', 'signaux'}` (code ci-dessus).
+3. Ajouter `_selectionner_contre_mesure(categorie, contexte)` (score multicritère, spec archive P4).
+4. Ajouter `_fiche_source_b(contexte, cm, alternatives, indice)` → fiche au format 6 items (PAS l'ancien format 6 sections).
+5. Modifier `analyse_recommandations()` : encapsuler dans l'algorithme 4 niveaux (Contrôle → Détection → Diagnostic → Prescription). Si Niveau 3 détecte une catégorie dominante ≥ seuil → émettre aussi une fiche Source B.
+6. Ajouter `diagnostic_prioritaire(equipes, contexte_extra)` → dict compact pour la carte cockpit : `{'priorites': [...], 'score_confiance': int, 'mode': str}`. Max 3 items.
+7. Enrichir `_contexte_extra()` dans `app/routes/recommandations.py` avec : `facteur_recurrence`, `machine_concentration_pct`.
+
+**Règle de formatage** : dans `_fiche_source_b()` et dans toutes les fiches Source A réécrites, la section "Diagnostic probable" doit contenir la mention `(Hypothèse — à confirmer terrain)` quand le mode est `assiste` ou `faible`.
+
+---
+
+## LOT 2 — COCKPIT AIGUILLEUR + ISHIKAWA PRÉ-REMPLI
+
+**Fichiers** :
+
+1. **`app/templates/chef/_diagnostic.html`** (NOUVEAU partial) : carte cockpit aiguilleur, max 3 lignes, liens R-DASH. Badge confiance en haut à droite.
+2. **`app/templates/chef/dashboard.html`** : `{% include 'chef/_diagnostic.html' %}` dans la colonne gauche, après `_alertes.html`.
+3. **`app/routes/dashboard.py`** `vue_chef()` : appeler `diagnostic_prioritaire(equipes, contexte)` et injecter `diagnostic_cockpit` dans les deux `render_template`. Importer depuis `recommandations`.
+4. **`app/routes/problemes.py`** : ajouter route `creer_depuis_diagnostic` (POST) — idempotente (vérifie si un Problème `reco_code=code` est déjà ouvert), pré-remplit `pareto_cause`, `machine_cible`, `categorie_6m` (via `_CATEGORIE_VERS_6M`). Redirige vers la page d'édition Ishikawa.
+5. **`app/templates/recommandations/index.html`** : afficher badge confiance (score + mode) sur chaque fiche Source B · CTA adapté selon mode (`auto` → [Lancer l'action], `assiste` → [Analyser]) · bouton « Voir 2 alternatives » sur fiches Source B.
+
+---
+
+## FICHIERS À MODIFIER
+
+| Fichier | Modification |
+|---|---|
+| `app/services/recommandations.py` | `BIBLIOTHEQUE_CONTRE_MESURES` · `_indice_confiance()` · `_selectionner_contre_mesure()` · `_fiche_source_b()` · algorithme 4 niveaux dans `analyse_recommandations()` · `diagnostic_prioritaire()` |
+| `app/routes/recommandations.py` | Enrichir `_contexte_extra()` avec `facteur_recurrence` + `machine_concentration_pct` |
+| `app/routes/dashboard.py` | Injecter `diagnostic_cockpit` dans `vue_chef()` |
+| `app/templates/chef/_diagnostic.html` | **NOUVEAU** — carte cockpit aiguilleur |
+| `app/templates/chef/dashboard.html` | Include `_diagnostic.html` + import |
+| `app/routes/problemes.py` | Route `creer_depuis_diagnostic` (idempotente) |
+| `app/templates/recommandations/index.html` | Badge confiance · CTA adapté · bouton alternatives |
+| `documents/notes-impact/P5A-feat-diagnostic-mixte.md` | Note d'impact 9 sections avant commit |
+
+Aucune nouvelle table. Pas de Flask-Migrate. `ActionChef.reco_code` et `Probleme.reco_code` existent déjà (livrés P4).
+
+---
+
+## VÉRIFICATION
+
+```bash
+# Précondition
+git fetch origin claude/install-claude-excel-6MGzv
+git rebase origin/claude/install-claude-excel-6MGzv
+
+# Données fraîches
+cd cuf-pilotage && python seed_data.py
+
+# Tests de non-régression
+bash .claude/skills/run-cuf-pilotage/smoke.sh   # 16/16 doivent rester verts
+
+# Captures
+python .claude/skills/run-cuf-pilotage/screenshot.py chef
+```
+
+**Contrôles visuels :**
+- Carte diagnostic cockpit affiche max 3 priorités avec liens (pas de contenu dupliqué)
+- Badge confiance visible sur les fiches Source B : score + mode (auto/assisté/faible)
+- Fiches Source B au format 6 items : "Diagnostic probable" contient "(Hypothèse — à confirmer terrain)"
+- Mode `assiste` → CTA "Analyser (Ishikawa)" ; mode `auto` → CTA "Lancer l'action"
+- Route `creer_depuis_diagnostic` crée un Ishikawa pré-rempli et ne crée pas de doublon si déjà ouvert
+- Aucune occurrence de "cause vraie" / "cause principale absolue" dans les textes affichés
+
+---
+
+---
+
+# P4 — Recommandations métier + Actions FCFA + Signaux machines (LIVRÉ 2026-06-05 — archive de référence)
+
+> Commit `aaf65bf` · La spec Source B (`BIBLIOTHEQUE_CONTRE_MESURES`) ci-dessous est la référence pour P5-A Lot 1.
+> **NE PAS RÉEXÉCUTER** — P4 est livré. Lire uniquement pour extraire la spec Source B.
 
 ---
 

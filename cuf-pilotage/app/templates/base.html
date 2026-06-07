@@ -63,7 +63,7 @@
       </a>
       <a class="wp-nav-link {% if request.endpoint in ('dashboard.actions_chef', 'dashboard.nouvelle_action_chef') %}active{% endif %}"
          href="{{ url_for('dashboard.actions_chef') }}">
-        <span class="wp-nav-ic"><i class="bi bi-check2-square"></i></span>Actions Chef
+        <span class="wp-nav-ic"><i class="bi bi-check2-square"></i></span>Décisions de pilotage
       </a>
       {% endif %}
 
@@ -78,7 +78,7 @@
       {% if current_user.role in ('chef', 'pdg', 'admin') %}
       <a class="wp-nav-link {% if request.endpoint and request.endpoint.startswith('recommandations.') %}active{% endif %}"
          href="{{ url_for('recommandations.index') }}">
-        <span class="wp-nav-ic"><i class="bi bi-lightbulb"></i></span>Recommandations
+        <span class="wp-nav-ic"><i class="bi bi-lightbulb"></i></span>Prescriptions de pilotage
       </a>
       {% endif %}
 
@@ -163,7 +163,7 @@
         <a class="wp-nav-link" href="{{ url_for('problemes.liste') }}">
           <span class="wp-nav-ic"><i class="bi bi-diagram-3"></i></span>Résolution</a>
         <a class="wp-nav-link" href="{{ url_for('dashboard.actions_chef') }}">
-          <span class="wp-nav-ic"><i class="bi bi-check2-square"></i></span>Actions Chef</a>
+          <span class="wp-nav-ic"><i class="bi bi-check2-square"></i></span>Décisions de pilotage</a>
         {% endif %}
         {% if current_user.role == 'pdg' %}
         <span class="wp-nav-section">Direction</span>
@@ -172,7 +172,7 @@
         {% endif %}
         {% if current_user.role in ('chef', 'pdg', 'admin') %}
         <a class="wp-nav-link" href="{{ url_for('recommandations.index') }}">
-          <span class="wp-nav-ic"><i class="bi bi-lightbulb"></i></span>Recommandations</a>
+          <span class="wp-nav-ic"><i class="bi bi-lightbulb"></i></span>Prescriptions de pilotage</a>
         {% endif %}
         <span class="wp-nav-section">Données</span>
         {% if current_user.role == 'operateur' %}

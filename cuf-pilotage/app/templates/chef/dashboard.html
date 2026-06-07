@@ -734,7 +734,9 @@
                     <span style="font-weight:600;font-size:.88rem;color:var(--wp-ink);">{{ reco.titre }}</span>
                     <span class="wp-pill {{ prio_class }}">{{ prio_label }}</span>
                   </div>
-                  <div style="font-size:.78rem;color:var(--wp-muted);">{{ reco.solutions[0].titre }}</div>
+                  <div style="font-size:.78rem;color:var(--wp-muted);">
+                    {%- if reco.fiche -%}{{ reco.fiche.action | truncate(120) }}{%- elif reco.solutions -%}{{ reco.solutions[0].titre }}{%- endif -%}
+                  </div>
                 </div>
               </div>
               {% endfor %}

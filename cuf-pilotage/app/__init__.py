@@ -247,6 +247,14 @@ def _ensure_schema():
         colonnes_action_chef = {col['name'] for col in inspector.get_columns('action_chef')}
         if 'note_resultat' not in colonnes_action_chef:
             ajouts.append("ALTER TABLE action_chef ADD COLUMN note_resultat TEXT")
+        if 'prescription_initiale' not in colonnes_action_chef:
+            ajouts.append("ALTER TABLE action_chef ADD COLUMN prescription_initiale TEXT")
+        if 'indicateur_suivi' not in colonnes_action_chef:
+            ajouts.append("ALTER TABLE action_chef ADD COLUMN indicateur_suivi VARCHAR(200)")
+        if 'date_verification_prevue' not in colonnes_action_chef:
+            ajouts.append("ALTER TABLE action_chef ADD COLUMN date_verification_prevue DATE")
+        if 'reco_code' not in colonnes_action_chef:
+            ajouts.append("ALTER TABLE action_chef ADD COLUMN reco_code VARCHAR(50)")
 
     if not ajouts:
         return

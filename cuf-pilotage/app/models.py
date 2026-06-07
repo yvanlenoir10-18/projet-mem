@@ -426,6 +426,12 @@ class ActionChef(db.Model):
     motif_classe_sans_action = db.Column(db.Text)
     note_resultat = db.Column(db.Text)
 
+    # Traçabilité prescriptions (P4)
+    prescription_initiale   = db.Column(db.Text)
+    indicateur_suivi        = db.Column(db.String(200))
+    date_verification_prevue = db.Column(db.Date)
+    reco_code               = db.Column(db.String(50))
+
     origine_type = db.Column(db.String(30), nullable=False, default='libre')
     origine_label = db.Column(db.String(200))
     origine_url = db.Column(db.String(300))

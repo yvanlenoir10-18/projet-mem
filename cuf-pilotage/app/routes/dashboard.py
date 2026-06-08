@@ -2498,9 +2498,12 @@ def vue_chef_v2():
     if not equipes:
         return render_template('chef/v2.html',
                                jours=jours, label_periode=label_periode,
+                               equipes_vides=True,
                                statut_global=None, priorites_chef=priorites_chef,
                                machine_top=machine_top, cascade=None,
-                               attribution=None, trs_moyen=0)
+                               attribution=None, trs_moyen=0,
+                               nb_postes=0,
+                               nb_problemes_ouverts=nb_problemes_ouverts)
 
     trs_valeurs = [e.trs_global for e in equipes if e.trs_global is not None]
     trs_moyen   = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
@@ -2530,12 +2533,15 @@ def vue_chef_v2():
 
     return render_template('chef/v2.html',
                            jours=jours, label_periode=label_periode,
+                           equipes_vides=False,
                            statut_global=statut_global,
                            priorites_chef=priorites_chef,
                            machine_top=machine_top,
                            cascade=cascade,
                            attribution=attribution,
-                           trs_moyen=trs_moyen)
+                           trs_moyen=trs_moyen,
+                           nb_postes=len(equipes),
+                           nb_problemes_ouverts=nb_problemes_ouverts)
 
 
 @dashboard_bp.route('/chef/fiches')

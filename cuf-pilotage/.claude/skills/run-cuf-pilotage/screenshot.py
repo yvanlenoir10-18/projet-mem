@@ -28,7 +28,7 @@ TMP_DIR = Path('/tmp/cuf-ss')
 
 CREDENTIALS = {
     'operateur': ('saisie@cuf.cm', 'cuf2026'),
-    'chef':      ('chef@cuf.cm',   'cuf2026'),
+    'prod':      ('prod@cuf.cm',   'cuf2026'),
     'pdg':       ('pdg@cuf.cm',    'cuf2026'),
     'admin':     ('admin@cuf.cm',  'cuf2026'),
 }
@@ -39,13 +39,17 @@ VIEWS = {
         ('03-formulaire-nouveau',  '/saisie/nouveau'),
         ('04-historique',          '/saisie/historique'),
     ],
-    'chef': [
-        ('05-chef-dashboard',      '/dashboard/chef'),
+    'prod': [
+        ('05-prod-dashboard',      '/dashboard/prod'),
         ('06-analyse-arrets',      '/analyse/arrets'),
         ('07-recommandations',     '/recommandations/'),
         ('08-problemes',           '/problemes/'),
-        ('chef-production',        '/dashboard/chef/production'),
-        ('chef-qualite',           '/dashboard/chef/qualite'),
+        ('prod-fiches',            '/dashboard/chef/fiches'),
+        ('prod-machines',          '/dashboard/chef/machines'),
+        ('prod-production',        '/dashboard/chef/production'),
+        ('prod-qualite',           '/dashboard/chef/qualite'),
+        ('prod-pertes',            '/dashboard/pertes'),
+        ('prod-actions',           '/dashboard/chef/actions'),
     ],
     'pdg': [
         ('09-pdg-dashboard',       '/dashboard/pdg'),
@@ -126,7 +130,7 @@ async def main():
 
         elif arg.startswith('/'):
             # Ad-hoc URL — guess the role from the path
-            role = 'chef' if any(k in arg for k in ['dashboard', 'analyse', 'probleme', 'recommandation', 'admin']) else 'operateur'
+            role = 'prod' if any(k in arg for k in ['dashboard', 'analyse', 'probleme', 'recommandation', 'admin']) else 'operateur'
             if 'admin' in arg:
                 role = 'admin'
             if 'pdg' in arg:

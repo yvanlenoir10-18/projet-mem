@@ -486,6 +486,79 @@ def manque_a_gagner_agrege(equipes):
     return {k: (round(v, 0) if isinstance(v, float) else v) for k, v in cumul.items()}
 
 
+# ── Cascade économique (Chef V2 — Vue 1 « LE POINT ») ─────────────────────────
+
+def cascade_economique(equipes):
+    """
+    Cascade économique RÉCONCILIANTE pour le profil Chef V2.
+
+    Recompose les sorties existantes de calcule_manque_gagner() en barres qui
+    somment EXACTEMENT, même après arrondi :
+
+        potentiel − perte_volume − perte_qualite = reel
+
+    `perte_volume` est calculé en RÉSIDUEL (manque − perte_qualite). C'est ce
+    qui garantit la réconciliation : il absorbe tout écart d'arrondi, donc la
+    cascade affichée « tombe toujours juste ». Aucun calcul métier nouveau —
+    pur réagencement de l'existant (contrat verrouillé 2026-06-08).
+
+    Distinction assumée (Jonsson & Lesshammar, 1999) :
+    - cette cascade = MESURE économique (combien on perd), réconciliée ;
+    - la décomposition D/P/Q de calcule_pertes_equipe() = ATTRIBUTION causale
+      (pourquoi on perd probablement), indicative, NON additive au manque.
+
+    Champs sémantiques :
+    - perte_volume  = valeur du bois jamais valorisé (arrêts + cadence cumulés).
+    - perte_qualite = perte nette sur le bois déclassé revendu sous le prix
+      conforme = valeur plein-tarif du déclassé − valeur réellement récupérée.
+
+    Returns: dict {statut, potentiel, reel, manque, perte_volume,
+                   perte_qualite, reconcilie}.
+        statut == 'pas_de_perte' quand la production dépasse la capacité cible
+        (sur-performance) : aucune barre de perte, garde-fou contre l'absurde.
+    """
+    taux = _param_float('taux_revente_rebut', 0.70)
+    P = Vc = Vd_net = Vdech = 0.0
+    for e in equipes:
+        m = calcule_manque_gagner(e)
+        P      += m['valeur_potentielle']
+        Vc     += m['valeur_conforme']
+        Vd_net += m['valeur_declass']        # DÉJÀ net (× taux_revente)
+        Vdech  += m['valeur_dechets']
+
+    potentiel = int(round(P))
+    reel      = int(round(Vc + Vd_net + Vdech))
+
+    if potentiel <= reel:
+        return {
+            'statut':        'pas_de_perte',
+            'potentiel':     potentiel,
+            'reel':          reel,
+            'manque':        0,
+            'perte_volume':  0,
+            'perte_qualite': 0,
+            'reconcilie':    True,
+        }
+
+    manque = potentiel - reel
+
+    # Perte qualité = valeur plein tarif du déclassé − valeur nette récupérée.
+    vd_full = (Vd_net / taux) if taux > 0 else Vd_net
+    perte_qualite = int(round(vd_full - Vd_net))
+    perte_qualite = max(0, min(perte_qualite, manque))   # garde-fou borné [0, manque]
+    perte_volume  = manque - perte_qualite               # résiduel → ferme toujours
+
+    return {
+        'statut':        'perte',
+        'potentiel':     potentiel,
+        'reel':          reel,
+        'manque':        manque,
+        'perte_volume':  perte_volume,
+        'perte_qualite': perte_qualite,
+        'reconcilie':    (potentiel - perte_volume - perte_qualite == reel),
+    }
+
+
 # ── Pareto ────────────────────────────────────────────────────────────────────
 
 def pareto_arrets(equipes):

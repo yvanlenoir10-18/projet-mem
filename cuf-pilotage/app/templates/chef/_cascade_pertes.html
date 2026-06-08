@@ -1,0 +1,129 @@
+{# ── Cascade économique « Où part la valeur » — Chef V2 Vue 1 ──────────────────
+   Contrat verrouillé 2026-06-08 :
+   - Cette cascade est une MESURE économique réconciliée :
+       potentiel − perte_volume − perte_qualite = reel   (exact, au FCFA près)
+   - Le bloc D/P/Q en dessous est une ATTRIBUTION causale indicative.
+     Il ne s'additionne PAS au manque à gagner (note obligatoire incluse).
+   Attendus : `cascade` (dict) et `attribution` (dict) — voir vue_chef_v2().
+#}
+{% if cascade and cascade.statut == 'pas_de_perte' %}
+  <div class="wp-card" style="padding:20px;border-left:4px solid var(--wp-leaf);background:rgba(63,138,92,0.07);">
+    <div style="font-size:1.05rem;font-weight:600;color:var(--wp-leaf);">
+      <i class="bi bi-check-circle-fill"></i> Objectif de capacité atteint
+    </div>
+    <div style="color:var(--wp-muted);margin-top:6px;">
+      La production valorisée dépasse la capacité cible sur la période.
+      Aucune perte à décomposer.
+    </div>
+  </div>
+{% elif cascade %}
+  {% set p  = cascade.potentiel if cascade.potentiel > 0 else 1 %}
+  {% set wv = (cascade.perte_volume  / p * 100) %}
+  {% set wq = (cascade.perte_qualite / p * 100) %}
+  {% set wr = (cascade.reel          / p * 100) %}
+
+  <div class="wp-card" style="padding:20px;">
+    <div style="font-size:1.05rem;font-weight:700;margin-bottom:4px;">
+      <i class="bi bi-cash-stack"></i> Où part la valeur
+    </div>
+    <div style="color:var(--wp-muted);font-size:.85rem;margin-bottom:16px;">
+      Mesure économique de la période. Les montants se réconcilient exactement.
+    </div>
+
+    {# Barre empilée : ce qui reste (vert) + les deux pertes #}
+    <div style="display:flex;height:34px;border-radius:6px;overflow:hidden;
+                border:1px solid var(--wp-line);margin-bottom:18px;">
+      <div title="Valeur réelle"
+           style="width:{{ wr }}%;background:var(--wp-leaf);"></div>
+      <div title="Volume non valorisé"
+           style="width:{{ wv }}%;background:#9a8f80;"></div>
+      <div title="Perte déclassement"
+           style="width:{{ wq }}%;background:var(--wp-ochre);"></div>
+    </div>
+
+    {# Lignes de la cascade — l'équation #}
+    <table style="width:100%;border-collapse:collapse;font-size:.95rem;">
+      <tr>
+        <td style="padding:6px 0;">Valeur potentielle</td>
+        <td style="padding:6px 0;text-align:right;font-weight:700;">
+          {{ "{:,.0f}".format(cascade.potentiel).replace(",", " ") }} FCFA
+        </td>
+      </tr>
+      <tr style="color:#6b6256;">
+        <td style="padding:6px 0;">
+          <i class="bi bi-dash"></i> Volume non valorisé
+          <span style="color:var(--wp-muted);font-size:.8rem;">(temps perdu + cadence)</span>
+        </td>
+        <td style="padding:6px 0;text-align:right;">
+          − {{ "{:,.0f}".format(cascade.perte_volume).replace(",", " ") }} FCFA
+        </td>
+      </tr>
+      <tr style="color:#8a6d1f;">
+        <td style="padding:6px 0;">
+          <i class="bi bi-dash"></i> Perte déclassement
+          <span style="color:var(--wp-muted);font-size:.8rem;">(bois revendu sous le prix)</span>
+        </td>
+        <td style="padding:6px 0;text-align:right;">
+          − {{ "{:,.0f}".format(cascade.perte_qualite).replace(",", " ") }} FCFA
+        </td>
+      </tr>
+      <tr style="border-top:2px solid var(--wp-line);">
+        <td style="padding:8px 0;font-weight:700;color:var(--wp-leaf);">= Valeur réelle</td>
+        <td style="padding:8px 0;text-align:right;font-weight:700;color:var(--wp-leaf);">
+          {{ "{:,.0f}".format(cascade.reel).replace(",", " ") }} FCFA
+        </td>
+      </tr>
+    </table>
+
+    <div style="margin-top:10px;font-size:.85rem;color:var(--wp-muted);">
+      Manque à gagner de la période :
+      <strong>{{ "{:,.0f}".format(cascade.manque).replace(",", " ") }} FCFA</strong>
+    </div>
+  </div>
+
+  {# ── Attribution causale D/P/Q — indicative, NON additive ──────────────── #}
+  {% if attribution %}
+  <div class="wp-card" style="padding:20px;margin-top:14px;">
+    <div style="font-size:1.0rem;font-weight:700;margin-bottom:12px;">
+      <i class="bi bi-search"></i> Lecture des causes probables
+    </div>
+
+    <div class="row g-2">
+      <div class="col-4">
+        <div style="padding:10px;border-radius:6px;background:rgba(180,60,50,0.06);">
+          <div style="font-weight:700;">Temps perdu</div>
+          <div style="font-size:.75rem;color:var(--wp-muted);">arrêts · Disponibilité (D)</div>
+          <div style="font-size:1.1rem;font-weight:700;margin-top:4px;">
+            {{ "{:,.0f}".format(attribution.perte_d).replace(",", " ") }} FCFA
+          </div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div style="padding:10px;border-radius:6px;background:rgba(197,151,58,0.08);">
+          <div style="font-weight:700;">Cadence</div>
+          <div style="font-size:.75rem;color:var(--wp-muted);">vitesse · Performance (P)</div>
+          <div style="font-size:1.1rem;font-weight:700;margin-top:4px;">
+            {{ "{:,.0f}".format(attribution.perte_p).replace(",", " ") }} FCFA
+          </div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div style="padding:10px;border-radius:6px;background:rgba(63,138,92,0.06);">
+          <div style="font-weight:700;">Matière</div>
+          <div style="font-size:.75rem;color:var(--wp-muted);">déclassement · Qualité (Q)</div>
+          <div style="font-size:1.1rem;font-weight:700;margin-top:4px;">
+            {{ "{:,.0f}".format(attribution.perte_q).replace(",", " ") }} FCFA
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# Note obligatoire — empêche d'additionner D+P+Q au manque à gagner #}
+    <div style="margin-top:12px;padding:10px 12px;border-left:3px solid var(--wp-ochre);
+                background:rgba(197,151,58,0.06);font-size:.85rem;color:#6b6256;">
+      <strong>Lecture diagnostic :</strong> ces montants aident à comprendre les causes.
+      Ils ne sont pas une addition comptable du manque à gagner.
+    </div>
+  </div>
+  {% endif %}
+{% endif %}

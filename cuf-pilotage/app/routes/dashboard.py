@@ -20,6 +20,7 @@ from ..services.trs import (
     pareto_arrets, couleur_trs,
     calcule_pertes_equipe, calcule_pertes_fcfa, decompose_dpq,
     calcule_manque_gagner, manque_a_gagner_agrege, calcule_trs_par_essence,
+    cascade_economique,
 )
 from ..services.export import generer_rapport_excel
 from ..services.controles_saisie import compte_anomalies_periode, detecte_anomalies
@@ -2462,6 +2463,69 @@ def vue_chef():
                            alerte_soir=alerte_soir,
                            alerte_declass=_alerte_declassement_essence(equipes),
                            projection_active=projection_active)
+
+
+@dashboard_bp.route('/chef/v2')
+@login_required
+@roles_required('chef', 'admin')
+def vue_chef_v2():
+    """Chef Scierie V2 — Vue 1 « LE POINT ».
+
+    Écran de premier regard : verdict + priorités + montants FCFA, puis la
+    cascade économique réconciliée (« où part la valeur ») et, à part, la
+    lecture des causes probables D/P/Q (attribution indicative, non additive).
+
+    Route parallèle : /chef (vue_chef) reste intacte comme fallback. Cette vue
+    ne réécrit aucun moteur — elle réagence des fonctions existantes.
+    """
+    aujourd_hui = date.today()
+    jours = int(request.args.get('jours', 7))
+
+    alertes  = _alertes_chef(aujourd_hui)
+    kpi_jour = _kpi_aujourdhui(aujourd_hui)
+    nb_problemes_ouverts = Probleme.query.filter(
+        Probleme.statut.in_(('ouvert', 'en_analyse'))
+    ).count()
+    stats_actions_chef = _stats_actions_chef()
+    priorites_chef = _priorites_chef(
+        aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_actions_chef
+    )[:3]
+    machine_top = _machine_prioritaire_recent(aujourd_hui, jours=7)
+
+    equipes = _get_equipes_periode(jours)
+    label_periode = f"{jours} derniers jours"
+
+    if not equipes:
+        return render_template('chef/v2.html',
+                               jours=jours, label_periode=label_periode,
+                               statut_global=None, priorites_chef=priorites_chef,
+                               machine_top=machine_top, cascade=None,
+                               attribution=None, trs_moyen=0)
+
+    trs_valeurs = [e.trs_global for e in equipes if e.trs_global is not None]
+    trs_moyen   = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
+    statut_global = _statut_global(trs_moyen, alertes)
+
+    # Cascade économique réconciliée (mesure : où part la valeur)
+    cascade = cascade_economique(equipes)
+
+    # Attribution causale D/P/Q en FCFA (diagnostic indicatif, NON additif)
+    attribution = {'perte_d': 0.0, 'perte_p': 0.0, 'perte_q': 0.0}
+    for e in equipes:
+        pe = calcule_pertes_equipe(e)
+        attribution['perte_d'] += pe['perte_d']
+        attribution['perte_p'] += pe['perte_p']
+        attribution['perte_q'] += pe['perte_q']
+    attribution = {k: int(round(v)) for k, v in attribution.items()}
+
+    return render_template('chef/v2.html',
+                           jours=jours, label_periode=label_periode,
+                           statut_global=statut_global,
+                           priorites_chef=priorites_chef,
+                           machine_top=machine_top,
+                           cascade=cascade,
+                           attribution=attribution,
+                           trs_moyen=trs_moyen)
 
 
 @dashboard_bp.route('/chef/fiches')

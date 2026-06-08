@@ -46,13 +46,12 @@
     {% for u in utilisateurs %}
     {# Couleur de l'avatar selon le rôle #}
     {% if u.role == 'admin' %}{% set av = 'terra' %}
-    {% elif u.role == 'chef' %}{% set av = 'leaf' %}
+    {% elif u.role == 'prod' %}{% set av = 'leaf' %}
     {% elif u.role == 'pdg' %}{% set av = 'sky' %}
     {% else %}{% set av = 'emerald' %}{% endif %}
 
     {# Pill de rôle #}
     {% if u.role == 'admin' %}{% set rp = 'danger' %}{% set rl = 'Admin' %}
-    {% elif u.role == 'chef' %}{% set rp = 'warning' %}{% set rl = 'Chef' %}
     {% elif u.role == 'prod' %}{% set rp = 'success' %}{% set rl = 'Chef de Production' %}
     {% elif u.role == 'pdg' %}{% set rp = 'info' %}{% set rl = 'PDG' %}
     {% else %}{% set rp = 'neutral' %}{% set rl = 'Opérateur' %}{% endif %}
@@ -161,15 +160,14 @@
             {% for r in roles %}
             <option value="{{ r }}">
               {% if r == 'admin' %}Administrateur
-              {% elif r == 'chef' %}Chef Scierie (ancien profil)
-              {% elif r == 'prod' %}Chef de Production (nouveau cockpit)
+              {% elif r == 'prod' %}Chef de Production
               {% elif r == 'pdg' %}PDG / Direction
               {% else %}Opérateur (saisie){% endif %}
             </option>
             {% endfor %}
           </select>
           <div class="form-text" style="color:var(--wp-muted);">
-            Opérateur : saisie — Chef : analyses + config — PDG : tableau financier — Admin : tout
+            Opérateur : saisie — Chef de Production : pilotage + analyses + config — PDG : tableau financier — Admin : tout
           </div>
         </div>
         <div class="mb-4">
@@ -239,8 +237,7 @@
             {% for r in roles %}
             <option value="{{ r }}" {% if r == utilisateur.role %}selected{% endif %}>
               {% if r == 'admin' %}Administrateur
-              {% elif r == 'chef' %}Chef Scierie (ancien profil)
-              {% elif r == 'prod' %}Chef de Production (nouveau cockpit)
+              {% elif r == 'prod' %}Chef de Production
               {% elif r == 'pdg' %}PDG / Direction
               {% else %}Opérateur (saisie){% endif %}
             </option>

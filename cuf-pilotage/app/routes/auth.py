@@ -44,11 +44,9 @@ def _redirect_par_role(role):
     """Redirige vers la bonne page selon le rôle de l'utilisateur."""
     if role == 'pdg':
         return redirect(url_for('dashboard.vue_pdg'))
-    if role == 'chef':
-        return redirect(url_for('dashboard.vue_chef'))
     if role == 'prod':
         return redirect(url_for('dashboard.vue_prod'))
     if role == 'admin':
-        return redirect(url_for('dashboard.vue_chef'))
+        return redirect(url_for('dashboard.vue_prod'))
     # operateur
     return redirect(url_for('saisie.accueil_operateur'))

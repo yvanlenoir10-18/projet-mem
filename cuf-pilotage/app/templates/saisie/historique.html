@@ -21,7 +21,7 @@
        title="Ouvrir la feuille de relevé papier (pour impression terrain)">
       <i class="bi bi-printer"></i> Feuille terrain
     </a>
-    {% if current_user.role in ('operateur','chef','admin') %}
+    {% if current_user.role in ('operateur','prod','admin') %}
     <a href="{{ url_for('saisie.nouveau_poste') }}"
        class="btn btn-primary d-flex align-items-center gap-2">
       <i class="bi bi-plus-circle"></i> Nouvelle saisie
@@ -479,7 +479,7 @@
           <td class="text-nowrap">
             {% set peut_modifier_ligne = (
               (p.statut in ('brouillon', 'a_corriger') and p.user_id == current_user.id)
-              or (current_user.role in ('chef', 'admin') and p.statut in ('a_verifier', 'valide_chef'))
+              or (current_user.role in ('prod', 'admin') and p.statut in ('a_verifier', 'valide_chef'))
             ) %}
             <a href="{{ url_for('saisie.detail_poste', poste_id=p.id) }}"
                class="wp-icon-btn" title="Voir le détail"
@@ -493,7 +493,7 @@
                style="text-decoration:none;display:inline-flex;color:var(--wp-sky);">
               <i class="bi bi-printer"></i>
             </a>
-            {% if current_user.role in ('chef', 'admin') or p.user_id == current_user.id %}
+            {% if current_user.role in ('prod', 'admin') or p.user_id == current_user.id %}
             <form method="POST"
                   action="/saisie/poste/{{ p.id }}/dupliquer"
                   class="d-inline"
@@ -559,7 +559,7 @@
   <p style="color:var(--wp-muted);margin:0 0 1.25rem;font-size:.95rem;">
     Aucune fiche ne correspond aux filtres actuels.
   </p>
-  {% if current_user.role in ('operateur','chef','admin') %}
+  {% if current_user.role in ('operateur','prod','admin') %}
   <a href="{{ url_for('saisie.nouveau_poste') }}" class="btn btn-primary">
     <i class="bi bi-plus-circle me-1"></i> Saisir la première équipe
   </a>

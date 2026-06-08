@@ -84,17 +84,18 @@ HTTP=$(curl -s -c "$COOKIE_JAR" -b "$COOKIE_JAR" \
 [[ "$HTTP" == "302" ]] && echo "[smoke] OK  soumission fiche → 302 (brouillon créé)" \
                        || { echo "[smoke] ERR soumission fiche → $HTTP"; ((ERRORS++)); }
 
-# ── 4. Chef ──────────────────────────────────────────────────────────────────
-echo "--- Profil chef (chef@cuf.cm) ---"
-_login "chef%40cuf.cm" "cuf2026"
-_check "dashboard chef"    "/dashboard/chef"
-_check "chef V2 (le point)" "/dashboard/chef/v2"
+# ── 4. Chef de Production (rôle prod) ────────────────────────────────────────
+echo "--- Profil Chef de Production (prod@cuf.cm) ---"
+_login "prod%40cuf.cm" "cuf2026"
+_check "dashboard prod"    "/dashboard/prod"
 _check "production"        "/dashboard/chef/production"
 _check "qualité"           "/dashboard/chef/qualite"
 _check "machines"          "/dashboard/chef/machines"
 _check "analyse arrêts"    "/analyse/arrets"
 _check "recommandations"   "/recommandations/"
 _check "problèmes liste"   "/problemes/"
+# Le rôle 'chef' est supprimé : /dashboard/chef ne doit plus exister (404)
+_check "chef supprimé"     "/dashboard/chef" "404"
 
 # ── 5. PDG ───────────────────────────────────────────────────────────────────
 echo "--- Profil PDG (pdg@cuf.cm) ---"

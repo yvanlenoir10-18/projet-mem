@@ -307,7 +307,7 @@ def _peut_modifier(equipe):
     if equipe.statut in (STATUT_BROUILLON, STATUT_A_CORRIGER):
         return equipe.user_id == current_user.id
     if equipe.statut in (STATUT_A_VERIFIER, STATUT_VALIDE_CHEF) and not equipe.est_verrouille:
-        return current_user.role in ('chef', 'admin')
+        return current_user.role in ('prod', 'admin')
     return False
 
 
@@ -317,14 +317,14 @@ def _peut_soumettre(equipe):
 
 def _peut_valider_chef(equipe):
     return (
-        current_user.role in ('chef', 'admin')
+        current_user.role in ('prod', 'admin')
         and equipe.statut == STATUT_A_VERIFIER
         and not equipe.est_verrouille
     )
 
 
 def _peut_demander_correction(equipe):
-    if current_user.role not in ('chef', 'admin'):
+    if current_user.role not in ('prod', 'admin'):
         return False
     if equipe.statut not in (STATUT_A_VERIFIER, STATUT_VALIDE_CHEF, STATUT_VERROUILLE):
         return False
@@ -376,7 +376,7 @@ def _validation_chef_resume(equipe, anomalies):
     ]
 
     return {
-        'visible': current_user.role in ('chef', 'admin'),
+        'visible': current_user.role in ('prod', 'admin'),
         'bloquantes': bloquantes,
         'avertissements': avertissements,
         'informations': informations,
@@ -787,7 +787,7 @@ def _render_form(equipe=None):
 
 @saisie_bp.route('/nouveau', methods=['GET', 'POST'])
 @login_required
-@roles_required('operateur', 'chef', 'admin')
+@roles_required('operateur', 'prod', 'admin')
 def nouveau_poste():
     """Formulaire de saisie d'une nouvelle équipe — sauvegardée en brouillon."""
     if request.method == 'POST':
@@ -921,7 +921,7 @@ def nouveau_poste():
 
 @saisie_bp.route('/equipe/<int:equipe_id>/verification')
 @login_required
-@roles_required('operateur', 'chef', 'admin')
+@roles_required('operateur', 'prod', 'admin')
 def verification_equipe(equipe_id):
     """Écran de contrôle terrain avant envoi au chef."""
     equipe = Equipe.query.get_or_404(equipe_id)
@@ -962,7 +962,7 @@ def verification_equipe(equipe_id):
 
 @saisie_bp.route('/equipe/<int:equipe_id>/soumettre', methods=['POST'])
 @login_required
-@roles_required('operateur', 'chef', 'admin')
+@roles_required('operateur', 'prod', 'admin')
 def soumettre_equipe(equipe_id):
     """Transition brouillon/a_corriger → a_verifier. Fige les prix et recalcule le TRS final."""
     equipe = Equipe.query.get_or_404(equipe_id)
@@ -1024,7 +1024,7 @@ def soumettre_equipe(equipe_id):
 
 @saisie_bp.route('/equipe/<int:equipe_id>/modifier', methods=['GET', 'POST'])
 @login_required
-@roles_required('operateur', 'chef', 'admin')
+@roles_required('operateur', 'prod', 'admin')
 def modifier_equipe(equipe_id):
     """Formulaire pré-rempli pour modifier une fiche autorisée."""
     equipe = Equipe.query.get_or_404(equipe_id)
@@ -1188,7 +1188,7 @@ def modifier_equipe(equipe_id):
 
 @saisie_bp.route('/poste/<int:poste_id>/dupliquer', methods=['POST'])
 @login_required
-@roles_required('operateur', 'chef', 'admin')
+@roles_required('operateur', 'prod', 'admin')
 def dupliquer_poste(poste_id):
     """Crée un brouillon à partir de la structure d'une fiche existante."""
     source = Equipe.query.get_or_404(poste_id)
@@ -1234,7 +1234,7 @@ def dupliquer_poste(poste_id):
 
 @saisie_bp.route('/equipe/<int:equipe_id>/valider-chef', methods=['POST'])
 @login_required
-@roles_required('chef', 'admin')
+@roles_required('prod', 'admin')
 def valider_chef_equipe(equipe_id):
     """Transition a_verifier → valide_chef. Les dashboards intègrent alors la fiche."""
     equipe = Equipe.query.get_or_404(equipe_id)
@@ -1293,7 +1293,7 @@ def valider_chef_equipe(equipe_id):
 
 @saisie_bp.route('/equipe/<int:equipe_id>/verrouiller', methods=['POST'])
 @login_required
-@roles_required('chef', 'admin')
+@roles_required('prod', 'admin')
 def verrouiller_equipe(equipe_id):
     """Transition valide_chef → verrouille (chef ou admin)."""
     equipe = Equipe.query.get_or_404(equipe_id)
@@ -1323,7 +1323,7 @@ def deverrouiller_equipe(equipe_id):
 
 @saisie_bp.route('/equipe/<int:equipe_id>/demander-correction', methods=['POST'])
 @login_required
-@roles_required('chef', 'admin')
+@roles_required('prod', 'admin')
 def demander_correction(equipe_id):
     """Transition a_verifier/valide_chef/verrouille → a_corriger avec motif lisible."""
     equipe = Equipe.query.get_or_404(equipe_id)
@@ -1433,7 +1433,7 @@ def _stats_operateur(user_id):
 
 @saisie_bp.route('/accueil')
 @login_required
-@roles_required('operateur', 'chef', 'admin')
+@roles_required('operateur', 'prod', 'admin')
 def accueil_operateur():
     """Accueil terrain orienté collecte pour le profil opérateur."""
     base_query = Equipe.query.filter(Equipe.user_id == current_user.id)
@@ -1478,7 +1478,7 @@ def accueil_operateur():
 @login_required
 def historique():
     query = Equipe.query
-    peut_voir_toutes = current_user.role in ('chef', 'admin', 'pdg')
+    peut_voir_toutes = current_user.role in ('prod', 'admin', 'pdg')
     filtres = {
         'jour': request.args.get('jour', '').strip(),
         'user_id': request.args.get('user_id', '').strip(),
@@ -1530,7 +1530,7 @@ def historique():
     equipes = query.order_by(Equipe.date.desc(), Equipe.numero_equipe).all()
     utilisateurs = []
     if peut_voir_toutes:
-        utilisateurs = User.query.filter(User.role.in_(('operateur', 'chef', 'admin'))).order_by(User.nom.asc()).all()
+        utilisateurs = User.query.filter(User.role.in_(('operateur', 'prod', 'admin'))).order_by(User.nom.asc()).all()
 
     # P12 — pré-calcul des anomalies pour drapeau dans la liste
     anomalies_par_poste = {e.id: detecte_anomalies(e) for e in equipes}
@@ -1541,7 +1541,7 @@ def historique():
     return render_template('saisie/historique.html',
                            postes=equipes,
                            anomalies_par_poste=anomalies_par_poste,
-                           afficher_indicateurs=current_user.role in ('chef', 'pdg', 'admin'),
+                           afficher_indicateurs=current_user.role in ('prod', 'pdg', 'admin'),
                            filtres=filtres,
                            utilisateurs=utilisateurs,
                            peut_voir_toutes=peut_voir_toutes,
@@ -1556,7 +1556,7 @@ def detail_poste(poste_id):
     if current_user.role == 'operateur' and equipe.user_id != current_user.id:
         abort(403)
 
-    afficher_economie = current_user.role in ('chef', 'pdg', 'admin')
+    afficher_economie = current_user.role in ('prod', 'pdg', 'admin')
     pertes = calcule_pertes_equipe(equipe) if afficher_economie else None
     manque = calcule_manque_gagner(equipe) if afficher_economie else None  # P11 — indicateur principal
     couleur = couleur_trs(equipe.trs_global)
@@ -1572,7 +1572,7 @@ def detail_poste(poste_id):
                            trs_productions=trs_productions,
                            perte_fcfa=pertes['total'] if pertes else 0,
                            afficher_economie=afficher_economie,
-                           afficher_indicateurs=current_user.role in ('chef', 'pdg', 'admin'),
+                           afficher_indicateurs=current_user.role in ('prod', 'pdg', 'admin'),
                            couleur_trs=couleur,
                            anomalies=anomalies,
                            validation_chef=_validation_chef_resume(equipe, anomalies),
@@ -1583,16 +1583,16 @@ def detail_poste(poste_id):
                            peut_verrouiller=(
                                equipe.statut == STATUT_VALIDE_CHEF
                                and not equipe.est_verrouille
-                               and current_user.role in ('chef', 'admin')
+                               and current_user.role in ('prod', 'admin')
                            ),
                            peut_deverrouiller=(
                                equipe.est_verrouille
                                and current_user.role == 'admin'
                            ),
                            peut_dupliquer=(
-                               current_user.role in ('chef', 'admin')
+                               current_user.role in ('prod', 'admin')
                                or equipe.user_id == current_user.id
-                           ) and current_user.role in ('operateur', 'chef', 'admin'),
+                           ) and current_user.role in ('operateur', 'prod', 'admin'),
                            peut_demander_correction=_peut_demander_correction(equipe))
 
 

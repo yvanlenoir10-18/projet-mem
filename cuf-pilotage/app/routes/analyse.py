@@ -14,7 +14,7 @@ analyse_bp = Blueprint('analyse', __name__, url_prefix='/analyse')
 
 @analyse_bp.route('/arrets')
 @login_required
-@roles_required('chef', 'prod', 'admin')
+@roles_required('prod', 'admin')
 def arrets():
     jours     = int(request.args.get('jours', 30))
     machine   = request.args.get('machine', '').strip()

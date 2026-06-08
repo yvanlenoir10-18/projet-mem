@@ -82,7 +82,7 @@
       {% endif %}
       {% for role in reco.roles if role != 'admin' %}
       <span class="wp-pill wp-pill-neutral" style="font-size:.65rem;">
-        {{ 'Chef' if role == 'chef' else 'Direction' }}
+        {{ 'Chef de Production' if role == 'prod' else 'Direction' }}
       </span>
       {% endfor %}
       <span class="ms-auto" style="font-size:.7rem;color:var(--wp-muted);">

@@ -2,7 +2,7 @@
 Utilitaires transversaux — wood_pilot.
 
 Décorateur RBAC : roles_required(*roles)
-  Usage : @roles_required('chef', 'admin')
+  Usage : @roles_required('prod', 'admin')
   Renvoie 403 si l'utilisateur n'a pas le bon rôle.
 """
 from functools import wraps
@@ -10,15 +10,14 @@ from flask import abort, flash, redirect, url_for
 from flask_login import current_user
 
 
-ROLES_VALIDES = ('operateur', 'chef', 'prod', 'pdg', 'admin')
+ROLES_VALIDES = ('operateur', 'prod', 'pdg', 'admin')
 
 # Accueil par défaut selon le rôle
 _ACCUEIL_ROLE = {
     'operateur': 'saisie.accueil_operateur',
-    'chef':      'dashboard.vue_chef',
     'prod':      'dashboard.vue_prod',
     'pdg':       'dashboard.vue_pdg',
-    'admin':     'dashboard.vue_chef',
+    'admin':     'dashboard.vue_prod',
 }
 
 
@@ -34,7 +33,7 @@ def roles_required(*roles):
     Décorateur RBAC — limite l'accès à une ou plusieurs rôles.
 
     Exemple :
-        @roles_required('chef', 'admin')
+        @roles_required('prod', 'admin')
         def ma_vue(): ...
     """
     def decorator(f):

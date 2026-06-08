@@ -67,6 +67,50 @@
       </a>
       {% endif %}
 
+      {% if current_user.role == 'prod' %}
+      <span class="wp-nav-section">Production</span>
+      <a class="wp-nav-link {% if request.endpoint == 'dashboard.vue_prod' %}active{% endif %}"
+         href="{{ url_for('dashboard.vue_prod') }}">
+        <span class="wp-nav-ic"><i class="bi bi-speedometer2"></i></span>Tableau de bord
+      </a>
+      <a class="wp-nav-link {% if request.endpoint == 'dashboard.fiches_chef' %}active{% endif %}"
+         href="{{ url_for('dashboard.fiches_chef') }}">
+        <span class="wp-nav-ic"><i class="bi bi-clipboard-check"></i></span>Fiches chef
+      </a>
+      <a class="wp-nav-link {% if request.endpoint == 'dashboard.machines_chef' %}active{% endif %}"
+         href="{{ url_for('dashboard.machines_chef') }}">
+        <span class="wp-nav-ic"><i class="bi bi-tools"></i></span>Machines & Arrêts
+      </a>
+      <a class="wp-nav-link {% if request.endpoint == 'dashboard.production_chef' %}active{% endif %}"
+         href="{{ url_for('dashboard.production_chef') }}">
+        <span class="wp-nav-ic"><i class="bi bi-bar-chart-line"></i></span>Production & Objectifs
+      </a>
+      <a class="wp-nav-link {% if request.endpoint == 'dashboard.qualite_chef' %}active{% endif %}"
+         href="{{ url_for('dashboard.qualite_chef') }}">
+        <span class="wp-nav-ic"><i class="bi bi-tree"></i></span>Qualité / Matière
+      </a>
+      <a class="wp-nav-link {% if request.endpoint == 'dashboard.pertes' %}active{% endif %}"
+         href="{{ url_for('dashboard.pertes') }}">
+        <span class="wp-nav-ic"><i class="bi bi-cash-stack"></i></span>Pertes financières
+      </a>
+      <a class="wp-nav-link {% if request.endpoint == 'analyse.arrets' %}active{% endif %}"
+         href="{{ url_for('analyse.arrets') }}">
+        <span class="wp-nav-ic"><i class="bi bi-exclamation-triangle"></i></span>Causes d'arrêts
+      </a>
+      <a class="wp-nav-link {% if request.endpoint and request.endpoint.startswith('problemes.') %}active{% endif %}"
+         href="{{ url_for('problemes.liste') }}">
+        <span class="wp-nav-ic"><i class="bi bi-diagram-3"></i></span>Résolution
+      </a>
+      <a class="wp-nav-link {% if request.endpoint in ('dashboard.actions_chef', 'dashboard.nouvelle_action_chef') %}active{% endif %}"
+         href="{{ url_for('dashboard.actions_chef') }}">
+        <span class="wp-nav-ic"><i class="bi bi-check2-square"></i></span>Décisions de pilotage
+      </a>
+      <a class="wp-nav-link {% if request.endpoint and request.endpoint.startswith('recommandations.') %}active{% endif %}"
+         href="{{ url_for('recommandations.index') }}">
+        <span class="wp-nav-ic"><i class="bi bi-lightbulb"></i></span>Prescriptions de pilotage
+      </a>
+      {% endif %}
+
       {% if current_user.role == 'pdg' %}
       <span class="wp-nav-section">Direction</span>
       <a class="wp-nav-link {% if request.endpoint == 'dashboard.vue_pdg' %}active{% endif %}"
@@ -120,13 +164,20 @@
       <div class="wp-avatar wp-avatar-sm
         {% if current_user.role == 'admin' %}wp-avatar-terra
         {% elif current_user.role == 'chef' %}wp-avatar-leaf
+        {% elif current_user.role == 'prod' %}wp-avatar-emerald
         {% elif current_user.role == 'pdg' %}wp-avatar-sky
         {% else %}wp-avatar-emerald{% endif %}">
         {{ current_user.initiales }}
       </div>
       <div class="wp-user-card-info">
         <div class="wp-user-name">{{ current_user.nom }}</div>
-        <div class="wp-user-role">{{ current_user.role }}</div>
+        <div class="wp-user-role">
+          {% if current_user.role == 'prod' %}Chef de Production
+          {% elif current_user.role == 'chef' %}Chef Scierie
+          {% elif current_user.role == 'admin' %}Administrateur
+          {% elif current_user.role == 'pdg' %}PDG
+          {% else %}Opérateur{% endif %}
+        </div>
       </div>
       <a href="{{ url_for('auth.logout') }}" aria-label="Déconnexion"
          class="wp-icon-btn border-0" style="width:28px;height:28px;border-radius:8px;flex-shrink:0;">
@@ -164,6 +215,29 @@
           <span class="wp-nav-ic"><i class="bi bi-diagram-3"></i></span>Résolution</a>
         <a class="wp-nav-link" href="{{ url_for('dashboard.actions_chef') }}">
           <span class="wp-nav-ic"><i class="bi bi-check2-square"></i></span>Décisions de pilotage</a>
+        {% endif %}
+        {% if current_user.role == 'prod' %}
+        <span class="wp-nav-section">Production</span>
+        <a class="wp-nav-link" href="{{ url_for('dashboard.vue_prod') }}">
+          <span class="wp-nav-ic"><i class="bi bi-speedometer2"></i></span>Tableau de bord</a>
+        <a class="wp-nav-link" href="{{ url_for('dashboard.fiches_chef') }}">
+          <span class="wp-nav-ic"><i class="bi bi-clipboard-check"></i></span>Fiches chef</a>
+        <a class="wp-nav-link" href="{{ url_for('dashboard.machines_chef') }}">
+          <span class="wp-nav-ic"><i class="bi bi-tools"></i></span>Machines & Arrêts</a>
+        <a class="wp-nav-link" href="{{ url_for('dashboard.production_chef') }}">
+          <span class="wp-nav-ic"><i class="bi bi-bar-chart-line"></i></span>Production & Objectifs</a>
+        <a class="wp-nav-link" href="{{ url_for('dashboard.qualite_chef') }}">
+          <span class="wp-nav-ic"><i class="bi bi-tree"></i></span>Qualité / Matière</a>
+        <a class="wp-nav-link" href="{{ url_for('dashboard.pertes') }}">
+          <span class="wp-nav-ic"><i class="bi bi-cash-stack"></i></span>Pertes financières</a>
+        <a class="wp-nav-link" href="{{ url_for('analyse.arrets') }}">
+          <span class="wp-nav-ic"><i class="bi bi-exclamation-triangle"></i></span>Causes d'arrêts</a>
+        <a class="wp-nav-link" href="{{ url_for('problemes.liste') }}">
+          <span class="wp-nav-ic"><i class="bi bi-diagram-3"></i></span>Résolution</a>
+        <a class="wp-nav-link" href="{{ url_for('dashboard.actions_chef') }}">
+          <span class="wp-nav-ic"><i class="bi bi-check2-square"></i></span>Décisions de pilotage</a>
+        <a class="wp-nav-link" href="{{ url_for('recommandations.index') }}">
+          <span class="wp-nav-ic"><i class="bi bi-lightbulb"></i></span>Prescriptions de pilotage</a>
         {% endif %}
         {% if current_user.role == 'pdg' %}
         <span class="wp-nav-section">Direction</span>

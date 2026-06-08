@@ -53,6 +53,7 @@
     {# Pill de rôle #}
     {% if u.role == 'admin' %}{% set rp = 'danger' %}{% set rl = 'Admin' %}
     {% elif u.role == 'chef' %}{% set rp = 'warning' %}{% set rl = 'Chef' %}
+    {% elif u.role == 'prod' %}{% set rp = 'success' %}{% set rl = 'Chef de Production' %}
     {% elif u.role == 'pdg' %}{% set rp = 'info' %}{% set rl = 'PDG' %}
     {% else %}{% set rp = 'neutral' %}{% set rl = 'Opérateur' %}{% endif %}
 
@@ -160,7 +161,8 @@
             {% for r in roles %}
             <option value="{{ r }}">
               {% if r == 'admin' %}Administrateur
-              {% elif r == 'chef' %}Chef de production
+              {% elif r == 'chef' %}Chef Scierie (ancien profil)
+              {% elif r == 'prod' %}Chef de Production (nouveau cockpit)
               {% elif r == 'pdg' %}PDG / Direction
               {% else %}Opérateur (saisie){% endif %}
             </option>
@@ -237,7 +239,8 @@
             {% for r in roles %}
             <option value="{{ r }}" {% if r == utilisateur.role %}selected{% endif %}>
               {% if r == 'admin' %}Administrateur
-              {% elif r == 'chef' %}Chef de production
+              {% elif r == 'chef' %}Chef Scierie (ancien profil)
+              {% elif r == 'prod' %}Chef de Production (nouveau cockpit)
               {% elif r == 'pdg' %}PDG / Direction
               {% else %}Opérateur (saisie){% endif %}
             </option>

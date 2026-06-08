@@ -2467,7 +2467,7 @@ def vue_chef():
 
 @dashboard_bp.route('/chef/v2')
 @login_required
-@roles_required('chef', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def vue_chef_v2():
     """Chef Scierie V2 — Vue 1 « LE POINT ».
 
@@ -2544,9 +2544,81 @@ def vue_chef_v2():
                            nb_problemes_ouverts=nb_problemes_ouverts)
 
 
+@dashboard_bp.route('/prod')
+@login_required
+@roles_required('prod', 'admin')
+def vue_prod():
+    """Chef de Production V2 — cockpit autonome sur /dashboard/prod.
+
+    Réutilise temporairement le même moteur et template que vue_chef_v2.
+    Route propre à prod : prod@cuf.cm atterrit ici après login,
+    pas sur /chef/v2 qui reste la route chef.
+    """
+    aujourd_hui = date.today()
+    jours = int(request.args.get('jours', 7))
+
+    alertes  = _alertes_chef(aujourd_hui)
+    kpi_jour = _kpi_aujourdhui(aujourd_hui)
+    nb_problemes_ouverts = Probleme.query.filter(
+        Probleme.statut.in_(('ouvert', 'en_analyse'))
+    ).count()
+    stats_actions_chef = _stats_actions_chef()
+    priorites_chef = _priorites_chef(
+        aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_actions_chef
+    )[:3]
+    machine_top = _machine_prioritaire_recent(aujourd_hui, jours=7)
+
+    equipes = _get_equipes_periode(jours)
+    label_periode = f"{jours} derniers jours"
+
+    if not equipes:
+        return render_template('chef/v2.html',
+                               jours=jours, label_periode=label_periode,
+                               equipes_vides=True,
+                               statut_global=None, priorites_chef=priorites_chef,
+                               machine_top=machine_top, cascade=None,
+                               attribution=None, trs_moyen=0,
+                               nb_postes=0,
+                               nb_problemes_ouverts=nb_problemes_ouverts)
+
+    trs_valeurs = [e.trs_global for e in equipes if e.trs_global is not None]
+    trs_moyen   = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
+    statut_global = _statut_global(trs_moyen, alertes)
+
+    cascade = cascade_economique(equipes)
+
+    d = p = q = 0.0
+    for e in equipes:
+        m = calcule_manque_gagner(e)
+        if m['valeur_potentielle'] - m['valeur_reelle_valorisee'] <= 0:
+            continue
+        pe = calcule_pertes_equipe(e)
+        d += pe['perte_d']; p += pe['perte_p']; q += pe['perte_q']
+    total = d + p + q
+    if total > 0:
+        pct_d = round(d / total * 100)
+        pct_p = round(p / total * 100)
+        pct_q = 100 - pct_d - pct_p
+        attribution = {'pct_d': pct_d, 'pct_p': pct_p, 'pct_q': pct_q}
+    else:
+        attribution = None
+
+    return render_template('chef/v2.html',
+                           jours=jours, label_periode=label_periode,
+                           equipes_vides=False,
+                           statut_global=statut_global,
+                           priorites_chef=priorites_chef,
+                           machine_top=machine_top,
+                           cascade=cascade,
+                           attribution=attribution,
+                           trs_moyen=trs_moyen,
+                           nb_postes=len(equipes),
+                           nb_problemes_ouverts=nb_problemes_ouverts)
+
+
 @dashboard_bp.route('/chef/fiches')
 @login_required
-@roles_required('chef', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def fiches_chef():
     """Liste de contrôle des fiches côté chef scierie."""
     filtres = {
@@ -2592,7 +2664,7 @@ def fiches_chef():
 
 @dashboard_bp.route('/chef/machines')
 @login_required
-@roles_required('chef', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def machines_chef():
     """Diagnostic Machines & Arrêts pour le chef scierie."""
     jours = request.args.get('jours', 30)
@@ -2625,7 +2697,7 @@ def machines_chef():
 
 @dashboard_bp.route('/chef/production')
 @login_required
-@roles_required('chef', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def production_chef():
     """Production & Objectifs pour le chef scierie."""
     jours = request.args.get('jours', 30)
@@ -2655,7 +2727,7 @@ def production_chef():
 
 @dashboard_bp.route('/chef/qualite')
 @login_required
-@roles_required('chef', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def qualite_chef():
     """Qualité / Matière pour le chef scierie."""
     jours = request.args.get('jours', 30)
@@ -2747,7 +2819,7 @@ def _prefill_action_chef():
 
 @dashboard_bp.route('/chef/actions')
 @login_required
-@roles_required('chef', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def actions_chef():
     """Liste des décisions et actions suivies par le chef scierie."""
     statut = request.args.get('statut', 'ouvertes').strip()
@@ -2860,7 +2932,7 @@ def actions_chef():
 
 @dashboard_bp.route('/chef/actions/nouvelle', methods=['GET', 'POST'])
 @login_required
-@roles_required('chef', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def nouvelle_action_chef():
     """Création d'une action légère de pilotage."""
     valeurs = _prefill_action_chef()
@@ -2960,7 +3032,7 @@ def nouvelle_action_chef():
 
 @dashboard_bp.route('/chef/actions/<int:action_id>/statut', methods=['POST'])
 @login_required
-@roles_required('chef', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def changer_statut_action_chef(action_id):
     """Mise à jour rapide du statut d'une action."""
     action = ActionChef.query.get_or_404(action_id)
@@ -3157,7 +3229,7 @@ def vue_pdg():
 
 @dashboard_bp.route('/pertes')
 @login_required
-@roles_required('chef', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def pertes():
     """Analyse mensuelle des pertes financières D/P/Q avec drill-down."""
     from ..services.trs import _prix_production
@@ -3298,7 +3370,7 @@ def pertes():
 
 @dashboard_bp.route('/export/excel')
 @login_required
-@roles_required('chef', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def export_excel():
     aujourd_hui = date.today()
     try:

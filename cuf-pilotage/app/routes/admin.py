@@ -11,7 +11,15 @@ from ..utils import roles_required
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
-ROLES_DISPONIBLES = ['operateur', 'chef', 'pdg', 'admin']
+ROLES_DISPONIBLES = ['operateur', 'chef', 'prod', 'pdg', 'admin']
+
+LIBELLES_ROLE = {
+    'operateur': 'Opérateur',
+    'chef':      'Chef Scierie',
+    'prod':      'Chef de Production',
+    'pdg':       'PDG',
+    'admin':     'Administrateur',
+}
 
 PARAMS_CHEF = [
     'objectif_m3',

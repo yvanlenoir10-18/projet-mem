@@ -87,11 +87,10 @@ def _init_donnees_defaut():
             utilisateur.set_password(u['mdp'])
             db.session.add(utilisateur)
 
-    # Compte dédié au test du cockpit Chef Scierie V2 (« Le Point »).
-    # Idempotent : créé même sur une base déjà initialisée. Rôle 'chef' →
-    # accès à /dashboard/chef/v2 comme à l'ancien /dashboard/chef (fallback).
+    # Compte Chef de Production — profil autonome (rôle 'prod').
+    # Idempotent : créé même sur une base déjà initialisée.
     if not User.query.filter_by(email='prod@cuf.cm').first():
-        chef_prod = User(nom='Chef de Production', email='prod@cuf.cm', role='chef')
+        chef_prod = User(nom='Chef de Production', email='prod@cuf.cm', role='prod')
         chef_prod.set_password('cuf2026')
         db.session.add(chef_prod)
 
@@ -198,6 +197,12 @@ def _repair_seed_roles():
         admin = User(nom='Administrateur', email='admin@cuf.cm', role='admin')
         admin.set_password('cuf2026')
         db.session.add(admin)
+        db.session.flush()
+
+    # Migrer prod@cuf.cm de role='chef' → 'prod' si la DB a été créée avant P63
+    prod_user = User.query.filter_by(email='prod@cuf.cm').first()
+    if prod_user and prod_user.role != 'prod':
+        prod_user.role = 'prod'
         db.session.flush()
 
     db.session.commit()

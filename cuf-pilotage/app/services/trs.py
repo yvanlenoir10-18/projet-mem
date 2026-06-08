@@ -490,17 +490,27 @@ def manque_a_gagner_agrege(equipes):
 
 def cascade_economique(equipes):
     """
-    Cascade économique RÉCONCILIANTE pour le profil Chef V2.
+    Cascade économique RÉCONCILIANTE pour le profil Chef V2 (Vue 1 « Le Point »).
 
-    Recompose les sorties existantes de calcule_manque_gagner() en barres qui
-    somment EXACTEMENT, même après arrondi :
+    Décompose le manque à gagner POSTE PAR POSTE, puis somme. Le chef pilote
+    par poste et par fiche : la référence affichée doit donc être la somme des
+    manques des postes en déficit, pas l'écart net global (décision verrouillée
+    2026-06-08, Claude ↔ Codex ↔ utilisateur).
 
-        potentiel − perte_volume − perte_qualite = reel
+    Pourquoi par poste et non en net global : un poste qui dépasse la capacité
+    cible ne « rembourse » pas un poste en déficit. En net global, les postes
+    sur-performants masquent les pertes réelles (sur le seed : net = 0 alors que
+    la somme des manques = 524 020 FCFA). La somme par poste dit la vérité
+    opérationnelle ; le net global mentirait par compensation.
 
-    `perte_volume` est calculé en RÉSIDUEL (manque − perte_qualite). C'est ce
-    qui garantit la réconciliation : il absorbe tout écart d'arrondi, donc la
-    cascade affichée « tombe toujours juste ». Aucun calcul métier nouveau —
-    pur réagencement de l'existant (contrat verrouillé 2026-06-08).
+    Seuls les postes où `valeur_potentielle > valeur_reelle` (déficit réel)
+    contribuent. Leurs potentiel / réel sont sommés, et le manque est décomposé :
+
+        potentiel − perte_volume − perte_qualite = reel   (exact, après arrondi)
+
+    `perte_volume` est le RÉSIDUEL (manque − perte_qualite) : il absorbe tout
+    écart d'arrondi, donc la cascade « tombe toujours juste ». Aucun calcul
+    métier nouveau — pur réagencement de calcule_manque_gagner().
 
     Distinction assumée (Jonsson & Lesshammar, 1999) :
     - cette cascade = MESURE économique (combien on perd), réconciliée ;
@@ -512,50 +522,57 @@ def cascade_economique(equipes):
     - perte_qualite = perte nette sur le bois déclassé revendu sous le prix
       conforme = valeur plein-tarif du déclassé − valeur réellement récupérée.
 
-    Returns: dict {statut, potentiel, reel, manque, perte_volume,
-                   perte_qualite, reconcilie}.
-        statut == 'pas_de_perte' quand la production dépasse la capacité cible
-        (sur-performance) : aucune barre de perte, garde-fou contre l'absurde.
+    Returns: dict {statut, potentiel, reel, manque, perte_volume, perte_qualite,
+                   nb_postes_deficit, reconcilie}.
+        statut == 'pas_de_perte' quand aucun poste n'est en déficit (état
+        positif réel, pas un artefact).
     """
     taux = _param_float('taux_revente_rebut', 0.70)
-    P = Vc = Vd_net = Vdech = 0.0
+    P = R = Vd_net_deficit = 0.0
+    nb_deficit = 0
     for e in equipes:
         m = calcule_manque_gagner(e)
-        P      += m['valeur_potentielle']
-        Vc     += m['valeur_conforme']
-        Vd_net += m['valeur_declass']        # DÉJÀ net (× taux_revente)
-        Vdech  += m['valeur_dechets']
+        pot_i  = m['valeur_potentielle']
+        reel_i = m['valeur_reelle_valorisee']
+        if pot_i - reel_i <= 0:
+            continue                      # poste à capacité ou au-dessus : aucune perte
+        nb_deficit += 1
+        P += pot_i
+        R += reel_i
+        Vd_net_deficit += m['valeur_declass']   # DÉJÀ net (× taux_revente)
 
     potentiel = int(round(P))
-    reel      = int(round(Vc + Vd_net + Vdech))
+    reel      = int(round(R))
 
-    if potentiel <= reel:
+    if nb_deficit == 0 or potentiel <= reel:
         return {
-            'statut':        'pas_de_perte',
-            'potentiel':     potentiel,
-            'reel':          reel,
-            'manque':        0,
-            'perte_volume':  0,
-            'perte_qualite': 0,
-            'reconcilie':    True,
+            'statut':            'pas_de_perte',
+            'potentiel':         potentiel,
+            'reel':              reel,
+            'manque':            0,
+            'perte_volume':      0,
+            'perte_qualite':     0,
+            'nb_postes_deficit': nb_deficit,
+            'reconcilie':        True,
         }
 
     manque = potentiel - reel
 
     # Perte qualité = valeur plein tarif du déclassé − valeur nette récupérée.
-    vd_full = (Vd_net / taux) if taux > 0 else Vd_net
-    perte_qualite = int(round(vd_full - Vd_net))
+    vd_full = (Vd_net_deficit / taux) if taux > 0 else Vd_net_deficit
+    perte_qualite = int(round(vd_full - Vd_net_deficit))
     perte_qualite = max(0, min(perte_qualite, manque))   # garde-fou borné [0, manque]
     perte_volume  = manque - perte_qualite               # résiduel → ferme toujours
 
     return {
-        'statut':        'perte',
-        'potentiel':     potentiel,
-        'reel':          reel,
-        'manque':        manque,
-        'perte_volume':  perte_volume,
-        'perte_qualite': perte_qualite,
-        'reconcilie':    (potentiel - perte_volume - perte_qualite == reel),
+        'statut':            'perte',
+        'potentiel':         potentiel,
+        'reel':              reel,
+        'manque':            manque,
+        'perte_volume':      perte_volume,
+        'perte_qualite':     perte_qualite,
+        'nb_postes_deficit': nb_deficit,
+        'reconcilie':        (potentiel - perte_volume - perte_qualite == reel),
     }
 
 

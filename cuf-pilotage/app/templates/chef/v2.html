@@ -53,7 +53,9 @@
       <strong style="color:{{ statut_global.color }};">
         {{ "{:,.0f}".format(cascade.manque).replace(",", " ") }} FCFA
       </strong>
-      <span style="color:var(--wp-muted);font-size:.85rem;">sur {{ label_periode }}</span>
+      <span style="color:var(--wp-muted);font-size:.85rem;">
+        · {{ cascade.nb_postes_deficit }} poste{{ 's' if cascade.nb_postes_deficit > 1 }} en déficit · {{ label_periode }}
+      </span>
     </div>
     {% endif %}
   </div>

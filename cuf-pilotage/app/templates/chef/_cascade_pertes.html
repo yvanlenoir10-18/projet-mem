@@ -27,7 +27,9 @@
       <i class="bi bi-cash-stack"></i> Où part la valeur
     </div>
     <div style="color:var(--wp-muted);font-size:.85rem;margin-bottom:16px;">
-      Mesure économique de la période. Les montants se réconcilient exactement.
+      Décomposition du manque à gagner sur les
+      {{ cascade.nb_postes_deficit }} poste{{ 's' if cascade.nb_postes_deficit > 1 }}
+      en déficit. Les montants se réconcilient exactement.
     </div>
 
     {# Barre empilée : ce qui reste (vert) + les deux pertes #}
@@ -76,8 +78,9 @@
     </table>
 
     <div style="margin-top:10px;font-size:.85rem;color:var(--wp-muted);">
-      Manque à gagner de la période :
+      Manque à gagner (postes en déficit) :
       <strong>{{ "{:,.0f}".format(cascade.manque).replace(",", " ") }} FCFA</strong>
+      — soit le même montant qu'en tête de page.
     </div>
   </div>
 

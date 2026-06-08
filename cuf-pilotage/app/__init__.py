@@ -87,6 +87,14 @@ def _init_donnees_defaut():
             utilisateur.set_password(u['mdp'])
             db.session.add(utilisateur)
 
+    # Compte dédié au test du cockpit Chef Scierie V2 (« Le Point »).
+    # Idempotent : créé même sur une base déjà initialisée. Rôle 'chef' →
+    # accès à /dashboard/chef/v2 comme à l'ancien /dashboard/chef (fallback).
+    if not User.query.filter_by(email='prod@cuf.cm').first():
+        chef_prod = User(nom='Chef de Production', email='prod@cuf.cm', role='chef')
+        chef_prod.set_password('cuf2026')
+        db.session.add(chef_prod)
+
     if not Parametre.query.first():
         parametres = [
             # Prix de vente par essence (FCFA/m³) — alignés sur les prix de

@@ -2509,14 +2509,24 @@ def vue_chef_v2():
     # Cascade économique réconciliée (mesure : où part la valeur)
     cascade = cascade_economique(equipes)
 
-    # Attribution causale D/P/Q en FCFA (diagnostic indicatif, NON additif)
-    attribution = {'perte_d': 0.0, 'perte_p': 0.0, 'perte_q': 0.0}
+    # Attribution causale D/P/Q en POIDS DIAGNOSTIC (%), sur les seuls postes en
+    # déficit (cohérent avec la cascade). On affiche des parts, pas des FCFA bruts :
+    # le D/P/Q dit QUELLE cause domine, pas un montant qui concurrencerait le manque.
+    d = p = q = 0.0
     for e in equipes:
+        m = calcule_manque_gagner(e)
+        if m['valeur_potentielle'] - m['valeur_reelle_valorisee'] <= 0:
+            continue                      # même périmètre que cascade_economique()
         pe = calcule_pertes_equipe(e)
-        attribution['perte_d'] += pe['perte_d']
-        attribution['perte_p'] += pe['perte_p']
-        attribution['perte_q'] += pe['perte_q']
-    attribution = {k: int(round(v)) for k, v in attribution.items()}
+        d += pe['perte_d']; p += pe['perte_p']; q += pe['perte_q']
+    total = d + p + q
+    if total > 0:
+        pct_d = round(d / total * 100)
+        pct_p = round(p / total * 100)
+        pct_q = 100 - pct_d - pct_p       # résiduel → les 3 parts somment à 100
+        attribution = {'pct_d': pct_d, 'pct_p': pct_p, 'pct_q': pct_q}
+    else:
+        attribution = None
 
     return render_template('chef/v2.html',
                            jours=jours, label_periode=label_periode,

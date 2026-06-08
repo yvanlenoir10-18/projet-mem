@@ -92,12 +92,16 @@ aurait ruiné la crédibilité ; ici l'équation tombe juste par construction.
   à vérifier ». La règle métier verrouillée impose que les KPI financiers ne
   comptent que `STATUTS_ANALYSES` (validés). J'ai **suivi la règle verrouillée**
   (`_get_equipes_periode` → validés uniquement), pas la formulation de Codex.
-- **Nouveau point de vigilance (à discuter)** : l'encart d'attribution D/P/Q
-  affiche des montants **bruts théoriques** (≈ 36 M FCFA sur 7 j) très supérieurs
-  au manque économique (524 020 FCFA). La note « non additif » est exacte, mais
-  l'écart d'échelle peut dérouter. Options ouvertes : afficher D/P/Q en parts (%)
-  plutôt qu'en FCFA bruts, ou scoper l'attribution aux postes en déficit.
-  **Non bloquant.**
+- **Point d'échelle D/P/Q tranché** : l'encart D/P/Q affichait des montants bruts
+  (≈ 36 M FCFA) à côté du manque (524 020 FCFA), source de confusion. Désormais
+  il affiche un **poids diagnostic en %** (`pct_q = 100 − pct_d − pct_p`, résiduel
+  → somme = 100 %), **scopé aux seuls postes en déficit** (même périmètre que la
+  cascade). Plus de choc d'échelle ; la note « non additif » est conservée.
+- **Compte de test** : `prod@cuf.cm` (rôle `chef`, « Chef de Production ») créé
+  de façon idempotente dans `app/__init__.py` pour tester la V2.
+- **4 scénarios de test contrôlés** : `seed_scenarios_chef_v2.py` +
+  `documents/plans/chef-v2-scenarios-test.md` (normal · arrêt Bicoupe ·
+  déclassement · fiche incohérente), avec chiffres mesurés par le moteur.
 
 ## 8. Références bibliographiques mobilisées implicitement
 

@@ -84,48 +84,48 @@
     </div>
   </div>
 
-  {# ── Attribution causale D/P/Q — indicative, NON additive ──────────────── #}
+  {# ── Attribution causale D/P/Q — POIDS diagnostic (%), NON additive ─────── #}
   {% if attribution %}
   <div class="wp-card" style="padding:20px;margin-top:14px;">
-    <div style="font-size:1.0rem;font-weight:700;margin-bottom:12px;">
+    <div style="font-size:1.0rem;font-weight:700;margin-bottom:4px;">
       <i class="bi bi-search"></i> Lecture des causes probables
     </div>
+    <div style="color:var(--wp-muted);font-size:.8rem;margin-bottom:14px;">
+      Quelle cause pèse le plus dans le manque des postes en déficit. Poids relatif, pas un montant.
+    </div>
 
-    <div class="row g-2">
+    {# Barre de poids 100 % : Temps perdu / Cadence / Matière #}
+    <div style="display:flex;height:26px;border-radius:6px;overflow:hidden;
+                border:1px solid var(--wp-line);margin-bottom:14px;font-size:.72rem;
+                color:#fff;font-weight:700;line-height:26px;text-align:center;">
+      {% if attribution.pct_d %}<div style="width:{{ attribution.pct_d }}%;background:#b43c32;" title="Temps perdu">{{ attribution.pct_d }}%</div>{% endif %}
+      {% if attribution.pct_p %}<div style="width:{{ attribution.pct_p }}%;background:var(--wp-ochre);" title="Cadence">{{ attribution.pct_p }}%</div>{% endif %}
+      {% if attribution.pct_q %}<div style="width:{{ attribution.pct_q }}%;background:#3f8a5c;" title="Matière">{{ attribution.pct_q }}%</div>{% endif %}
+    </div>
+
+    <div class="row g-2 text-center">
       <div class="col-4">
-        <div style="padding:10px;border-radius:6px;background:rgba(180,60,50,0.06);">
-          <div style="font-weight:700;">Temps perdu</div>
-          <div style="font-size:.75rem;color:var(--wp-muted);">arrêts · Disponibilité (D)</div>
-          <div style="font-size:1.1rem;font-weight:700;margin-top:4px;">
-            {{ "{:,.0f}".format(attribution.perte_d).replace(",", " ") }} FCFA
-          </div>
-        </div>
+        <div style="font-weight:700;color:#b43c32;font-size:1.2rem;">{{ attribution.pct_d }} %</div>
+        <div style="font-weight:600;">Temps perdu</div>
+        <div style="font-size:.72rem;color:var(--wp-muted);">arrêts · Disponibilité (D)</div>
       </div>
       <div class="col-4">
-        <div style="padding:10px;border-radius:6px;background:rgba(197,151,58,0.08);">
-          <div style="font-weight:700;">Cadence</div>
-          <div style="font-size:.75rem;color:var(--wp-muted);">vitesse · Performance (P)</div>
-          <div style="font-size:1.1rem;font-weight:700;margin-top:4px;">
-            {{ "{:,.0f}".format(attribution.perte_p).replace(",", " ") }} FCFA
-          </div>
-        </div>
+        <div style="font-weight:700;color:var(--wp-ochre);font-size:1.2rem;">{{ attribution.pct_p }} %</div>
+        <div style="font-weight:600;">Cadence</div>
+        <div style="font-size:.72rem;color:var(--wp-muted);">vitesse · Performance (P)</div>
       </div>
       <div class="col-4">
-        <div style="padding:10px;border-radius:6px;background:rgba(63,138,92,0.06);">
-          <div style="font-weight:700;">Matière</div>
-          <div style="font-size:.75rem;color:var(--wp-muted);">déclassement · Qualité (Q)</div>
-          <div style="font-size:1.1rem;font-weight:700;margin-top:4px;">
-            {{ "{:,.0f}".format(attribution.perte_q).replace(",", " ") }} FCFA
-          </div>
-        </div>
+        <div style="font-weight:700;color:#3f8a5c;font-size:1.2rem;">{{ attribution.pct_q }} %</div>
+        <div style="font-weight:600;">Matière</div>
+        <div style="font-size:.72rem;color:var(--wp-muted);">déclassement · Qualité (Q)</div>
       </div>
     </div>
 
-    {# Note obligatoire — empêche d'additionner D+P+Q au manque à gagner #}
-    <div style="margin-top:12px;padding:10px 12px;border-left:3px solid var(--wp-ochre);
+    {# Note obligatoire — empêche de confondre poids diagnostic et manque comptable #}
+    <div style="margin-top:14px;padding:10px 12px;border-left:3px solid var(--wp-ochre);
                 background:rgba(197,151,58,0.06);font-size:.85rem;color:#6b6256;">
-      <strong>Lecture diagnostic :</strong> ces montants aident à comprendre les causes.
-      Ils ne sont pas une addition comptable du manque à gagner.
+      <strong>Lecture diagnostic :</strong> ces valeurs aident à comprendre les causes.
+      Elles ne sont pas une addition comptable du manque à gagner.
     </div>
   </div>
   {% endif %}

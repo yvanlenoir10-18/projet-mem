@@ -79,13 +79,25 @@ aurait ruiné la crédibilité ; ici l'équation tombe juste par construction.
 - **Ne contredit aucune hypothèse antérieure.** P58 (prescriptions 6 sections) et
   P59 (cadrage dashboard aiguilleur) restent valides : P60 est additif sur une
   route séparée.
-- **Point de vigilance signalé explicitement** : le `manque` de la cascade
-  (agrégat net `Σpotentiel − Σreel`, qui peut être compensé par des postes
-  sur-performants) **diffère** du `manque_a_gagner_agrege` du dashboard `/chef`
-  (somme des manques par poste, jamais négative). Les deux répondent à des
-  questions différentes. À trancher avec l'utilisateur : lequel devient la
-  référence affichée, pour éviter qu'un même mot « manque à gagner » porte deux
-  valeurs selon la vue. **Non bloquant** tant que le seed déclenche le garde-fou.
+- **Point §7 tranché (commit `84870e7`)** : la référence Chef V2 est la **somme
+  des manques poste par poste** (décision Codex). `cascade_economique()` a été
+  refondue pour ne décomposer que les postes en déficit (`potentiel > réel`).
+  Conséquence vérifiée : la cascade et le chiffre de tête de page sont le **même
+  montant à 0 FCFA près** (524 020 sur 7 j, 1 324 260 sur 30 j). L'ambiguïté
+  « un mot, deux valeurs » est levée. Motif de fond : en net global, les postes
+  sur-capacité **masquent** les pertes réelles (net = 0 vs somme = 524 020) — la
+  somme par poste dit la vérité opérationnelle, cohérente avec un pilotage par
+  fiche.
+- **Écart avec une règle verrouillée — à confirmer** : Codex a écrit « validés /
+  à vérifier ». La règle métier verrouillée impose que les KPI financiers ne
+  comptent que `STATUTS_ANALYSES` (validés). J'ai **suivi la règle verrouillée**
+  (`_get_equipes_periode` → validés uniquement), pas la formulation de Codex.
+- **Nouveau point de vigilance (à discuter)** : l'encart d'attribution D/P/Q
+  affiche des montants **bruts théoriques** (≈ 36 M FCFA sur 7 j) très supérieurs
+  au manque économique (524 020 FCFA). La note « non additif » est exacte, mais
+  l'écart d'échelle peut dérouter. Options ouvertes : afficher D/P/Q en parts (%)
+  plutôt qu'en FCFA bruts, ou scoper l'attribution aux postes en déficit.
+  **Non bloquant.**
 
 ## 8. Références bibliographiques mobilisées implicitement
 
@@ -101,5 +113,8 @@ aurait ruiné la crédibilité ; ici l'équation tombe juste par construction.
   cascade avec une vraie perte — relève des P0 de l'audit, pas de P60.
 - Construire Vue 2 « Mes décisions » (actions, Ishikawa, bilan avant/après FCFA).
 - Construire Vue 3 « Rapport PDG » (synthèse + export Excel existant).
-- Trancher le point §7 (référence unique du « manque à gagner »).
+- Décider du traitement de l'attribution D/P/Q (parts % vs FCFA bruts) — voir §7.
+- Confirmer le périmètre statut (validés uniquement vs « validés / à vérifier »).
+- Construire les 4 scénarios de test contrôlés (poste normal · arrêt Bicoupe ·
+  déclassement élevé · fiche incohérente) pour juger « Le Point » en 5 s — demande Codex.
 - Ajouter des tests unitaires sur `cascade_economique` (réconciliation + garde-fou).

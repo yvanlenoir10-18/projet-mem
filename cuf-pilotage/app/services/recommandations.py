@@ -24,7 +24,7 @@ _REGLES = [
         'couleur':  'terracotta',
         'priorite': 3,
         'famille':  'performance',
-        'roles':    ['prod', 'admin'],
+        'roles':    ['chef', 'admin'],
     },
     {
         'code':     'TRS_MOYEN',
@@ -33,7 +33,7 @@ _REGLES = [
         'couleur':  'ochre',
         'priorite': 2,
         'famille':  'performance',
-        'roles':    ['prod', 'admin'],
+        'roles':    ['chef', 'admin'],
     },
     {
         'code':     'MANQUE_ELEVE',
@@ -51,7 +51,7 @@ _REGLES = [
         'couleur':  'ochre',
         'priorite': 2,
         'famille':  'donnees',
-        'roles':    ['prod', 'admin'],
+        'roles':    ['chef', 'admin'],
     },
     {
         'code':     'DECLASS_EXCESSIF',
@@ -60,7 +60,7 @@ _REGLES = [
         'couleur':  'terracotta',
         'priorite': 3,
         'famille':  'qualite',
-        'roles':    ['prod', 'pdg', 'admin'],
+        'roles':    ['chef', 'pdg', 'admin'],
     },
     {
         'code':     'SAISIES_INCOHERENTES',
@@ -69,7 +69,7 @@ _REGLES = [
         'couleur':  'ochre',
         'priorite': 1,
         'famille':  'donnees',
-        'roles':    ['prod', 'admin'],
+        'roles':    ['chef', 'admin'],
     },
     {
         'code':     'TENDANCE_NEGATIVE',

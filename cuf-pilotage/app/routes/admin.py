@@ -11,10 +11,11 @@ from ..utils import roles_required
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
-ROLES_DISPONIBLES = ['operateur', 'prod', 'pdg', 'admin']
+ROLES_DISPONIBLES = ['operateur', 'chef', 'prod', 'pdg', 'admin']
 
 LIBELLES_ROLE = {
     'operateur': 'Opérateur',
+    'chef':      'Chef Scierie',
     'prod':      'Chef de Production',
     'pdg':       'PDG',
     'admin':     'Administrateur',
@@ -51,7 +52,7 @@ PARAMS_ADMIN_ONLY = [
 
 @admin_bp.route('/parametres', methods=['GET', 'POST'])
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'admin')
 def parametres():
     """Page de configuration des paramètres métier de CUF."""
     cles_autorisees = list(PARAMS_CHEF)

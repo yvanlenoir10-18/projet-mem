@@ -78,7 +78,7 @@ def _init_donnees_defaut():
     if not User.query.first():
         users = [
             {'nom': 'Agent Saisie',    'email': 'saisie@cuf.cm', 'role': 'operateur', 'mdp': 'cuf2026'},
-            {'nom': 'Chef de Production', 'email': 'chef@cuf.cm', 'role': 'prod',     'mdp': 'cuf2026'},
+            {'nom': 'Chef Scierie',    'email': 'chef@cuf.cm',   'role': 'chef',      'mdp': 'cuf2026'},
             {'nom': 'Directeur',       'email': 'pdg@cuf.cm',    'role': 'pdg',       'mdp': 'cuf2026'},
             {'nom': 'Administrateur',  'email': 'admin@cuf.cm',  'role': 'admin',     'mdp': 'cuf2026'},
         ]
@@ -199,14 +199,7 @@ def _repair_seed_roles():
         db.session.add(admin)
         db.session.flush()
 
-    # Le rôle 'chef' est supprimé (P64) : tout compte encore en 'chef' est
-    # migré vers 'prod' (Chef de Production). Couvre chef@cuf.cm et tout
-    # compte créé avant la suppression du rôle. Idempotent.
-    for ancien_chef in User.query.filter_by(role='chef').all():
-        ancien_chef.role = 'prod'
-        db.session.flush()
-
-    # Garde-fou prod@cuf.cm (créé en P63, role pouvait être 'chef')
+    # Migrer prod@cuf.cm de role='chef' → 'prod' si la DB a été créée avant P63
     prod_user = User.query.filter_by(email='prod@cuf.cm').first()
     if prod_user and prod_user.role != 'prod':
         prod_user.role = 'prod'

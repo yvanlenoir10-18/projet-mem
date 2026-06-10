@@ -2137,13 +2137,420 @@ def _tracabilite_validation(date_debut, date_fin=None):
     }
 
 
+@dashboard_bp.route('/chef')
+@login_required
+@roles_required('chef', 'admin')
+def vue_chef():
+    aujourd_hui = date.today()
+    jours = int(request.args.get('jours', 30))
+    alertes = _alertes_chef(aujourd_hui)
+    kpi_jour = _kpi_aujourdhui(aujourd_hui)
+    postes_du_jour = _postes_du_jour(aujourd_hui)
+    actions_immediates = _actions_immediates(aujourd_hui, alertes)
+    nb_problemes_ouverts = Probleme.query.filter(
+        Probleme.statut.in_(('ouvert', 'en_analyse'))
+    ).count()
+    stats_actions_chef = _stats_actions_chef()
+    actions_chef_urgentes = _actions_chef_urgentes(aujourd_hui)
+    actions_chef_a_revoir = _actions_chef_a_revoir(aujourd_hui)
+    priorites_chef = _priorites_chef(
+        aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_actions_chef
+    )
+    machine_top = _machine_prioritaire_recent(aujourd_hui, jours=7)
+    alerte_soir = _alerte_soir_decroche(aujourd_hui)
+    projection_active = _projection_production_active()
+
+    try:
+        mois_sel  = int(request.args.get('mois',  0))
+        annee_sel = int(request.args.get('annee', 0))
+    except (ValueError, TypeError):
+        mois_sel = annee_sel = 0
+
+    if mois_sel and annee_sel and 1 <= mois_sel <= 12 and annee_sel >= 2020:
+        debut_m = date(annee_sel, mois_sel, 1)
+        fin_m   = date(annee_sel, mois_sel + 1, 1) if mois_sel < 12 else date(annee_sel + 1, 1, 1)
+        equipes = Equipe.query.filter(
+            Equipe.date >= debut_m, Equipe.date < fin_m,
+            Equipe.statut.in_(_STATUTS_ANALYSES)
+        ).order_by(Equipe.date.desc()).all()
+        label_periode = f"{NOMS_MOIS[mois_sel]} {annee_sel}"
+        mode_mois = True
+        jours = (fin_m - debut_m).days
+        trace_debut, trace_fin = debut_m, fin_m
+    else:
+        equipes = _get_equipes_periode(jours)
+        label_periode = f"{jours} derniers jours"
+        mode_mois = False
+        trace_debut, trace_fin = aujourd_hui - timedelta(days=jours), None
+
+    tracabilite = _tracabilite_validation(trace_debut, trace_fin)
+
+    if not equipes:
+        return render_template('chef/dashboard.html',
+                               postes=[], pareto=[], stats={}, jours=jours,
+                               matrice={}, machines=Config.MACHINES,
+                               categories=Config.CATEGORIES_ARRET,
+                               decomposition=None, scorecard=None,
+                               regularite=None, gain_potentiel=None,
+                               mode_mois=mode_mois, label_periode=label_periode,
+                               mois_options=_mois_disponibles(),
+                               tracabilite=tracabilite,
+                               kpi_jour=kpi_jour,
+                               postes_du_jour=postes_du_jour,
+                               actions_immediates=actions_immediates,
+                               alertes=alertes,
+                               nb_problemes_ouverts=nb_problemes_ouverts,
+                               stats_actions_chef=stats_actions_chef,
+                               actions_chef_urgentes=actions_chef_urgentes,
+                               actions_chef_a_revoir=actions_chef_a_revoir,
+                               priorites_chef=priorites_chef,
+                               statut_global=None,
+                               machine_top=machine_top,
+                               pareto_chef=[],
+                               alerte_soir=alerte_soir,
+                               alerte_declass=[],
+                               projection_active=projection_active)
+
+    trs_valeurs  = [e.trs_global for e in equipes if e.trs_global is not None]
+    trs_moyen    = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
+    total_produit = sum(e.volume_sorti for e in equipes)
+    total_declass = round(sum(e.volume_declass for e in equipes), 2)
+    total_arrets  = sum(e.duree_totale_arrets for e in equipes)
+
+    essence_stats = calcule_trs_par_essence(equipes)
+
+    matin      = [e for e in equipes if e.numero_equipe == 'Matin']
+    apres_midi = [e for e in equipes if e.numero_equipe == 'Apres-midi']
+
+    def trs_moyen_groupe(groupe):
+        vals = [e.trs_global for e in groupe if e.trs_global]
+        return round(sum(vals) / len(vals), 1) if vals else 0
+
+    stats = {
+        'trs_moyen':        trs_moyen,
+        'couleur_trs':      couleur_trs(trs_moyen),
+        'total_produit':    round(total_produit, 2),
+        'total_declass':    total_declass,
+        'total_arrets_h':   round(total_arrets / 60, 1),
+        'nb_postes':        len(equipes),
+        'trs_matin':        trs_moyen_groupe(matin),
+        'trs_apres_midi':   trs_moyen_groupe(apres_midi),
+        'essence_stats':    essence_stats,
+    }
+
+    # F4 — Score de régularité (CV du TRS)
+    trs_valides = [e.trs_global for e in equipes
+                   if e.trs_global is not None and e.trs_global > 0]
+    if len(trs_valides) >= 10:
+        moyenne    = statistics.mean(trs_valides)
+        ecart_type = statistics.stdev(trs_valides)  # n-1, écart-type échantillon
+        cv = (ecart_type / moyenne) * 100 if moyenne > 0 else 0
+
+        # SEUILS PROVISOIRES — recalibrer après 60 jours données CUF réelles
+        if cv < 10:
+            label_reg, couleur_reg = 'régulier', 'success'
+        elif cv < 25:
+            label_reg, couleur_reg = 'variable', 'warning'
+        else:
+            label_reg, couleur_reg = 'instable', 'danger'
+
+        essences_dures = {'Azobé', 'Iroko'}
+        a_essence_dure = any(
+            p.essence in essences_dures
+            for e in equipes
+            for p in e.productions
+        )
+
+        regularite = {
+            'cv':           round(cv, 1),
+            'n':            len(trs_valides),
+            'label':        label_reg,
+            'couleur':      couleur_reg,
+            'essence_note': a_essence_dure,
+        }
+    else:
+        regularite = None
+
+    trs_par_date = {}
+    for e in sorted(equipes, key=lambda x: x.date):
+        d = e.date.isoformat()
+        if d not in trs_par_date:
+            trs_par_date[d] = []
+        if e.trs_global:
+            trs_par_date[d].append(e.trs_global)
+
+    chart_labels = list(trs_par_date.keys())
+    chart_trs    = [round(sum(v) / len(v), 1) if v else 0 for v in trs_par_date.values()]
+
+    # Décomposition cascade D × P × Q en m³ perdus (F1)
+    duree_poste   = float(Parametre.get('duree_poste', 480))
+    capacite_h    = float(Parametre.get('capacite_equipe_h', 1.5625))
+    cap_par_poste = capacite_h * (duree_poste / 60)  # m³ produits si TRS=100%
+
+    cap_total_m3 = cap_par_poste * len(equipes)
+    perte_d_m3   = 0.0
+    perte_p_m3   = 0.0
+    perte_q_m3   = 0.0
+    for e in equipes:
+        d, p, q = decompose_dpq(e)
+        perte_d_m3 += (1 - d)         * cap_par_poste
+        perte_p_m3 += d * (1 - p)     * cap_par_poste
+        perte_q_m3 += d * p * (1 - q) * cap_par_poste
+
+    vol_produit = max(0.0, cap_total_m3 - perte_d_m3 - perte_p_m3 - perte_q_m3)
+
+    def _pct(part):
+        return round(part / cap_total_m3 * 100, 1) if cap_total_m3 > 0 else 0
+
+    decomposition = {
+        'cap_total':    round(cap_total_m3, 1),
+        'vol_produit':  round(vol_produit, 1),
+        'perte_d':      round(perte_d_m3, 1),
+        'perte_p':      round(perte_p_m3, 1),
+        'perte_q':      round(perte_q_m3, 1),
+        'perte_total':  round(perte_d_m3 + perte_p_m3 + perte_q_m3, 1),
+        'pct_produit':  _pct(vol_produit),
+        'pct_d':        _pct(perte_d_m3),
+        'pct_p':        _pct(perte_p_m3),
+        'pct_q':        _pct(perte_q_m3),
+    }
+
+    # F3 — Calculateur potentiel gain FCFA
+    from ..services.trs import _prix_production
+    total_vol_prod = 0.0
+    total_val_prod = 0.0
+    for e in equipes:
+        for p in e.productions:
+            vol = p.volume_conforme + p.volume_declass
+            total_vol_prod += vol
+            total_val_prod += vol * _prix_production(p)
+
+    prix_moyen_fcfa = round(total_val_prod / total_vol_prod) if total_vol_prod > 0 else 0
+
+    gain_potentiel = {
+        'cap_total':  round(cap_total_m3, 1),
+        'vol_actuel': round(vol_produit, 1),
+        'trs_actuel': stats['trs_moyen'],
+        'prix_moyen': prix_moyen_fcfa,
+    }
+
+    # Scorecard semaine courante (lun-sam) — F5
+    lundi    = aujourd_hui - timedelta(days=aujourd_hui.weekday())
+    samedi   = lundi + timedelta(days=5)
+    equipes_semaine = Equipe.query.filter(
+        Equipe.date >= lundi, Equipe.date <= samedi
+    ).all()
+    index_eq = {(e.date, e.numero_equipe): e for e in equipes_semaine}
+
+    LABELS_JOURS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam']
+    SHIFTS = ['Matin', 'Apres-midi']
+
+    scorecard_days = []
+    for i in range(6):
+        jour = lundi + timedelta(days=i)
+        cellules = {}
+        for shift in SHIFTS:
+            eq = index_eq.get((jour, shift))
+            if eq is None:
+                cellules[shift] = {'state': 'absent', 'display': '—', 'couleur': 'secondary'}
+            elif eq.statut == STATUT_BROUILLON:
+                cellules[shift] = {'state': 'brouillon', 'display': '⏳', 'couleur': 'warning'}
+            elif eq.statut == STATUT_A_VERIFIER:
+                cellules[shift] = {'state': 'a_verifier', 'display': 'Chez le chef', 'couleur': 'info'}
+            elif eq.statut == STATUT_A_CORRIGER:
+                cellules[shift] = {'state': 'a_corriger', 'display': 'À corriger', 'couleur': 'warning'}
+            else:
+                trs = eq.trs_global or 0
+                if trs >= 70:
+                    coul = 'success'
+                elif trs >= 50:
+                    coul = 'warning'
+                else:
+                    coul = 'danger'
+                cellules[shift] = {
+                    'state':   'submitted',
+                    'display': f"{trs:.0f}%",
+                    'couleur': coul,
+                }
+        scorecard_days.append({
+            'label_court':   LABELS_JOURS[i],
+            'label_complet': jour.strftime('%d/%m'),
+            'is_today':      (jour == aujourd_hui),
+            'shifts':        cellules,
+        })
+
+    scorecard = {
+        'week_label': f"Semaine du {lundi.strftime('%d/%m')} au {samedi.strftime('%d/%m')}",
+        'days':       scorecard_days,
+        'shifts':     SHIFTS,
+    }
+
+    # Matrice criticité arrêts : machine × catégorie
+    matrice_raw = defaultdict(lambda: {'duree': 0, 'count': 0})
+    for e in equipes:
+        for arret in e.arrets:
+            if arret.duree_min:
+                cle = (arret.machine, arret.categorie)
+                matrice_raw[cle]['duree'] += arret.duree_min
+                matrice_raw[cle]['count'] += 1
+
+    matrice = {}
+    for m in Config.MACHINES:
+        matrice[m] = {}
+        for c in Config.CATEGORIES_ARRET:
+            data = matrice_raw.get((m, c), {'duree': 0, 'count': 0})
+            duree = data['duree']
+            if duree == 0:
+                couleur_cell = ''
+            elif duree > 120:
+                couleur_cell = 'table-danger'
+            elif duree >= 30:
+                couleur_cell = 'table-warning'
+            else:
+                couleur_cell = 'table-success'
+            matrice[m][c] = {
+                'duree': duree,
+                'duree_fmt': _format_duree(duree),
+                'count': data['count'],
+                'couleur': couleur_cell,
+            }
+
+    # P11 — Manque à gagner estimé agrégé sur la période (CA potentiel − CA valorisé)
+    manque_periode = manque_a_gagner_agrege(equipes)
+
+    # P12 — Compteur d'anomalies de saisie sur la période
+    anomalies_periode = compte_anomalies_periode(equipes)
+
+    # P14 — Top 3 recommandations pour le chef (30 derniers jours)
+    top_recos = top_n_recommandations(equipes, role='chef', n=3)
+
+    # P1-1 cockpit décisionnel
+    statut_global = _statut_global(trs_moyen, alertes)
+    pareto_chef = pareto_arrets(equipes)[:3]
+
+    return render_template('chef/dashboard.html',
+                           postes=equipes[:10],
+                           stats=stats,
+                           jours=jours,
+                           chart_labels=chart_labels,
+                           chart_trs=chart_trs,
+                           mois_options=_mois_disponibles(),
+                           mode_mois=mode_mois,
+                           label_periode=label_periode,
+                           matrice=matrice,
+                           machines=Config.MACHINES,
+                           categories=Config.CATEGORIES_ARRET,
+                           decomposition=decomposition,
+                           scorecard=scorecard,
+                           regularite=regularite,
+                           gain_potentiel=gain_potentiel,
+                           manque_periode=manque_periode,
+                           anomalies_periode=anomalies_periode,
+                           top_recos=top_recos,
+                           tracabilite=tracabilite,
+                           kpi_jour=kpi_jour,
+                           postes_du_jour=postes_du_jour,
+                           actions_immediates=actions_immediates,
+                           alertes=alertes,
+                           nb_problemes_ouverts=nb_problemes_ouverts,
+                           stats_actions_chef=stats_actions_chef,
+                           actions_chef_urgentes=actions_chef_urgentes,
+                           actions_chef_a_revoir=actions_chef_a_revoir,
+                           priorites_chef=priorites_chef,
+                           statut_global=statut_global,
+                           machine_top=machine_top,
+                           pareto_chef=pareto_chef,
+                           alerte_soir=alerte_soir,
+                           alerte_declass=_alerte_declassement_essence(equipes),
+                           projection_active=projection_active)
+
+
+@dashboard_bp.route('/chef/v2')
+@login_required
+@roles_required('chef', 'prod', 'admin')
+def vue_chef_v2():
+    """Chef Scierie V2 — Vue 1 « LE POINT ».
+
+    Écran de premier regard : verdict + priorités + montants FCFA, puis la
+    cascade économique réconciliée (« où part la valeur ») et, à part, la
+    lecture des causes probables D/P/Q (attribution indicative, non additive).
+
+    Route parallèle : /chef (vue_chef) reste intacte comme fallback. Cette vue
+    ne réécrit aucun moteur — elle réagence des fonctions existantes.
+    """
+    aujourd_hui = date.today()
+    jours = int(request.args.get('jours', 7))
+
+    alertes  = _alertes_chef(aujourd_hui)
+    kpi_jour = _kpi_aujourdhui(aujourd_hui)
+    nb_problemes_ouverts = Probleme.query.filter(
+        Probleme.statut.in_(('ouvert', 'en_analyse'))
+    ).count()
+    stats_actions_chef = _stats_actions_chef()
+    priorites_chef = _priorites_chef(
+        aujourd_hui, kpi_jour, alertes, nb_problemes_ouverts, stats_actions_chef
+    )[:3]
+    machine_top = _machine_prioritaire_recent(aujourd_hui, jours=7)
+
+    equipes = _get_equipes_periode(jours)
+    label_periode = f"{jours} derniers jours"
+
+    if not equipes:
+        return render_template('chef/v2.html',
+                               jours=jours, label_periode=label_periode,
+                               equipes_vides=True,
+                               statut_global=None, priorites_chef=priorites_chef,
+                               machine_top=machine_top, cascade=None,
+                               attribution=None, trs_moyen=0,
+                               nb_postes=0,
+                               nb_problemes_ouverts=nb_problemes_ouverts)
+
+    trs_valeurs = [e.trs_global for e in equipes if e.trs_global is not None]
+    trs_moyen   = round(sum(trs_valeurs) / len(trs_valeurs), 1) if trs_valeurs else 0
+    statut_global = _statut_global(trs_moyen, alertes)
+
+    # Cascade économique réconciliée (mesure : où part la valeur)
+    cascade = cascade_economique(equipes)
+
+    # Attribution causale D/P/Q en POIDS DIAGNOSTIC (%), sur les seuls postes en
+    # déficit (cohérent avec la cascade). On affiche des parts, pas des FCFA bruts :
+    # le D/P/Q dit QUELLE cause domine, pas un montant qui concurrencerait le manque.
+    d = p = q = 0.0
+    for e in equipes:
+        m = calcule_manque_gagner(e)
+        if m['valeur_potentielle'] - m['valeur_reelle_valorisee'] <= 0:
+            continue                      # même périmètre que cascade_economique()
+        pe = calcule_pertes_equipe(e)
+        d += pe['perte_d']; p += pe['perte_p']; q += pe['perte_q']
+    total = d + p + q
+    if total > 0:
+        pct_d = round(d / total * 100)
+        pct_p = round(p / total * 100)
+        pct_q = 100 - pct_d - pct_p       # résiduel → les 3 parts somment à 100
+        attribution = {'pct_d': pct_d, 'pct_p': pct_p, 'pct_q': pct_q}
+    else:
+        attribution = None
+
+    return render_template('chef/v2.html',
+                           jours=jours, label_periode=label_periode,
+                           equipes_vides=False,
+                           statut_global=statut_global,
+                           priorites_chef=priorites_chef,
+                           machine_top=machine_top,
+                           cascade=cascade,
+                           attribution=attribution,
+                           trs_moyen=trs_moyen,
+                           nb_postes=len(equipes),
+                           nb_problemes_ouverts=nb_problemes_ouverts)
+
+
 @dashboard_bp.route('/prod')
 @login_required
 @roles_required('prod', 'admin')
 def vue_prod():
     """Chef de Production V2 — cockpit autonome sur /dashboard/prod.
 
-    Réutilise temporairement le même moteur et template que l'ancien cockpit V2.
+    Réutilise temporairement le même moteur et template que vue_chef_v2.
     Route propre à prod : prod@cuf.cm atterrit ici après login,
     pas sur /chef/v2 qui reste la route chef.
     """
@@ -2211,7 +2618,7 @@ def vue_prod():
 
 @dashboard_bp.route('/chef/fiches')
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def fiches_chef():
     """Liste de contrôle des fiches côté chef scierie."""
     filtres = {
@@ -2234,7 +2641,7 @@ def fiches_chef():
     compteurs_resultats = _compteurs_fiches_chef(lignes)
 
     utilisateurs = User.query.filter(
-        User.role.in_(('operateur', 'prod', 'admin'))
+        User.role.in_(('operateur', 'chef', 'admin'))
     ).order_by(User.nom.asc()).all()
 
     return render_template(
@@ -2257,7 +2664,7 @@ def fiches_chef():
 
 @dashboard_bp.route('/chef/machines')
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def machines_chef():
     """Diagnostic Machines & Arrêts pour le chef scierie."""
     jours = request.args.get('jours', 30)
@@ -2290,7 +2697,7 @@ def machines_chef():
 
 @dashboard_bp.route('/chef/production')
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def production_chef():
     """Production & Objectifs pour le chef scierie."""
     jours = request.args.get('jours', 30)
@@ -2320,7 +2727,7 @@ def production_chef():
 
 @dashboard_bp.route('/chef/qualite')
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def qualite_chef():
     """Qualité / Matière pour le chef scierie."""
     jours = request.args.get('jours', 30)
@@ -2412,7 +2819,7 @@ def _prefill_action_chef():
 
 @dashboard_bp.route('/chef/actions')
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def actions_chef():
     """Liste des décisions et actions suivies par le chef scierie."""
     statut = request.args.get('statut', 'ouvertes').strip()
@@ -2525,7 +2932,7 @@ def actions_chef():
 
 @dashboard_bp.route('/chef/actions/nouvelle', methods=['GET', 'POST'])
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def nouvelle_action_chef():
     """Création d'une action légère de pilotage."""
     valeurs = _prefill_action_chef()
@@ -2625,7 +3032,7 @@ def nouvelle_action_chef():
 
 @dashboard_bp.route('/chef/actions/<int:action_id>/statut', methods=['POST'])
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def changer_statut_action_chef(action_id):
     """Mise à jour rapide du statut d'une action."""
     action = ActionChef.query.get_or_404(action_id)
@@ -2822,7 +3229,7 @@ def vue_pdg():
 
 @dashboard_bp.route('/pertes')
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def pertes():
     """Analyse mensuelle des pertes financières D/P/Q avec drill-down."""
     from ..services.trs import _prix_production
@@ -2963,7 +3370,7 @@ def pertes():
 
 @dashboard_bp.route('/export/excel')
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def export_excel():
     aujourd_hui = date.today()
     try:

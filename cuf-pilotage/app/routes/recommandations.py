@@ -86,7 +86,7 @@ def _contexte_extra(equipes, manque):
 
 @recos_bp.route('/')
 @login_required
-@roles_required('prod', 'pdg', 'admin')
+@roles_required('chef', 'prod', 'pdg', 'admin')
 def index():
     jours   = int(request.args.get('jours', 30))
     equipes = _equipes_periode(jours)

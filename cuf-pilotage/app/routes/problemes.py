@@ -230,7 +230,7 @@ def _stats_liste(problemes):
 
 @problemes_bp.route('/')
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def liste():
     statut = _nettoie(request.args.get('statut', 'ouverts'))
     query = Probleme.query
@@ -257,7 +257,7 @@ def liste():
 
 @problemes_bp.route('/nouveau', methods=['GET', 'POST'])
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def nouveau():
     data = _prefill_args() if request.method == 'GET' else _form_data(request.form)
     doublon = _doublon_ouvert(data)
@@ -298,7 +298,7 @@ def nouveau():
 
 @problemes_bp.route('/<int:probleme_id>/etape/2')
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def ishikawa(probleme_id):
     probleme = _probleme_or_404(probleme_id)
     return render_template(
@@ -312,7 +312,7 @@ def ishikawa(probleme_id):
 
 @problemes_bp.route('/<int:probleme_id>/etape/2/cause', methods=['POST'])
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def ajouter_cause(probleme_id):
     probleme = _probleme_or_404(probleme_id)
     payload = request.get_json(silent=True) or {}
@@ -343,7 +343,7 @@ def ajouter_cause(probleme_id):
 
 @problemes_bp.route('/<int:probleme_id>/cause/<int:cause_id>', methods=['DELETE'])
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def supprimer_cause(probleme_id, cause_id):
     probleme = _probleme_or_404(probleme_id)
     cause = _cause_or_404(probleme.id, cause_id)
@@ -364,7 +364,7 @@ def supprimer_cause(probleme_id, cause_id):
 
 @problemes_bp.route('/<int:probleme_id>/etape/3/<int:cause_id>')
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def pourquoi(probleme_id, cause_id):
     probleme = _probleme_or_404(probleme_id)
     cause = _cause_or_404(probleme.id, cause_id)
@@ -379,7 +379,7 @@ def pourquoi(probleme_id, cause_id):
 
 @problemes_bp.route('/<int:probleme_id>/etape/3/<int:cause_id>/pourquoi', methods=['POST'])
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def sauver_pourquoi(probleme_id, cause_id):
     probleme = _probleme_or_404(probleme_id)
     cause = _cause_or_404(probleme.id, cause_id)
@@ -427,7 +427,7 @@ def sauver_pourquoi(probleme_id, cause_id):
 
 @problemes_bp.route('/<int:probleme_id>/etape/4', methods=['GET', 'POST'])
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def selectionner_racine(probleme_id):
     probleme = _probleme_or_404(probleme_id)
     causes = sorted(probleme.causes, key=lambda c: (CATEGORIES_6M.index(c.categorie_6m), c.cree_le))
@@ -483,7 +483,7 @@ def selectionner_racine(probleme_id):
 
 @problemes_bp.route('/<int:probleme_id>/rapport')
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def rapport(probleme_id):
     probleme = _probleme_or_404(probleme_id)
     racine = probleme.cause_racine
@@ -501,7 +501,7 @@ def rapport(probleme_id):
 
 @problemes_bp.route('/<int:probleme_id>/clore', methods=['POST'])
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def clore(probleme_id):
     probleme = _probleme_or_404(probleme_id)
     if probleme.statut != 'cause_identifiee':
@@ -515,7 +515,7 @@ def clore(probleme_id):
 
 @problemes_bp.route('/<int:probleme_id>/rouvrir', methods=['POST'])
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def rouvrir(probleme_id):
     probleme = _probleme_or_404(probleme_id)
     if probleme.statut == 'clos':
@@ -527,7 +527,7 @@ def rouvrir(probleme_id):
 
 @problemes_bp.route('/<int:probleme_id>')
 @login_required
-@roles_required('prod', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def detail(probleme_id):
     probleme = _probleme_or_404(probleme_id)
     if probleme.statut in ('cause_identifiee', 'clos'):

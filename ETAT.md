@@ -9,24 +9,27 @@
 
 ## Dernière session — 2026-06-10
 
-- **Données simulées purgées** : 62 fiches de production + 109 arrêts supprimés de la base dev (`instance/woodpilot.db`). Comptes (4) et paramètres (27) conservés. L'utilisateur saisira ses **vraies données terrain** lui-même.
-- Smoke test : **20/20 verts** après purge (l'app gère la base vide sans erreur).
-- Décision de méthode : adoption du pattern « fichier d'état » (ce fichier), vérificateur séparé pour les formules critiques (à activer en P4), conditions de livraison objectives formalisées ci-dessous.
+- **Divergence remote/local détectée et résolue** : le revert P65 du 09/06 (restauration du rôle chef) n'avait jamais atteint le remote — le travail vivait dans un environnement perdu. Re-appliqué proprement : `git revert 70f51e0` (commit 6331133), 23 fichiers restaurés, note d'impact P65 recréée.
+- **chef + prod coexistent à nouveau** : `ROLES_VALIDES = ('operateur', 'chef', 'prod', 'pdg', 'admin')`, 5 comptes en base, smoke.sh enrichi de 4 checks prod → **20/20 verts**.
+- **Données simulées purgées** : 62 fiches + 109 arrêts supprimés. Comptes (5) et paramètres (27) conservés. L'utilisateur saisira ses **vraies données terrain** lui-même.
+- Méthode : création de ce fichier (ETAT.md) + règle `.claude/rules/etat-vivant.md` ; vérificateur séparé prévu pour les prochaines formules critiques.
 
 ## En cours / prochaine étape
 
-- [ ] **Saisie des données réelles** par l'utilisateur (comptes : `saisie@cuf.cm` / `cuf2026` pour les opérateurs).
-- [ ] **P4 — Moteur de recommandations métier** : plan complet validé dans `documents/plans/quizzical-percolating-parasol.md` (6 sections par reco, bibliothèque de contre-mesures, bilan FCFA, suppression couche IA). **En attente du feu vert utilisateur avant tout code.**
-- Reporté P5 : auto-validation fiches, tendances par essence, comparaison multi-période (liste complète dans le plan P4).
+- [ ] **Saisie des données réelles** par l'utilisateur (`saisie@cuf.cm` / `cuf2026` pour les opérateurs).
+- [ ] **P5 — Dashboard Chef « aiguilleur »** : cadrage écrit le 07/06 (`documents/plans/P5-dashboard-chef-aiguilleur.md`, note P59). Aucun code encore — attendre le feu vert utilisateur.
+- [x] **P4 — Moteur de prescriptions métier** : **LIVRÉ le 07/06** (P58) — 7 règles réécrites au format 6 sections, `reco_ai.py` supprimé (100 % hors ligne respecté), 4 colonnes modèle ajoutées.
+- [x] **Chef V2 « Le Point »** + cascade économique : livré (P60–P62).
+- [x] **Rôle prod autonome** : livré (P63) ; coexistence avec chef garantie (P65).
 
 ## Décisions verrouillées récentes (complète CLAUDE.md, ne le remplace pas)
 
 | Date | Décision | Détail |
 |---|---|---|
 | 2026-06-10 | Base purgée des données simulées | Ne PAS relancer `seed_data.py` sans accord explicite — il regénérerait des données fictives par-dessus les vraies. |
-| 2026-06-09 | **chef + prod coexistent** (P65, revert de P64) | Ne JAMAIS supprimer le rôle `chef`. Deux profils distincts : `chef@cuf.cm` (Chef Scierie, cockpit `/dashboard/chef`) et `prod@cuf.cm` (Chef de Production, `/dashboard/prod`). |
-| 2026-06-05 | Couche IA à supprimer en P4 | `app/services/reco_ai.py` viole la règle « 100 % hors ligne ». Suppression actée, exécution prévue en P4. |
-| 2026-06-05 | Format reco = 6 sections | Signal → Lecture terrain → Coût → Action → Gain attendu → Vérification. Jamais de conseil générique. |
+| 2026-06-09 | **chef + prod coexistent** (P65, revert de P64 — ré-appliqué le 10/06) | Ne JAMAIS supprimer le rôle `chef`. Deux profils distincts : `chef@cuf.cm` (Chef Scierie, `/dashboard/chef`) et `prod@cuf.cm` (Chef de Production, `/dashboard/prod`). |
+| 2026-06-07 | Couche IA supprimée (P58 — FAIT) | `reco_ai.py` et `test_ia.py` supprimés du dépôt. Toute réintroduction d'appel réseau viole la règle « 100 % hors ligne ». |
+| 2026-06-05 | Format prescription = 6 sections | Signal → Lecture terrain → Coût → Action → Gain attendu → Vérification. Jamais de conseil générique. Implémenté via `_GABARITS` dans `services/recommandations.py`. |
 
 ## Définition de « livré » (conditions d'arrêt objectives)
 
@@ -41,6 +44,7 @@ Une feature n'est **livrée** que si TOUTES ces portes passent — jamais « ça
 
 ## Leçons apprises (append-only, datées)
 
+- **2026-06-10** — **Un commit local jamais poussé est PERDU au changement d'environnement.** Le revert P65 du 09/06 n'existait que localement ; le remote était resté à l'état P64 (chef supprimé) pendant que le résumé de session croyait la coexistence en place. Règles : `git push` avant de clore TOUTE session ; `git fetch origin <branche>` en début de session pour détecter une divergence.
 - **2026-06-10** — La purge de données doit respecter l'ordre des FK : `ActionChefEvenement → ActionChef → Probleme → Arret → Equipe`. Users et Parametres épargnés.
 - **2026-06-09** — `git revert --no-edit <sha>` est la voie propre pour annuler une feature entière (P64→P65 : 22 fichiers restaurés d'un coup, y compris un template supprimé). Reconstruire à la main = risque d'oubli.
 - **2026-06-09** — Un revert git ne défait PAS les migrations déjà exécutées en base : après le revert de P64, `chef@cuf.cm` avait encore `role='prod'` en DB. Toujours vérifier la base après un revert qui touche `_repair_seed_roles()`.
@@ -60,6 +64,8 @@ Une feature n'est **livrée** que si TOUTES ces portes passent — jamais « ça
 - **Objectif 25 m³/jour** = objectif affiché CUF, jamais présenté comme techniquement fondé (règle mémoire). Production réelle observée : 10–20 m³/poste. C'est l'écart que l'app mesure (H1/H3).
 - **Pourquoi 100 % hors ligne** : terrain Ebolowa sans réseau fiable ; SQLite local + .exe Windows = zéro dépendance externe, données souveraines.
 - **Statuts de fiche** : seules les fiches `valide_chef` + `verrouille` entrent dans les KPI (traçabilité de la validation) — un chiffre du dashboard est toujours adossé à des fiches validées identifiables.
+- **Moteur de prescriptions (P4/P58)** : 7 règles déterministes calculées sur les données réelles, chaque prescription = 6 sections (Signal → Lecture terrain → Coût → Action → Gain → Vérification). **Aucune IA, aucun appel réseau** — argument clé : reproductible et défendable, contrairement à une boîte noire.
+- **Deux profils de pilotage** : `chef` (Chef Scierie — supervision atelier, validation des fiches) et `prod` (Chef de Production — cockpit décisionnel V2). La séparation reflète l'organisation réelle de CUF, pas une contrainte technique.
 
 ## Protocole de mise à jour de ce fichier
 

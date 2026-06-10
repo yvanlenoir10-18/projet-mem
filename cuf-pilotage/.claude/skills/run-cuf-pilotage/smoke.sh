@@ -96,6 +96,14 @@ _check "analyse arrêts"    "/analyse/arrets"
 _check "recommandations"   "/recommandations/"
 _check "problèmes liste"   "/problemes/"
 
+# ── 4b. Chef de Production ───────────────────────────────────────────────────
+echo "--- Profil Chef de Production (prod@cuf.cm) ---"
+_login "prod%40cuf.cm" "cuf2026"
+_check "dashboard prod"    "/dashboard/prod"
+_check "prod fiches"       "/dashboard/chef/fiches"
+_check "prod machines"     "/dashboard/chef/machines"
+_check "prod pertes"       "/dashboard/pertes"
+
 # ── 5. PDG ───────────────────────────────────────────────────────────────────
 echo "--- Profil PDG (pdg@cuf.cm) ---"
 _login "pdg%40cuf.cm" "cuf2026"

@@ -7,6 +7,14 @@
 
 ---
 
+## Dernière session — 2026-07-10
+
+- **Import des données terrain réelles** (mai–juin 2026) en remplacement de la seed. Source : `documents/collecte/Suivi_bicoupe_CUF_mai-juin-2026.xlsx` (relevé chef, feuille 5 TRS). Outil versionné : `documents/outils/import_donnees_reelles.py` (idempotent). Note : `documents/notes-impact/import-donnees-reelles-mai-juin-2026.md`.
+- **Méthode** : le fichier consigne le TRS mesuré mais pas les m³ → reconstruction par **inversion des formules `trs.py`**, ancrée sur les colonnes D/P/Q **publiées** (propres) plutôt que sur les colonnes brutes (incohérences de saisie : Marche > 480, retard = 979 min…). **Écart moyen TRS reconstruit vs fichier : 0,17 pt.**
+- **Résultat** : 95 quarts, 3 créneaux réels (Matin/Après-midi/**Nuit** → chaîne 4 en 3×8), TRS bicoupe moyen **63,3 %** (médiane 65,7 %, min 0 %, max 97,9 %), conforme 756,5 m³ (atteinte 88,4 %), Pareto dominé par le **changement de lame (53,4 %)**, manque à gagner ~238,7 M FCFA.
+- **Point mémoire** : TRS bicoupe réel (63,3 %) **au-dessus** de H3 (< 60 %) — à discuter honnêtement ; le vrai problème est la **dispersion** (0 %→98 %), pas la moyenne.
+- **5 figures régénérées** avec les vraies données, profil Chef de Production (`prod@cuf.cm`) pour les figures 15-18, direction (`pdg@cuf.cm`) pour la 19. Smoke **24/24 verts** sur les données réelles. Aucun code applicatif modifié.
+
 ## Dernière session — 2026-06-10
 
 - **Divergence remote/local détectée et résolue** : le revert P65 du 09/06 (restauration du rôle chef) n'avait jamais atteint le remote — le travail vivait dans un environnement perdu. Re-appliqué proprement : `git revert 70f51e0` (commit 6331133), 23 fichiers restaurés, note d'impact P65 recréée.
@@ -16,7 +24,7 @@
 
 ## En cours / prochaine étape
 
-- [ ] **Saisie des données réelles** par l'utilisateur (`saisie@cuf.cm` / `cuf2026` pour les opérateurs).
+- [x] **Données réelles chargées** (2026-07-10) via `documents/outils/import_donnees_reelles.py` — mai-juin 2026, 95 quarts. La saisie manuelle opérateur reste possible en complément.
 - [ ] **P5 — Dashboard Chef « aiguilleur »** : cadrage écrit le 07/06 (`documents/plans/P5-dashboard-chef-aiguilleur.md`, note P59). Aucun code encore — attendre le feu vert utilisateur.
 - [x] **P4 — Moteur de prescriptions métier** : **LIVRÉ le 07/06** (P58) — 7 règles réécrites au format 6 sections, `reco_ai.py` supprimé (100 % hors ligne respecté), 4 colonnes modèle ajoutées.
 - [x] **Chef V2 « Le Point »** + cascade économique : livré (P60–P62).
@@ -26,6 +34,8 @@
 
 | Date | Décision | Détail |
 |---|---|---|
+| 2026-07-10 | **Données réelles = source de vérité** | La base contient les relevés mai-juin 2026. Ré-import via `documents/outils/import_donnees_reelles.py` (idempotent, purge + recharge). Ne PAS relancer `seed_data.py` (regénérerait du fictif). DB hors-Git → rejouer l'import après tout nouveau conteneur. |
+| 2026-07-10 | **Hypothèses d'import explicites** | Volumes m³ reconstruits par inversion TRS (le fichier n'a pas de m³). Rendement matière par essence = hypothèse de modélisation (densité bois), non mesurée — n'affecte pas le TRS. Chaîne 4 réelle = **3 postes** (Nuit inclus), objectif affiché 25 m³/j = 2 postes seulement. |
 | 2026-06-10 | Base purgée des données simulées | Ne PAS relancer `seed_data.py` sans accord explicite — il regénérerait des données fictives par-dessus les vraies. |
 | 2026-06-09 | **chef + prod coexistent** (P65, revert de P64 — ré-appliqué le 10/06) | Ne JAMAIS supprimer le rôle `chef`. Deux profils distincts : `chef@cuf.cm` (Chef Scierie, `/dashboard/chef`) et `prod@cuf.cm` (Chef de Production, `/dashboard/prod`). |
 | 2026-06-07 | Couche IA supprimée (P58 — FAIT) | `reco_ai.py` et `test_ia.py` supprimés du dépôt. Toute réintroduction d'appel réseau viole la règle « 100 % hors ligne ». |

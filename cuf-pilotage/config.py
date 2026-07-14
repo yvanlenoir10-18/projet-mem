@@ -24,7 +24,7 @@ class Config:
     DUREE_POSTE_MINUTES = 480  # 8 heures
 
     # Essences traitées sur la Chaîne 4
-    ESSENCES = ['Ayous', 'Azobé', 'Iroko', 'Movingui']
+    ESSENCES = ['Ayous', 'Bilinga', 'Iroko', 'Movingui']
 
     # Machines de la Chaîne 4
     MACHINES = [

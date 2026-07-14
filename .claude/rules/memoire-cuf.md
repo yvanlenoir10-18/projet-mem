@@ -13,7 +13,7 @@
 - Objectif affiché CUF : 25 m³/poste — ne jamais présenter comme techniquement fondé
 - Production réelle : 10 à 20 m³/poste selon les relevés
 - Machine goulot : bicoupe (traite 100% du bois)
-- Essences : Ayous, Azobé, Iroko, Movingui
+- Essences : Ayous, Bilinga, Iroko, Movingui (Bilinga remplace Azobé depuis le 2026-07-10)
 - Jamais inventer de données terrain — signaler clairement quand une donnée manque
 
 ## TRS / OEE

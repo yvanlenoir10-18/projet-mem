@@ -26,8 +26,8 @@
         Prix de vente par essence (FCFA/m³)
       </div>
       <div style="padding:24px;">
-        {% for essence in ['ayous', 'azobe', 'iroko', 'movingui'] %}
-        {% set couleur_map = {'ayous': 'var(--wp-leaf)', 'azobe': 'var(--wp-bark)',
+        {% for essence in ['ayous', 'bilinga', 'iroko', 'movingui'] %}
+        {% set couleur_map = {'ayous': 'var(--wp-leaf)', 'bilinga': 'var(--wp-bark)',
                               'iroko': 'var(--wp-ochre)', 'movingui': 'var(--wp-emerald)'} %}
         <div class="mb-4">
           <label class="form-label d-flex align-items-center gap-2">
@@ -97,7 +97,7 @@
         <div class="mb-4">
           <label class="form-label">Capacités par essence (m³/heure)</label>
           <div class="row g-2">
-            {% for essence in ['ayous', 'azobe', 'iroko', 'movingui'] %}
+            {% for essence in ['ayous', 'bilinga', 'iroko', 'movingui'] %}
             <div class="col-6">
               <div class="input-group input-group-sm">
                 <span class="input-group-text"

@@ -26,7 +26,7 @@ PARAMS_CHEF = [
     'duree_poste',
     'capacite_equipe_h',
     'capacite_ayous_h',
-    'capacite_azobe_h',
+    'capacite_bilinga_h',
     'capacite_iroko_h',
     'capacite_movingui_h',
     'seuil_trs_anomalie',
@@ -39,7 +39,7 @@ PARAMS_CHEF = [
 
 PARAMS_ADMIN_ONLY = [
     'prix_ayous',
-    'prix_azobe',
+    'prix_bilinga',
     'prix_iroko',
     'prix_movingui',
     'taux_revente_rebut',

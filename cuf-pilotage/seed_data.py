@@ -10,7 +10,7 @@ Tout est aléatoire mais réaliste :
 - volume_conforme : ~10-20 m³/poste, cohérent avec les relevés terrain de la chaîne 4
 - 1 à 2 productions par équipe (mixage essences possible)
 - 0 à 4 arrêts par équipe (15-90 min chacun)
-- essences pondérées : Ayous 40%, Iroko 25%, Azobé 20%, Movingui 15%
+- essences pondérées : Ayous 40%, Iroko 25%, Bilinga 20%, Movingui 15%
 - statut='verrouille' pour que les recommandations détectent les équipes
 """
 import random
@@ -30,7 +30,7 @@ NB_JOURS    = (JOUR_FIN - JOUR_DEBUT).days + 1
 ESSENCES_PONDEREES = (
     ['Ayous'] * 40 +
     ['Iroko'] * 25 +
-    ['Azobé'] * 20 +
+    ['Bilinga'] * 20 +
     ['Movingui'] * 15
 )
 
@@ -136,7 +136,7 @@ def _genere_productions():
         prix = {
             'Ayous':    180_000,
             'Iroko':    420_000,
-            'Azobé':    280_000,
+            'Bilinga':    280_000,
             'Movingui': 320_000,
         }[ess]
         productions.append({

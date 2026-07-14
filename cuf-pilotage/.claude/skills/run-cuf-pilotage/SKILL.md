@@ -174,7 +174,7 @@ GET  /dashboard/export/excel    → export Excel
 # Test chevauchement (doit bloquer)
 curl -s -b "$COOKIE" \
   --data "...prod_essence[]=Ayous&prod_heure_debut[]=06:00&prod_heure_fin[]=11:00&...
-         &prod_essence[]=Azobe&prod_heure_debut[]=08:00&prod_heure_fin[]=14:00..." \
+         &prod_essence[]=Bilinga&prod_heure_debut[]=08:00&prod_heure_fin[]=14:00..." \
   -w "%{http_code}" http://127.0.0.1:5000/saisie/nouveau
 # → 200 (bloqué)
 ```

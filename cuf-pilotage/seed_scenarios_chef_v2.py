@@ -11,7 +11,7 @@ Tester :  http://127.0.0.1:5000/dashboard/chef/v2   (compte prod@cuf.cm / cuf202
 Les 4 scénarios (un poste Matin par jour, sur les 4 derniers jours) :
   1. Poste normal           — production ~objectif, peu d'arrêt → pas de déficit
   2. Arrêt Bicoupe long      — 180 min de panne Bicoupe → manque FCFA, D dominant
-  3. Déclassement élevé      — beaucoup de déclassé Azobé → manque FCFA, Q dominant
+  3. Déclassement élevé      — beaucoup de déclassé Bilinga → manque FCFA, Q dominant
   4. Fiche incohérente       — statut « à vérifier » + arrêts qui se chevauchent
                                → priorité de contrôle, EXCLUE du manque officiel
 
@@ -26,7 +26,7 @@ from app.services.trs import calcule_trs
 
 app = create_app()
 
-PRIX = {'Ayous': 180_000, 'Iroko': 420_000, 'Azobé': 280_000, 'Movingui': 320_000}
+PRIX = {'Ayous': 180_000, 'Iroko': 420_000, 'Bilinga': 280_000, 'Movingui': 320_000}
 
 
 def _poste(user, jour, essence, conforme, declass, entree, statut, arrets):
@@ -88,7 +88,7 @@ def inserer():
                         'categorie': 'Panne machine'}])
 
         # ── Scénario 3 — Déclassement élevé ───────────────────────────────
-        _poste(user, today - timedelta(days=1), 'Azobé',
+        _poste(user, today - timedelta(days=1), 'Bilinga',
                conforme=6.0, declass=6.0, entree=13.0, statut='verrouille',
                arrets=[{'machine': 'Scie de tête', 'debut': '10:00',
                         'fin': '10:20', 'cause': 'Bois noueux',

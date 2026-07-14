@@ -52,8 +52,8 @@ RENDEMENT_ESSENCE = {
     'Ayous':    0.68,   # tendre, léger
     'Iroko':    0.60,   # mi-dur
     'Movingui': 0.57,   # dur
-    'Azobe':    0.52,   # très dense
-    'Autre':    0.58,   # mélange essences diverses
+    'Bilinga':  0.53,   # dense (bois dur)
+    'Autre':    0.58,   # mélange essences diverses (dont Azobé, minoritaire)
 }
 RENDEMENT_DEFAUT = 0.60
 DUREE_POSTE = 480
@@ -62,8 +62,10 @@ USER_ID = 1                  # saisie@cuf.cm (opérateur)
 # Mapping créneau Excel -> libellé app
 CRENEAU_MAP = {'Matin': 'Matin', 'Après-midi': 'Apres-midi', 'Nuit': 'Nuit'}
 
-# Normalisation essences (H-d)
-ESSENCES_CONFIG = {'ayous': 'Ayous', 'azobe': 'Azobe', 'azobé': 'Azobe',
+# Normalisation essences (H-d). Bilinga remplace Azobé comme 4e essence
+# configurée (cf. décision 2026-07-10) : Bilinga est majoritaire dans les
+# relevés réels ; Azobé, minoritaire, bascule désormais dans « Autre ».
+ESSENCES_CONFIG = {'ayous': 'Ayous', 'bilinga': 'Bilinga',
                    'iroko': 'Iroko', 'movingui': 'Movingui'}
 
 def normalise_essence(nom):
@@ -94,7 +96,7 @@ def main():
     with app.app_context():
         prix = {
             'Ayous':    num(Parametre.get('prix_ayous', 180000)),
-            'Azobe':    num(Parametre.get('prix_azobe', 280000)),
+            'Bilinga':  num(Parametre.get('prix_bilinga', 280000)),
             'Iroko':    num(Parametre.get('prix_iroko', 420000)),
             'Movingui': num(Parametre.get('prix_movingui', 320000)),
         }

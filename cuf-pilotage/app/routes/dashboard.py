@@ -2254,7 +2254,7 @@ def vue_chef():
         else:
             label_reg, couleur_reg = 'instable', 'danger'
 
-        essences_dures = {'Azobé', 'Iroko'}
+        essences_dures = {'Bilinga', 'Iroko'}
         a_essence_dure = any(
             p.essence in essences_dures
             for e in equipes

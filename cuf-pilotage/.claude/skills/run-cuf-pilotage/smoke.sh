@@ -121,7 +121,7 @@ _login "saisie%40cuf.cm" "cuf2026"
 CSRF=$(curl -s -c "$COOKIE_JAR" -b "$COOKIE_JAR" "${BASE}/saisie/nouveau" \
   | grep -o 'name="csrf_token" value="[^"]*"' | head -1 | sed 's/.*value="//;s/"//')
 RESP=$(curl -s -c "$COOKIE_JAR" -b "$COOKIE_JAR" \
-  --data "csrf_token=${CSRF}&date=2026-05-28&poste=matin&numero_equipe=CHV&operateur_nom=Smoke&rempli_par_nom=Smoke&effectif=10&aucun_arret_confirme=1&prod_essence[]=Ayous&prod_heure_debut[]=06:00&prod_heure_fin[]=11:00&prod_volume_entree[]=8.0&prod_volume_conforme[]=5.0&prod_volume_declass[]=1.0&prod_essence[]=Azobe&prod_heure_debut[]=08:00&prod_heure_fin[]=14:00&prod_volume_entree[]=7.0&prod_volume_conforme[]=4.0&prod_volume_declass[]=1.0" \
+  --data "csrf_token=${CSRF}&date=2026-05-28&poste=matin&numero_equipe=CHV&operateur_nom=Smoke&rempli_par_nom=Smoke&effectif=10&aucun_arret_confirme=1&prod_essence[]=Ayous&prod_heure_debut[]=06:00&prod_heure_fin[]=11:00&prod_volume_entree[]=8.0&prod_volume_conforme[]=5.0&prod_volume_declass[]=1.0&prod_essence[]=Bilinga&prod_heure_debut[]=08:00&prod_heure_fin[]=14:00&prod_volume_entree[]=7.0&prod_volume_conforme[]=4.0&prod_volume_declass[]=1.0" \
   -w "\n__HTTP:%{http_code}__" "${BASE}/saisie/nouveau")
 CHV_HTTP=$(echo "$RESP" | grep -o '__HTTP:[0-9]*__' | sed 's/__HTTP://;s/__//')
 CHV_MSG=$(echo "$RESP" | grep -oi "Chevauchement horaire" | head -1)

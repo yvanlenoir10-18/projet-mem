@@ -100,7 +100,7 @@ def _init_donnees_defaut():
             # référence figés dans les fiches (snapshots), pour cohérence entre
             # l'historique et les saisies futures.
             ('prix_ayous',         '180000', 'Prix de vente Ayous (FCFA/m³)'),
-            ('prix_azobe',         '280000', 'Prix de vente Azobé (FCFA/m³)'),
+            ('prix_bilinga',         '280000', 'Prix de vente Bilinga (FCFA/m³)'),
             ('prix_iroko',         '420000', 'Prix de vente Iroko (FCFA/m³)'),
             ('prix_movingui',      '320000', 'Prix de vente Movingui (FCFA/m³)'),
             # Paramètres de production
@@ -108,7 +108,7 @@ def _init_donnees_defaut():
             ('duree_poste',        '480',    'Durée officielle d\'un poste (minutes)'),
             ('capacite_equipe_h',  '1.5625', 'Capacité théorique par défaut de la ligne (m³/heure) — 12.5m³/8h'),
             ('capacite_ayous_h',   '1.5625', 'Capacité théorique Ayous (m³/heure)'),
-            ('capacite_azobe_h',   '1.5625', 'Capacité théorique Azobé (m³/heure)'),
+            ('capacite_bilinga_h',   '1.5625', 'Capacité théorique Bilinga (m³/heure)'),
             ('capacite_iroko_h',   '1.5625', 'Capacité théorique Iroko (m³/heure)'),
             ('capacite_movingui_h','1.5625', 'Capacité théorique Movingui (m³/heure)'),
             # Paramètre financier
@@ -122,7 +122,7 @@ def _init_donnees_defaut():
         ('taux_revente_rebut', '0.70', 'Taux de revente locale du bois déclassé (70%)'),
         ('valeur_dechets_m3',  '0',    'Valeur résiduelle des déchets en V1 (FCFA/m³)'),
         ('capacite_ayous_h',   '1.5625', 'Capacité théorique Ayous (m³/heure)'),
-        ('capacite_azobe_h',   '1.5625', 'Capacité théorique Azobé (m³/heure)'),
+        ('capacite_bilinga_h',   '1.5625', 'Capacité théorique Bilinga (m³/heure)'),
         ('capacite_iroko_h',   '1.5625', 'Capacité théorique Iroko (m³/heure)'),
         ('capacite_movingui_h','1.5625', 'Capacité théorique Movingui (m³/heure)'),
     ]
@@ -292,7 +292,7 @@ def _seed_donnees_demo():
     specs = [
         # Mai 2026 — données courantes
         (d(2026, 5, 1), 'Matin', 'valide_chef', 68.0,
-         [('Ayous', 8.0, 5.0, 0.5), ('Azobé', 5.0, 3.0, 0.3)],
+         [('Ayous', 8.0, 5.0, 0.5), ('Bilinga', 5.0, 3.0, 0.3)],
          [('Bicoupe', '08:15', '09:00', 'Remplacement courroie', 'Mécanique'),
           ('Déligneuse', '10:30', '10:50', 'Attente opérateur', 'Organisationnelle')]),
         (d(2026, 5, 1), 'Apres-midi', 'valide_chef', 72.0,
@@ -303,14 +303,14 @@ def _seed_donnees_demo():
          [('Scie de tête', '07:30', '08:30', 'Tension lame', 'Mécanique'),
           ('Bicoupe', '10:00', '10:30', 'Pause non planifiée', 'Organisationnelle')]),
         (d(2026, 5, 2), 'Apres-midi', 'valide_chef', 74.0,
-         [('Azobé', 7.0, 4.5, 0.4)],
+         [('Bilinga', 7.0, 4.5, 0.4)],
          [('Ébouteuse', '15:00', '15:20', 'Réglage longueur', 'Maintenance planifiée')]),
         (d(2026, 5, 3), 'Matin', 'brouillon', None,
          [('Iroko', 5.0, 3.0, 0.3)],
          []),
         # Avril 2026 — pour le delta TRS et la tendance
         (d(2026, 4, 1), 'Matin', 'valide_chef', 60.0,
-         [('Ayous', 8.0, 4.5, 0.4), ('Azobé', 5.0, 2.8, 0.3)],
+         [('Ayous', 8.0, 4.5, 0.4), ('Bilinga', 5.0, 2.8, 0.3)],
          [('Bicoupe', '08:00', '09:15', 'Blocage grumes', 'Approvisionnement')]),
         (d(2026, 4, 1), 'Apres-midi', 'valide_chef', 65.0,
          [('Iroko', 8.0, 5.0, 0.5)],
@@ -324,7 +324,7 @@ def _seed_donnees_demo():
          [('Bicoupe', '08:00', '09:30', 'Panne moteur', 'Mécanique')]),
         # Février 2026 — tendance
         (d(2026, 2, 15), 'Matin', 'valide_chef', 62.0,
-         [('Azobé', 9.0, 5.2, 0.5)],
+         [('Bilinga', 9.0, 5.2, 0.5)],
          []),
     ]
 

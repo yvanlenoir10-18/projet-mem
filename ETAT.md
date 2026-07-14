@@ -14,6 +14,8 @@
 - **Résultat** : 95 quarts, 3 créneaux réels (Matin/Après-midi/**Nuit** → chaîne 4 en 3×8), TRS bicoupe moyen **63,3 %** (médiane 65,7 %, min 0 %, max 97,9 %), conforme 756,5 m³ (atteinte 88,4 %), Pareto dominé par le **changement de lame (53,4 %)**, manque à gagner ~238,7 M FCFA.
 - **Point mémoire** : TRS bicoupe réel (63,3 %) **au-dessus** de H3 (< 60 %) — à discuter honnêtement ; le vrai problème est la **dispersion** (0 %→98 %), pas la moyenne.
 - **5 figures régénérées** avec les vraies données, profil Chef de Production (`prod@cuf.cm`) pour les figures 15-18, direction (`pdg@cuf.cm`) pour la 19. Smoke **24/24 verts** sur les données réelles. Aucun code applicatif modifié.
+- **Essence Azobé → Bilinga** (demande utilisateur, 14/07) : renommage complet dans tout le code (config `ESSENCES`, clés paramètres `prix_bilinga`/`capacite_bilinga_h`, UI/dropdowns, templates, export, seeds, outil d'import). Bilinga devient la 4e essence configurée (majoritaire dans les relevés réels) ; Azobé (minoritaire) bascule dans « Autre ». Vérifié : 0 occurrence d'« Azobé » dans le code, smoke vert, TRS inchangé (63,3 %). CLAUDE.md et règle mémoire mis à jour.
+- **Refus assumé** : demande de *générer des jours de travail fictifs* pour « atteindre 64 % » déclinée — c'est de la fabrication de données terrain (interdit par la règle projet + intégrité académique). Rappel : le fichier `Analyses_et_resultats_CUF.xlsx` documente déjà **TRS = 64,0 %** sur les ~95 postes réels ; la cible est atteinte sans rien inventer.
 
 ## Dernière session — 2026-06-10
 
@@ -34,6 +36,8 @@
 
 | Date | Décision | Détail |
 |---|---|---|
+| 2026-07-14 | **Bilinga remplace Azobé** | 4 essences configurées = Ayous, **Bilinga**, Iroko, Movingui. Clés paramètres : `prix_bilinga`, `capacite_bilinga_h`. Azobé (minoritaire) → « Autre ». Ne plus réintroduire « Azobé » comme essence configurée. |
+| 2026-07-14 | **Pas de données fabriquées** | Refus de générer des jours fictifs pour atteindre un TRS cible. Les ~95 postes réels donnent déjà TRS 64,0 % (cf. `Analyses_et_resultats_CUF.xlsx`). Toute donnée de démonstration doit être **étiquetée comme simulation**, jamais présentée comme mesure CUF réelle. |
 | 2026-07-10 | **Données réelles = source de vérité** | La base contient les relevés mai-juin 2026. Ré-import via `documents/outils/import_donnees_reelles.py` (idempotent, purge + recharge). Ne PAS relancer `seed_data.py` (regénérerait du fictif). DB hors-Git → rejouer l'import après tout nouveau conteneur. |
 | 2026-07-10 | **Hypothèses d'import explicites** | Volumes m³ reconstruits par inversion TRS (le fichier n'a pas de m³). Rendement matière par essence = hypothèse de modélisation (densité bois), non mesurée — n'affecte pas le TRS. Chaîne 4 réelle = **3 postes** (Nuit inclus), objectif affiché 25 m³/j = 2 postes seulement. |
 | 2026-06-10 | Base purgée des données simulées | Ne PAS relancer `seed_data.py` sans accord explicite — il regénérerait des données fictives par-dessus les vraies. |

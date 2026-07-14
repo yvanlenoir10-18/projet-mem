@@ -12,7 +12,7 @@ Application desktop de pilotage de la production de la chaîne 4 — scierie ind
   - Bicoupe : chariot en va-et-vient (coupe à l'aller et au retour ; plateaux par passes successives).
   - Scie de tronçonnage : délignage, éboutage, dédoublage.
 - Lames : préventif **toutes les 2 h** ; immédiat à tout **changement d'essence tendre↔dure**.
-- Essences (4 seulement) : **Ayous, Azobé, Iroko, Movingui**.
+- Essences (4 seulement) : **Ayous, Bilinga, Iroko, Movingui**. (Bilinga remplace Azobé depuis le 2026-07-10 ; Azobé, minoritaire dans les relevés, bascule dans « Autre ».)
 - Point de comptage terrain : **passage fixe AVANT la bicoupe**.
 - Benchmarks : Cameroun 60 % (cible) ; pertes scieries 30–36 % ; Afrique centrale ~35 % ; Ouganda ~32 % ; Nigeria 46–58 %.
 

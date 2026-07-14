@@ -455,7 +455,7 @@ def _feuille_essence(wb, equipes):
 
     BG_ESSENCE = {
         'Ayous':    JAUNE_PALE,
-        'Azobé':    'FFCCBC',
+        'Bilinga':    'FFCCBC',
         'Iroko':    VERT_CLAIR,
         'Movingui': BLEU_PALE,
     }

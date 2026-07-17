@@ -16,7 +16,7 @@ ROLES_VALIDES = ('operateur', 'chef', 'prod', 'pdg', 'admin')
 _ACCUEIL_ROLE = {
     'operateur': 'saisie.accueil_operateur',
     'chef':      'dashboard.vue_chef',
-    'prod':      'dashboard.vue_prod',
+    'prod':      'dashboard.vue_chef',
     'pdg':       'dashboard.vue_pdg',
     'admin':     'dashboard.vue_chef',
 }

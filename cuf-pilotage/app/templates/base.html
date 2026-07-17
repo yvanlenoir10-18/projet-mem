@@ -69,8 +69,8 @@
 
       {% if current_user.role == 'prod' %}
       <span class="wp-nav-section">Production</span>
-      <a class="wp-nav-link {% if request.endpoint == 'dashboard.vue_prod' %}active{% endif %}"
-         href="{{ url_for('dashboard.vue_prod') }}">
+      <a class="wp-nav-link {% if request.endpoint == 'dashboard.vue_chef' %}active{% endif %}"
+         href="{{ url_for('dashboard.vue_chef') }}">
         <span class="wp-nav-ic"><i class="bi bi-speedometer2"></i></span>Tableau de bord
       </a>
       <a class="wp-nav-link {% if request.endpoint == 'dashboard.fiches_chef' %}active{% endif %}"
@@ -218,7 +218,7 @@
         {% endif %}
         {% if current_user.role == 'prod' %}
         <span class="wp-nav-section">Production</span>
-        <a class="wp-nav-link" href="{{ url_for('dashboard.vue_prod') }}">
+        <a class="wp-nav-link" href="{{ url_for('dashboard.vue_chef') }}">
           <span class="wp-nav-ic"><i class="bi bi-speedometer2"></i></span>Tableau de bord</a>
         <a class="wp-nav-link" href="{{ url_for('dashboard.fiches_chef') }}">
           <span class="wp-nav-ic"><i class="bi bi-clipboard-check"></i></span>Fiches chef</a>

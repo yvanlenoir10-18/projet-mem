@@ -2139,7 +2139,7 @@ def _tracabilite_validation(date_debut, date_fin=None):
 
 @dashboard_bp.route('/chef')
 @login_required
-@roles_required('chef', 'admin')
+@roles_required('chef', 'prod', 'admin')
 def vue_chef():
     aujourd_hui = date.today()
     jours = int(request.args.get('jours', 30))

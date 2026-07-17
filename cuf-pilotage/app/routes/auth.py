@@ -47,7 +47,7 @@ def _redirect_par_role(role):
     if role == 'chef':
         return redirect(url_for('dashboard.vue_chef'))
     if role == 'prod':
-        return redirect(url_for('dashboard.vue_prod'))
+        return redirect(url_for('dashboard.vue_chef'))
     if role == 'admin':
         return redirect(url_for('dashboard.vue_chef'))
     # operateur

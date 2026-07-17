@@ -80,7 +80,7 @@
     </a>
 
     {% if a_corriger %}
-    <a href="{{ url_for('saisie.modifier_equipe', equipe_id=a_corriger[0].id) }}{% if a_corriger[0].correction_cible %}#{{ a_corriger[0].correction_cible }}{% endif %}" class="wp-operator-tile wp-operator-tile-has-alert">
+    <a href="{{ url_for('saisie.historique', statut='a_corriger') }}" class="wp-operator-tile wp-operator-tile-has-alert">
     {% else %}
     <a href="{{ url_for('saisie.historique') }}" class="wp-operator-tile">
     {% endif %}

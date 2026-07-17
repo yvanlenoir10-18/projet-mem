@@ -6,7 +6,7 @@
 Application desktop de pilotage de la production de la chaîne 4 — scierie industrielle CUF, Ebolowa. Utilisée par **BWAME EBENGUE CARLOS YVAN** (analyse, export) et les **opérateurs** (saisie au niveau du poste). Soutient le mémoire M2 « Amélioration des performances de production de la chaîne 4 ».
 
 ## ⚠️ Règles métier verrouillées — ne jamais inventer, confondre ou approximer
-- **25 m³/jour** = deux postes combinés. **12,5 m³/poste**. NE JAMAIS confondre le niveau jour et le niveau poste.
+- **Objectif officiel = 25 m³/poste-équipe** (un quart de 8 h ; confirmé 2× par le chef — mémoire §3.1.1.2). Production réelle ≈ **14,55 m³/poste = 58 %** d'atteinte. Ne JAMAIS présenter les 25 m³ comme techniquement fondés ; ne pas confondre production (débité) et conforme.
 - Deux postes : matin **6h–14h**, soir **14h–23h**. Environ **10 opérateurs/poste**.
 - Ordre exact des machines : **Scie de tête → Bicoupe → Scie de tronçonnage**.
   - Bicoupe : chariot en va-et-vient (coupe à l'aller et au retour ; plateaux par passes successives).

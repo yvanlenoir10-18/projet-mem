@@ -76,9 +76,12 @@ def _init_donnees_defaut():
     from .models import User, Parametre
 
     if not User.query.first():
+        # Quatre profils (conformes au mémoire, §3.1.4.2) : Opérateur, Chef de
+        # Production (créé plus bas, rôle 'prod'), Direction, Administrateur.
+        # Le rôle 'chef' (Chef Scierie) reste défini dans le code mais n'a plus
+        # de compte de démonstration (fusionné avec Chef de Production).
         users = [
             {'nom': 'Agent Saisie',    'email': 'saisie@cuf.cm', 'role': 'operateur', 'mdp': 'cuf2026'},
-            {'nom': 'Chef Scierie',    'email': 'chef@cuf.cm',   'role': 'chef',      'mdp': 'cuf2026'},
             {'nom': 'Directeur',       'email': 'pdg@cuf.cm',    'role': 'pdg',       'mdp': 'cuf2026'},
             {'nom': 'Administrateur',  'email': 'admin@cuf.cm',  'role': 'admin',     'mdp': 'cuf2026'},
         ]

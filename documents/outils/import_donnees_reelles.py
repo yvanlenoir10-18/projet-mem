@@ -48,14 +48,17 @@ CAPACITE_H = 1.5625          # H-a
 # (base : littérature filière — Ayous tendre rend + ; Azobé dense rend −), calibré
 # autour du benchmark Cameroun 60 %. HYPOTHÈSE DE MODÉLISATION, non mesurée par CUF :
 # le fichier terrain ne consigne pas les m³ d'entrée. N'affecte AUCUNE composante TRS.
+# Rendements matière RÉELS du mémoire (Tableau 12 / §3.1.2.5) : global 30,6 % ≈ 31 %.
+# Ayous 33,8 · Movingui 30,9 · Iroko 30,4 · Bilinga 23,3 (dur) ; Autre = essences
+# hors des 4 (Azobé 39,6 · Fraké 40,8 · Dabéma 20,0 · Moabi…), moyenne ~0,33.
 RENDEMENT_ESSENCE = {
-    'Ayous':    0.68,   # tendre, léger
-    'Iroko':    0.60,   # mi-dur
-    'Movingui': 0.57,   # dur
-    'Bilinga':  0.53,   # dense (bois dur)
-    'Autre':    0.58,   # mélange essences diverses (dont Azobé, minoritaire)
+    'Ayous':    0.338,
+    'Iroko':    0.304,
+    'Movingui': 0.309,
+    'Bilinga':  0.233,
+    'Autre':    0.265,  # calibré pour un rendement global = 31 % (mémoire 30,6 %)
 }
-RENDEMENT_DEFAUT = 0.60
+RENDEMENT_DEFAUT = 0.265
 DUREE_POSTE = 480
 USER_ID = 1                  # saisie@cuf.cm (opérateur)
 

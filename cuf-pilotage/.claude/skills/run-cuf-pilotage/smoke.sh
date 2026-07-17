@@ -85,8 +85,8 @@ HTTP=$(curl -s -c "$COOKIE_JAR" -b "$COOKIE_JAR" \
                        || { echo "[smoke] ERR soumission fiche → $HTTP"; ((ERRORS++)); }
 
 # ── 4. Chef ──────────────────────────────────────────────────────────────────
-echo "--- Profil chef (chef@cuf.cm) ---"
-_login "chef%40cuf.cm" "cuf2026"
+echo "--- Routes chef de production (via admin@cuf.cm) ---"
+_login "admin%40cuf.cm" "cuf2026"
 _check "dashboard chef"    "/dashboard/chef"
 _check "chef V2 (le point)" "/dashboard/chef/v2"
 _check "production"        "/dashboard/chef/production"

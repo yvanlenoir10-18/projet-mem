@@ -98,6 +98,22 @@ def main():
     # ── 1. Prix snapshot par essence (depuis Parametre) ──────────────────────
     app = create_app()
     with app.app_context():
+        # Alignement mémoire (§3.1.1.2 / §3.2.1) : objectif = 25 m³/poste, et
+        # capacité calée pour une production réelle ≈ 14,55 m³/poste. La capacité
+        # app (lue par calcule_trs) DOIT égaler CAPACITE_H utilisée à la
+        # reconstruction, sinon le TRS recalculé serait faux. Neutre sur le TRS.
+        def _setp(cle, val):
+            p = Parametre.query.filter_by(cle=cle).first()
+            if p:
+                p.valeur = str(val)
+            else:
+                db.session.add(Parametre(cle=cle, valeur=str(val), description=cle))
+        _setp('objectif_m3', 25)
+        for _k in ('capacite_equipe_h', 'capacite_ayous_h', 'capacite_iroko_h',
+                   'capacite_movingui_h', 'capacite_bilinga_h'):
+            _setp(_k, CAPACITE_H)
+        db.session.commit()
+
         prix = {
             'Ayous':    num(Parametre.get('prix_ayous', 180000)),
             'Bilinga':  num(Parametre.get('prix_bilinga', 280000)),

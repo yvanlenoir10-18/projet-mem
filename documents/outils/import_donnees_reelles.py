@@ -43,7 +43,8 @@ XLSX = os.environ.get(
     os.path.join(_RACINE, 'documents', 'collecte', 'Suivi_bicoupe_CUF_mai-juin-2026.xlsx'),
 )
 
-CAPACITE_H = 1.5625          # H-a
+CAPACITE_H = 2.473           # H-a — calibré pour production réelle ≈ 14,55 m³/poste
+                             # (mémoire §3.1.1.2). Neutre sur le TRS (voir note).
 # H-b. Rendement matière DIFFÉRENCIÉ par essence selon la densité/dureté du bois
 # (base : littérature filière — Ayous tendre rend + ; Azobé dense rend −), calibré
 # autour du benchmark Cameroun 60 %. HYPOTHÈSE DE MODÉLISATION, non mesurée par CUF :

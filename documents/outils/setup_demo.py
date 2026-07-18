@@ -161,7 +161,7 @@ def appliquer_correctifs():
 CAP = 2.473
 DUREE = 480
 RENDEMENT = {'Ayous': 0.338, 'Bilinga': 0.233, 'Iroko': 0.304, 'Movingui': 0.309}
-PRIX = {'Ayous': 180000, 'Bilinga': 280000, 'Iroko': 420000, 'Movingui': 320000}
+PRIX = {'Ayous': 407149, 'Bilinga': 446051, 'Iroko': 262833, 'Movingui': 262383}
 CATS = [('Changement de lame', 'Reglage / outil', 0.55, 'Bicoupe'),
         ('Panne machine bicoupe', 'Panne machine', 0.20, 'Bicoupe'),
         ('Retard de releve', 'Organisationnelle', 0.15, 'Bicoupe'),
@@ -189,6 +189,8 @@ def generer_donnees():
         setp('objectif_m3', 25)
         for k in ('capacite_equipe_h','capacite_ayous_h','capacite_iroko_h','capacite_movingui_h','capacite_bilinga_h'):
             setp(k, CAP)
+        for _ess, _p in PRIX.items():   # prix FOB export -> parametres admin
+            setp('prix_' + _ess.lower(), _p)
         db.session.commit()
 
         def ensure_user(nom, email, role):
@@ -254,7 +256,7 @@ def generer_donnees():
                     hd = f'{d0//60:02d}:{d0%60:02d}'; hf = f'{d1//60:02d}:{d1%60:02d}'
                     db.session.add(Production(equipe_id=eq.id, essence=ess, volume_entree=v_e,
                         volume_conforme=v_c, volume_declass=v_d, heure_debut=hd, heure_fin=hf,
-                        prix_snapshot=PRIX[ess])); n_prod += 1
+                        prix_snapshot=None)); n_prod += 1  # pas de prix fige -> l'admin pilote les prix
             jour += timedelta(days=1)
         db.session.commit()
 

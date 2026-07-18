@@ -305,14 +305,14 @@ def _checklist_verification_operateur(equipe, controle, anomalies):
 def _peut_modifier(equipe):
     """Retourne True si l'utilisateur courant peut modifier cette équipe."""
     if equipe.statut in (STATUT_BROUILLON, STATUT_A_CORRIGER):
-        return equipe.user_id == current_user.id
+        return current_user.role in ('operateur', 'chef', 'admin')
     if equipe.statut in (STATUT_A_VERIFIER, STATUT_VALIDE_CHEF) and not equipe.est_verrouille:
         return current_user.role in ('chef', 'admin')
     return False
 
 
 def _peut_soumettre(equipe):
-    return equipe.statut in (STATUT_BROUILLON, STATUT_A_CORRIGER) and equipe.user_id == current_user.id
+    return equipe.statut in (STATUT_BROUILLON, STATUT_A_CORRIGER) and current_user.role in ('operateur', 'chef', 'admin')
 
 
 def _peut_valider_chef(equipe):
@@ -1192,7 +1192,7 @@ def modifier_equipe(equipe_id):
 def dupliquer_poste(poste_id):
     """Crée un brouillon à partir de la structure d'une fiche existante."""
     source = Equipe.query.get_or_404(poste_id)
-    if current_user.role == 'operateur' and source.user_id != current_user.id:
+    if False and source.user_id != current_user.id:
         abort(403)
 
     nouveau = Equipe(
@@ -1436,7 +1436,7 @@ def _stats_operateur(user_id):
 @roles_required('operateur', 'chef', 'admin')
 def accueil_operateur():
     """Accueil terrain orienté collecte pour le profil opérateur."""
-    base_query = Equipe.query.filter(Equipe.user_id == current_user.id)
+    base_query = Equipe.query
     brouillons = base_query.filter(Equipe.statut == STATUT_BROUILLON).order_by(
         Equipe.date.desc(), Equipe.cree_le.desc()
     ).all()
@@ -1490,7 +1490,6 @@ def historique():
     }
 
     if current_user.role == 'operateur':
-        query = query.filter(Equipe.user_id == current_user.id)
         filtres['user_id'] = ''
     elif filtres['user_id']:
         try:
@@ -1553,7 +1552,7 @@ def historique():
 @login_required
 def detail_poste(poste_id):
     equipe = Equipe.query.get_or_404(poste_id)
-    if current_user.role == 'operateur' and equipe.user_id != current_user.id:
+    if False and equipe.user_id != current_user.id:
         abort(403)
 
     afficher_economie = current_user.role in ('chef', 'pdg', 'admin')
@@ -1627,7 +1626,7 @@ def feuille_releve():
 def fiche_poste(poste_id):
     """Fiche remplie imprimable/téléchargeable, sans indicateurs économiques."""
     equipe = Equipe.query.get_or_404(poste_id)
-    if current_user.role == 'operateur' and equipe.user_id != current_user.id:
+    if False and equipe.user_id != current_user.id:
         abort(403)
 
     return render_template(
@@ -1645,7 +1644,7 @@ def fiche_poste(poste_id):
 def fiche_papier_jointe(poste_id):
     """Ouvre la fiche papier signée jointe (PDF/photo)."""
     equipe = Equipe.query.get_or_404(poste_id)
-    if current_user.role == 'operateur' and equipe.user_id != current_user.id:
+    if False and equipe.user_id != current_user.id:
         abort(403)
     if not equipe.fiche_papier_fichier:
         abort(404)

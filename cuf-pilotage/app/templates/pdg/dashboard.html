@@ -303,6 +303,107 @@
   </div>
 </div>
 
+{# ── Décision financière : où agit l'argent (leviers D/P/Q) ── #}
+{% if perte_dpq %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-ink);">
+  <div class="wp-card-header" style="justify-content:space-between;">
+    <span><i class="bi bi-cash-stack" style="color:var(--wp-ink);"></i> Décision financière — où agit l'argent</span>
+    <a href="{{ url_for('dashboard.pertes') }}" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;">
+      Analyse détaillée des pertes <i class="bi bi-arrow-right"></i>
+    </a>
+  </div>
+  <div class="p-3">
+    <div class="row g-3">
+
+      {# Valeur produite #}
+      <div class="col-md-6 col-xl-3">
+        <div class="wp-kpi h-100" style="background:#f6faf4;">
+          <div class="wp-kpi-label">Valeur produite (valorisée)</div>
+          <div class="wp-kpi-value" style="color:var(--wp-leaf);font-size:1.5rem;">
+            {{ "{:,.0f}".format(valeur_produite).replace(",", " ") }}
+          </div>
+          <div class="wp-kpi-sub">FCFA · conforme + déclassé aux prix courants</div>
+        </div>
+      </div>
+
+      {# Perte Disponibilité (arrêts) #}
+      <div class="col-md-6 col-xl-3">
+        <div class="wp-kpi h-100">
+          <div class="wp-kpi-label"><i class="bi bi-pause-circle" style="color:var(--wp-terracotta);"></i> Levier Disponibilité</div>
+          <div class="wp-kpi-value" style="color:var(--wp-terracotta);font-size:1.5rem;">
+            {{ "{:,.0f}".format(perte_dpq.d).replace(",", " ") }}
+          </div>
+          <div class="wp-kpi-sub">FCFA perdus en <strong>arrêts machine</strong></div>
+          {% if perte_dpq.total > 0 %}
+          <div class="progress mt-2" style="height:6px;">
+            <div class="progress-bar" style="width:{{ (perte_dpq.d / perte_dpq.total * 100)|int }}%;background:var(--wp-terracotta);"></div>
+          </div>
+          <div class="wp-kpi-sub mt-1">{{ (perte_dpq.d / perte_dpq.total * 100)|int }}% des pertes</div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# Perte Performance (cadence) #}
+      <div class="col-md-6 col-xl-3">
+        <div class="wp-kpi h-100">
+          <div class="wp-kpi-label"><i class="bi bi-speedometer2" style="color:var(--wp-ochre);"></i> Levier Performance</div>
+          <div class="wp-kpi-value" style="color:var(--wp-ochre);font-size:1.5rem;">
+            {{ "{:,.0f}".format(perte_dpq.p).replace(",", " ") }}
+          </div>
+          <div class="wp-kpi-sub">FCFA perdus en <strong>cadence</strong> (ralentis)</div>
+          {% if perte_dpq.total > 0 %}
+          <div class="progress mt-2" style="height:6px;">
+            <div class="progress-bar" style="width:{{ (perte_dpq.p / perte_dpq.total * 100)|int }}%;background:var(--wp-ochre);"></div>
+          </div>
+          <div class="wp-kpi-sub mt-1">{{ (perte_dpq.p / perte_dpq.total * 100)|int }}% des pertes</div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# Perte Qualité (déclassé/déchets) #}
+      <div class="col-md-6 col-xl-3">
+        <div class="wp-kpi h-100">
+          <div class="wp-kpi-label"><i class="bi bi-droplet-half" style="color:var(--wp-terracotta);"></i> Levier Qualité</div>
+          <div class="wp-kpi-value" style="color:var(--wp-terracotta);font-size:1.5rem;">
+            {{ "{:,.0f}".format(perte_dpq.q).replace(",", " ") }}
+          </div>
+          <div class="wp-kpi-sub">FCFA perdus en <strong>déclassé + déchets</strong></div>
+          {% if perte_dpq.total > 0 %}
+          <div class="progress mt-2" style="height:6px;">
+            <div class="progress-bar" style="width:{{ (perte_dpq.q / perte_dpq.total * 100)|int }}%;background:var(--wp-terracotta);"></div>
+          </div>
+          <div class="wp-kpi-sub mt-1">{{ (perte_dpq.q / perte_dpq.total * 100)|int }}% des pertes</div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+
+    <div class="d-flex flex-wrap gap-4 mt-3 pt-3" style="border-top:1px solid var(--wp-line);">
+      <div>
+        <span class="wp-kpi-label">Total pertes chiffrées</span>
+        <div style="font-weight:800;color:var(--wp-terracotta);font-size:1.05rem;">
+          {{ "{:,.0f}".format(perte_dpq.total).replace(",", " ") }} FCFA
+        </div>
+      </div>
+      <div>
+        <span class="wp-kpi-label">Manque à gagner estimé</span>
+        <div style="font-weight:800;color:var(--wp-terracotta);font-size:1.05rem;">
+          {{ "{:,.0f}".format(manque_periode.manque_a_gagner_estime).replace(",", " ") }} FCFA
+        </div>
+      </div>
+      <div style="flex:1;min-width:220px;">
+        <span class="wp-kpi-label">Lecture Direction</span>
+        <div style="font-size:.8rem;color:var(--wp-muted);">
+          Le levier le plus coûteux indique où un investissement rapporte le plus.
+          Cliquer « Analyse détaillée » pour voir la répartition par machine et par essence.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
 {# ── Ligne 2 : rendement par essence + TRS 12 mois ── #}
 <div class="row g-3 mb-4">
   {% if rendement_par_essence %}

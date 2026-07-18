@@ -3180,6 +3180,22 @@ def vue_pdg():
     trs_moyen = round(sum(trs_vals) / len(trs_vals), 1) if trs_vals else 0
     perte_totale = sum(calcule_pertes_fcfa(e) for e in equipes_mois)
 
+    # ── Décision financière : pertes décomposées D / P / Q en FCFA ────────
+    # (les trois leviers d'action du PDG : arrêts, cadence, qualité)
+    perte_d = perte_p = perte_q = 0.0
+    for e in equipes_mois:
+        pe = calcule_pertes_equipe(e)
+        perte_d += pe['perte_d']
+        perte_p += pe['perte_p']
+        perte_q += pe['perte_q']
+    perte_dpq = {
+        'd': int(perte_d), 'p': int(perte_p), 'q': int(perte_q),
+        'total': int(perte_d + perte_p + perte_q),
+    }
+    # Valeur réellement produite (chiffre valorisé) et coût de l'arrêt n°1
+    valeur_produite = int(round(sum(_prix(pr) * (pr.volume_conforme + pr.volume_declass)
+                                    for e in equipes_mois for pr in e.productions)))
+
     # P11 — Manque à gagner estimé sur la période (indicateur principal P11)
     manque_periode = manque_a_gagner_agrege(equipes_mois)
 
@@ -3256,6 +3272,8 @@ def vue_pdg():
                            production_reelle=round(production_reelle, 1),
                            production_cible=round(production_cible, 1),
                            perte_fcfa=int(perte_totale),
+                           perte_dpq=perte_dpq,
+                           valeur_produite=valeur_produite,
                            manque_periode=manque_periode,
                            nb_postes=nb_postes,
                            pareto=pareto,
@@ -3275,9 +3293,10 @@ def vue_pdg():
 
 @dashboard_bp.route('/pertes')
 @login_required
-@roles_required('chef', 'prod', 'admin')
+@roles_required('chef', 'prod', 'pdg', 'admin')
 def pertes():
-    """Analyse mensuelle des pertes financières D/P/Q avec drill-down."""
+    """Analyse mensuelle des pertes financières D/P/Q avec drill-down.
+    Accessible au PDG : c'est sa page de décision financière détaillée."""
     from ..services.trs import _prix_production
 
     aujourd_hui = date.today()

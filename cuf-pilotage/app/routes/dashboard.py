@@ -2178,10 +2178,24 @@ def vue_chef():
         jours = (fin_m - debut_m).days
         trace_debut, trace_fin = debut_m, fin_m
     else:
+        jours_explicite = request.args.get('jours') is not None
         equipes = _get_equipes_periode(jours)
-        label_periode = f"{jours} derniers jours"
         mode_mois = False
-        trace_debut, trace_fin = aujourd_hui - timedelta(days=jours), None
+        if not equipes and not jours_explicite:
+            # Repli automatique : aucune donnée dans la fenêtre récente et
+            # l'utilisateur n'a pas choisi de période -> afficher tout l'historique
+            # validé plutôt qu'un cockpit vide (cas données non récentes).
+            equipes = Equipe.query.filter(
+                Equipe.statut.in_(_STATUTS_ANALYSES)
+            ).order_by(Equipe.date.desc()).all()
+        if equipes and not jours_explicite and (aujourd_hui - min(e.date for e in equipes)).days > jours:
+            debut_hist = min(e.date for e in equipes)
+            label_periode = "Toutes les dates"
+            jours = (aujourd_hui - debut_hist).days + 1
+            trace_debut, trace_fin = debut_hist, None
+        else:
+            label_periode = f"{jours} derniers jours"
+            trace_debut, trace_fin = aujourd_hui - timedelta(days=jours), None
 
     tracabilite = _tracabilite_validation(trace_debut, trace_fin)
 

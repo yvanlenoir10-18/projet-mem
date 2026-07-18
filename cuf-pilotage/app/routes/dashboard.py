@@ -1393,7 +1393,7 @@ def _action_fiche_chef(equipe):
     return {'label': 'Voir', 'couleur': 'outline-secondary'}
 
 
-def _fiches_chef_query(filtres):
+def _fiches_chef_query(filtres, avec_statut=True):
     query = Equipe.query
 
     debut, fin, label = _periode_fiches_chef(filtres['periode'])
@@ -1402,11 +1402,14 @@ def _fiches_chef_query(filtres):
     if fin:
         query = query.filter(Equipe.date <= fin)
 
+    # avec_statut=False : on garde tous les statuts (sert à compter chaque type
+    # pour les tuiles du haut, indépendamment de l'onglet sélectionné).
     statut = filtres['statut']
-    if statut == 'validees':
-        query = query.filter(Equipe.statut.in_((STATUT_VALIDE_CHEF, STATUT_VERROUILLE)))
-    elif statut in (STATUT_BROUILLON, STATUT_A_VERIFIER, STATUT_A_CORRIGER, STATUT_VALIDE_CHEF, STATUT_VERROUILLE):
-        query = query.filter(Equipe.statut == statut)
+    if avec_statut:
+        if statut == 'validees':
+            query = query.filter(Equipe.statut.in_((STATUT_VALIDE_CHEF, STATUT_VERROUILLE)))
+        elif statut in (STATUT_BROUILLON, STATUT_A_VERIFIER, STATUT_A_CORRIGER, STATUT_VALIDE_CHEF, STATUT_VERROUILLE):
+            query = query.filter(Equipe.statut == statut)
 
     if filtres['equipe'] in ('Matin', 'Apres-midi'):
         query = query.filter(Equipe.numero_equipe == filtres['equipe'])
@@ -1457,6 +1460,17 @@ def _ligne_fiche_chef(equipe):
             ' '.join(a.cause for a in equipe.arrets),
         ]).lower(),
     }
+
+
+def _filtrer_par_statut(lignes, statut):
+    """Filtre les lignes déjà chargées selon l'onglet statut choisi.
+    Reprend la logique SQL de _fiches_chef_query pour rester cohérent."""
+    if statut == 'validees':
+        return [l for l in lignes if l['statut'] in (STATUT_VALIDE_CHEF, STATUT_VERROUILLE)]
+    if statut in (STATUT_BROUILLON, STATUT_A_VERIFIER, STATUT_A_CORRIGER,
+                  STATUT_VALIDE_CHEF, STATUT_VERROUILLE):
+        return [l for l in lignes if l['statut'] == statut]
+    return lignes  # 'tous' ou valeur inconnue -> aucun filtre
 
 
 def _filtrer_lignes_fiches(lignes, filtres):
@@ -2637,7 +2651,7 @@ def fiches_chef():
     """Liste de contrôle des fiches côté chef scierie."""
     filtres = {
         'statut': request.args.get('statut', STATUT_A_VERIFIER).strip(),
-        'periode': request.args.get('periode', '30j').strip(),
+        'periode': request.args.get('periode', 'tout').strip(),
         'equipe': request.args.get('equipe', '').strip(),
         'operateur_id': request.args.get('operateur_id', '').strip(),
         'anomalies': request.args.get('anomalies', '').strip(),
@@ -2648,10 +2662,14 @@ def fiches_chef():
     except ValueError:
         filtres['operateur_id'] = None
 
-    equipes, label_periode_fiches = _fiches_chef_query(filtres)
+    # Base = toutes les fiches de la période (SANS filtre statut) : les tuiles du
+    # haut comptent alors chaque statut réel, même si l'onglet courant n'en montre qu'un.
+    equipes, label_periode_fiches = _fiches_chef_query(filtres, avec_statut=False)
     lignes_base = [_ligne_fiche_chef(equipe) for equipe in equipes]
     compteurs_base = _compteurs_fiches_chef(lignes_base)
-    lignes = _filtrer_lignes_fiches(lignes_base, filtres)
+    # Liste affichée = on applique l'onglet statut choisi puis recherche/anomalies.
+    lignes_statut = _filtrer_par_statut(lignes_base, filtres['statut'])
+    lignes = _filtrer_lignes_fiches(lignes_statut, filtres)
     compteurs_resultats = _compteurs_fiches_chef(lignes)
 
     utilisateurs = User.query.filter(

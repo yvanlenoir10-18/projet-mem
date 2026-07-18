@@ -3128,6 +3128,20 @@ def vue_pdg():
         Equipe.statut.in_(_STATUTS_ANALYSES)
     ).all()
 
+    # Repli : mois courant vide et aucune période choisie -> dernier mois avec données
+    if not equipes_mois and not mode_libre and not request.args.get('mois'):
+        derniere = Equipe.query.filter(
+            Equipe.statut.in_(_STATUTS_ANALYSES)
+        ).order_by(Equipe.date.desc()).first()
+        if derniere:
+            mois, annee = derniere.date.month, derniere.date.year
+            debut = date(annee, mois, 1)
+            fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)
+            equipes_mois = Equipe.query.filter(
+                Equipe.date >= debut, Equipe.date < fin,
+                Equipe.statut.in_(_STATUTS_ANALYSES)
+            ).all()
+
     nb_brouillons = Equipe.query.filter(
         Equipe.date >= debut, Equipe.date < fin,
         Equipe.statut.in_(STATUTS_NON_ANALYSES)

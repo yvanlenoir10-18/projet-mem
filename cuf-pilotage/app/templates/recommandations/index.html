@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% block title %}Prescriptions de pilotage{% endblock %}
+{% block page_title %}Prescriptions de pilotage{% endblock %}
+
+{% block content %}
+
+{# ── En-tête ── #}
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div>
+    <span style="font-size:.78rem;color:var(--wp-muted);">
+      Calculées sur {{ contexte_global.nb_postes }} postes · {{ jours }} derniers jours
+      {% if contexte_global.trs_moyen %}
+      · TRS moyen {{ contexte_global.trs_moyen }} %
+      {% endif %}
+      · <span style="color:var(--wp-leaf);font-weight:600;">100 % hors ligne</span>
+    </span>
+  </div>
+  <div class="btn-group">
+    <a href="?jours=7"  class="btn btn-sm btn-outline-primary {% if jours==7  %}active{% endif %}">7 j</a>
+    <a href="?jours=30" class="btn btn-sm btn-outline-primary {% if jours==30 %}active{% endif %}">30 j</a>
+    <a href="?jours=90" class="btn btn-sm btn-outline-primary {% if jours==90 %}active{% endif %}">90 j</a>
+  </div>
+</div>
+
+{% if not recommandations %}
+{# ── Aucune prescription ── #}
+<div class="wp-card p-5 text-center">
+  <i class="bi bi-check2-circle fs-1 mb-3 d-block" style="color:var(--wp-leaf);"></i>
+  <div style="font-size:1.1rem;font-weight:600;color:var(--wp-ink);">Aucune prescription active</div>
+  <div style="color:var(--wp-muted);margin-top:.5rem;">
+    Tous les indicateurs sont dans les seuils définis. Continuez ainsi.
+  </div>
+  {% if nb_total > 0 %}
+  <div class="mt-2" style="font-size:.78rem;color:var(--wp-muted);">
+    {{ nb_total }} prescription{{ 's' if nb_total > 1 }} active{{ 's' if nb_total > 1 }}
+    pour d'autres rôles.
+  </div>
+  {% endif %}
+</div>
+
+{% else %}
+
+{# ── Bandeau récapitulatif ── #}
+<div class="wp-card mb-4 p-3" style="border-left:4px solid var(--wp-terracotta);background:#fff8f6;">
+  <div class="d-flex align-items-center gap-3 flex-wrap">
+    <div>
+      <span style="font-size:2rem;font-weight:800;color:var(--wp-terracotta);">{{ recommandations|length }}</span>
+      <span style="font-size:.85rem;color:var(--wp-muted);margin-left:.3rem;">
+        prescription{{ 's' if recommandations|length > 1 }} prioritaire{{ 's' if recommandations|length > 1 }}
+      </span>
+    </div>
+    <div style="font-size:.78rem;color:var(--wp-muted);">
+      <i class="bi bi-database-check me-1" style="color:var(--wp-leaf);"></i>
+      Prescriptions calculées sur les données réelles des {{ contexte_global.nb_postes }} postes
+      · TRS actuel {{ contexte_global.trs_moyen or '—' }} %
+      · 100 % hors ligne.
+    </div>
+  </div>
+</div>
+
+{# ── Cartes prescriptions ── #}
+{% for reco in recommandations %}
+{% set couleur_css = 'var(--wp-terracotta)' if reco.couleur == 'terracotta' else 'var(--wp-ochre)' %}
+{% set bg_css = '#fff8f6' if reco.couleur == 'terracotta' else '#fffaf0' %}
+{% set prio_label = 'Haute' if reco.priorite == 3 else ('Moyenne' if reco.priorite == 2 else 'Basse') %}
+{% set prio_class = 'wp-reco-prio-haute' if reco.priorite == 3 else ('wp-reco-prio-moyenne' if reco.priorite == 2 else 'wp-reco-prio-basse') %}
+{% set famille_labels = {'performance': 'Performance', 'financier': 'Financier', 'donnees': 'Données', 'qualite': 'Qualité', 'tendance': 'Tendance'} %}
+{% set probleme_id = problemes_par_reco.get(reco.code) %}
+
+<div class="wp-card mb-4" style="border-left:4px solid {{ couleur_css }};">
+
+  {# ── En-tête de carte ── #}
+  <div class="wp-card-header" style="background:{{ bg_css }};border-bottom:1px solid #eee;">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <i class="bi {{ reco.icone }} fs-5" style="color:{{ couleur_css }};"></i>
+      <span style="font-weight:700;font-size:.95rem;color:var(--wp-ink);">{{ reco.titre }}</span>
+      <span class="wp-pill {{ prio_class }}">{{ prio_label }}</span>
+      {% if reco.famille %}
+      <span class="wp-pill wp-pill-neutral" style="font-size:.65rem;">
+        {{ famille_labels.get(reco.famille, reco.famille) }}
+      </span>
+      {% endif %}
+      {% for role in reco.roles if role != 'admin' %}
+      <span class="wp-pill wp-pill-neutral" style="font-size:.65rem;">
+        {{ 'Chef' if role == 'chef' else 'Direction' }}
+      </span>
+      {% endfor %}
+      <span class="ms-auto" style="font-size:.7rem;color:var(--wp-muted);">
+        <i class="bi bi-code-slash me-1"></i>{{ reco.code }}
+      </span>
+    </div>
+  </div>
+
+  <div class="p-4">
+
+    {% if reco.fiche %}
+    {# ── Fiche 6 sections ── #}
+    <div class="wp-fiche-6s">
+
+      <div class="wp-fiche-section">
+        <div class="wp-fiche-label"><i class="bi bi-radar me-1"></i>Signal détecté</div>
+        <div class="wp-fiche-texte">{{ reco.fiche.signal }}</div>
+      </div>
+
+      <div class="wp-fiche-section">
+        <div class="wp-fiche-label"><i class="bi bi-map me-1"></i>Lecture terrain</div>
+        <div class="wp-fiche-texte">{{ reco.fiche.lecture }}</div>
+      </div>
+
+      <div class="wp-fiche-section">
+        <div class="wp-fiche-label"><i class="bi bi-currency-exchange me-1"></i>Ce que ça coûte</div>
+        <div class="wp-fiche-texte">{{ reco.fiche.cout }}</div>
+      </div>
+
+      <div class="wp-fiche-section wp-fiche-action">
+        <div class="wp-fiche-label"><i class="bi bi-tools me-1"></i>Action</div>
+        <div class="wp-fiche-texte fw-semibold">{{ reco.fiche.action }}</div>
+      </div>
+
+      <div class="wp-fiche-section">
+        <div class="wp-fiche-label"><i class="bi bi-graph-up me-1"></i>Gain attendu</div>
+        <div class="wp-fiche-texte">{{ reco.fiche.gain }}</div>
+      </div>
+
+      <div class="wp-fiche-section">
+        <div class="wp-fiche-label"><i class="bi bi-check2-square me-1"></i>Vérification</div>
+        <div class="wp-fiche-texte">{{ reco.fiche.verification }}</div>
+      </div>
+
+    </div>
+
+    {# ── CTA adapté au type de prescription ── #}
+    <div class="d-flex gap-2 flex-wrap mt-3">
+
+      {% if reco.fiche.cta == 'corriger_fiches' %}
+        {# Données bloquantes → corriger les fiches directement #}
+        <a class="btn btn-sm btn-warning"
+           href="{{ url_for('dashboard.fiches_chef') }}{% if reco.fiche.cta_anomalie %}?anomalies={{ reco.fiche.cta_anomalie }}{% endif %}">
+          <i class="bi bi-pencil-square me-1"></i>Corriger les fiches
+        </a>
+
+      {% elif reco.fiche.cta == 'creer_ishikawa' %}
+        {# Perte mesurable → analyse Ishikawa #}
+        {% if probleme_id %}
+          <a class="btn btn-sm btn-outline-primary"
+             href="{{ url_for('problemes.detail', id=probleme_id) }}">
+            <i class="bi bi-diagram-3 me-1"></i>Voir l'analyse #{{ probleme_id }}
+          </a>
+        {% else %}
+          <a class="btn btn-sm btn-primary"
+             href="{{ url_for('problemes.nouveau',
+                              origine_type='recommandation',
+                              origine_label=reco.titre,
+                              reco_code=reco.code,
+                              contexte_quoi=reco.titre,
+                              contexte_combien='Analyse sur ' ~ contexte_global.nb_postes ~ ' postes',
+                              origine_url=url_for('recommandations.index', jours=jours)) }}">
+            <i class="bi bi-diagram-3 me-1"></i>Créer une analyse Ishikawa
+          </a>
+        {% endif %}
+
+        {# Bouton secondaire : créer une décision directe #}
+        <a class="btn btn-sm btn-outline-secondary"
+           href="{{ url_for('dashboard.nouvelle_action_chef',
+                            origine_type='recommandation',
+                            origine_label=reco.titre) }}">
+          <i class="bi bi-check2-circle me-1"></i>Créer une décision
+        </a>
+
+      {% endif %}
+
+    </div>
+
+    {% else %}
+    {# Fallback : affichage ancien si fiche non générée #}
+    <div class="mb-3">
+      <div class="wp-reco-section-label">
+        <i class="bi bi-list-check me-1"></i>Actions recommandées
+      </div>
+      {% for sol in reco.solutions %}
+      <div class="wp-reco-solution">
+        <div class="wp-reco-sol-num">{{ loop.index }}</div>
+        <div>
+          <div class="fw-semibold" style="font-size:.9rem;color:var(--wp-ink);">{{ sol.titre }}</div>
+          <div style="font-size:.82rem;color:var(--wp-muted);margin-top:.25rem;line-height:1.55;">{{ sol.detail }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+{% endfor %}
+
+{% endif %}
+
+{% endblock %}

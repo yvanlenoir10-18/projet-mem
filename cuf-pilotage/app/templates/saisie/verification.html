@@ -1,0 +1,448 @@
+{% extends 'base.html' %}
+{% block title %}Vérification avant envoi{% endblock %}
+{% block page_title %}Vérifier la fiche{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start mb-4 gap-3 flex-wrap">
+  <div class="d-flex align-items-start gap-3">
+    <a href="{{ url_for('saisie.detail_poste', poste_id=poste.id) }}"
+       class="wp-icon-btn" style="text-decoration:none;margin-top:2px;" aria-label="Retour">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+      <h1 style="font-size:1.35rem;font-weight:800;color:var(--wp-ink);margin:0;">
+        Vérification avant envoi au chef
+      </h1>
+      <p style="color:var(--wp-muted);font-size:.84rem;margin:5px 0 0;">
+        {{ poste.date.strftime('%d/%m/%Y') }} · {{ poste.numero_equipe }} ·
+        responsable : {{ poste.operateur_nom or poste.saisie_par.nom }}
+      </p>
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{{ url_for('saisie.modifier_equipe', equipe_id=poste.id) }}"
+       class="btn btn-outline-primary d-flex align-items-center gap-2">
+      <i class="bi bi-pencil"></i>
+      Modifier
+    </a>
+    {% if peut_soumettre_final %}
+    <form method="POST"
+          action="{{ url_for('saisie.soumettre_equipe', equipe_id=poste.id) }}"
+          onsubmit="return confirm('Envoyer cette fiche au chef pour validation ?')">
+      {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+      <button type="submit" class="btn btn-primary d-flex align-items-center gap-2">
+        <i class="bi bi-send-check"></i>
+        {% if anomalies or points_attention %}Envoyer quand même{% else %}Envoyer au chef{% endif %}
+      </button>
+    </form>
+    {% else %}
+    <button class="btn btn-secondary d-flex align-items-center gap-2" disabled>
+      <i class="bi bi-lock"></i>
+      Soumission bloquée
+    </button>
+    {% endif %}
+  </div>
+</div>
+
+{% if poste.statut == 'a_corriger' and poste.correction_motif %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-ochre);background:#fffaf0;">
+  <div class="wp-card-header" style="color:var(--wp-ochre);">
+    <i class="bi bi-chat-left-text"></i>
+    Message du chef à corriger
+    {% if poste.correction_demandee_par %}
+    <span class="ms-auto" style="font-size:.75rem;color:var(--wp-muted);font-weight:500;">
+      {{ poste.correction_demandee_par }}
+      {% if poste.correction_demandee_le %}· {{ poste.correction_demandee_le.strftime('%d/%m/%Y à %H:%M') }}{% endif %}
+    </span>
+    {% endif %}
+  </div>
+  <div style="padding:1rem 1.25rem;color:var(--wp-ink);font-size:.92rem;line-height:1.5;">
+    {{ poste.correction_motif }}
+    {% if poste.correction_cible %}
+    <div style="margin-top:.85rem;">
+      <a href="{{ url_for('saisie.modifier_equipe', equipe_id=poste.id) }}#{{ poste.correction_cible }}"
+         class="btn btn-sm btn-warning d-inline-flex align-items-center gap-2">
+        <i class="bi bi-arrow-down-circle"></i>
+        Ouvrir la zone à corriger
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-ui-checks-grid" style="color:var(--wp-sky);"></i>
+    Checklist avant envoi
+    <span class="ms-auto" style="font-size:.75rem;color:var(--wp-muted);font-weight:500;">
+      Vert = complet · orange = à relire · rouge = bloquant
+    </span>
+  </div>
+  <div class="wp-checklist-grid">
+    {% for item in checklist %}
+    <div class="wp-check-item wp-check-{{ item.etat }}">
+      <span class="wp-check-icon">
+        {% if item.etat == 'success' %}
+        <i class="bi bi-check2-circle"></i>
+        {% elif item.etat == 'danger' %}
+        <i class="bi bi-x-octagon"></i>
+        {% else %}
+        <i class="bi bi-exclamation-circle"></i>
+        {% endif %}
+      </span>
+      <div>
+        <strong>{{ item.titre }}</strong>
+        <small>{{ item.description }}</small>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-list-check" style="color:var(--wp-sky);"></i>
+    Résumé opérateur
+    <span class="ms-auto" style="font-size:.75rem;color:var(--wp-muted);font-weight:500;">
+      Avant envoi au chef
+    </span>
+  </div>
+  <div style="padding:1rem 1.25rem;">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div style="font-size:.72rem;font-weight:800;color:var(--wp-muted);text-transform:uppercase;margin-bottom:8px;">
+          Ce que j'ai saisi
+        </div>
+        {% for item in resume_operateur.saisi %}
+        <div style="font-size:.86rem;color:var(--wp-ink);line-height:1.45;margin-bottom:5px;">
+          <i class="bi bi-check2" style="color:var(--wp-leaf);"></i> {{ item }}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="col-md-4">
+        <div style="font-size:.72rem;font-weight:800;color:var(--wp-muted);text-transform:uppercase;margin-bottom:8px;">
+          À relire
+        </div>
+        {% for item in resume_operateur.a_relire %}
+        <div style="font-size:.86rem;color:var(--wp-ink);line-height:1.45;margin-bottom:5px;">
+          <i class="bi {% if controle.bloquants or points_attention or anomalies %}bi-exclamation-circle{% else %}bi-check2-circle{% endif %}"
+             style="color:{% if controle.bloquants %}var(--wp-terracotta){% elif points_attention or anomalies %}var(--wp-ochre){% else %}var(--wp-leaf){% endif %};"></i>
+          {{ item }}
+        </div>
+        {% endfor %}
+      </div>
+      <div class="col-md-4">
+        <div style="font-size:.72rem;font-weight:800;color:var(--wp-muted);text-transform:uppercase;margin-bottom:8px;">
+          Ce qui part au chef
+        </div>
+        {% for item in resume_operateur.transmis %}
+        <div style="font-size:.86rem;color:var(--wp-ink);line-height:1.45;margin-bottom:5px;">
+          <i class="bi bi-send" style="color:var(--wp-sky);"></i> {{ item }}
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if controle and controle.bloquants %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-terracotta);background:#fdecea;">
+  <div class="wp-card-header" style="color:var(--wp-terracotta);">
+    <i class="bi bi-x-octagon"></i>
+    À compléter avant envoi
+  </div>
+  <div style="padding:1rem 1.25rem;">
+    {% for point in controle.bloquants %}
+    <div class="d-flex gap-3 align-items-start"
+         style="padding:.75rem 0;{% if not loop.last %}border-bottom:1px dashed rgba(216,113,73,.25);{% endif %}">
+      <i class="bi bi-arrow-right-circle" style="color:var(--wp-terracotta);font-size:1.05rem;margin-top:1px;"></i>
+      <div>
+        <div style="font-weight:800;color:var(--wp-ink);font-size:.92rem;">{{ point.titre }}</div>
+        <div style="font-size:.84rem;color:var(--wp-muted);line-height:1.45;margin-top:3px;">{{ point.description }}</div>
+        <div style="font-size:.78rem;color:var(--wp-terracotta);font-style:italic;margin-top:5px;">
+          {{ point.action }}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% elif not anomalies and not points_attention %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-leaf);background:#f2fbf5;">
+  <div class="wp-card-header" style="color:var(--wp-leaf);">
+    <i class="bi bi-check-circle"></i>
+    Fiche prête à envoyer
+  </div>
+  <div style="padding:1rem 1.25rem;color:var(--wp-ink);font-size:.92rem;line-height:1.5;">
+    Les informations essentielles sont cohérentes. Vous pouvez envoyer la fiche au chef pour validation.
+  </div>
+</div>
+{% endif %}
+
+{% if points_attention %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-ochre);background:#fffaf0;">
+  <div class="wp-card-header" style="color:var(--wp-ochre);">
+    <i class="bi bi-info-circle"></i>
+    Points à relire
+  </div>
+  <div style="padding:1rem 1.25rem;">
+    {% for point in points_attention %}
+    <div class="d-flex gap-2 align-items-start" style="{% if not loop.last %}margin-bottom:.75rem;{% endif %}">
+      <i class="bi bi-arrow-right-short" style="color:var(--wp-ochre);font-size:1.1rem;"></i>
+      <div>
+        <div style="font-size:.88rem;color:var(--wp-ink);line-height:1.45;font-weight:800;">{{ point.titre }}</div>
+        <div style="font-size:.8rem;color:var(--wp-muted);line-height:1.45;">{{ point.description }}</div>
+        <div style="font-size:.76rem;color:var(--wp-ochre);font-style:italic;">{{ point.action }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Essences</div>
+      <div class="wp-kpi-value">{{ resume.nb_essences }}</div>
+      <div class="wp-kpi-sub">ligne{{ 's' if resume.nb_essences > 1 }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Entrée</div>
+      <div class="wp-kpi-value" style="font-size:1.45rem;">{{ resume.volume_entree }}<span class="unit"> m³</span></div>
+      <div class="wp-kpi-sub">grumes</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Sortie utile</div>
+      <div class="wp-kpi-value" style="font-size:1.45rem;">{{ (resume.volume_conforme + resume.volume_declass) | round(3) }}<span class="unit"> m³</span></div>
+      <div class="wp-kpi-sub">conforme + déclassé</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Arrêts</div>
+      <div class="wp-kpi-value" style="font-size:1.45rem;">{{ resume.duree_arrets }}<span class="unit"> min</span></div>
+      <div class="wp-kpi-sub">{{ resume.nb_arrets }} arrêt{{ 's' if resume.nb_arrets > 1 }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-clipboard-check" style="color:var(--wp-sky);"></i>
+    Origine et preuve terrain
+  </div>
+  <div style="padding:1rem 1.25rem;">
+    <div class="row g-3">
+      <div class="col-md-3">
+        <div style="font-size:.72rem;font-weight:800;color:var(--wp-muted);text-transform:uppercase;">Mode de saisie</div>
+        <div style="font-weight:800;color:var(--wp-ink);margin-top:3px;">
+          {% if poste.mode_saisie == 'papier' %}Ressaisie depuis fiche papier{% else %}Saisie directe{% endif %}
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div style="font-size:.72rem;font-weight:800;color:var(--wp-muted);text-transform:uppercase;">Responsable terrain</div>
+        <div style="font-weight:800;color:var(--wp-ink);margin-top:3px;">
+          {{ poste.operateur_nom or poste.saisie_par.nom }}
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div style="font-size:.72rem;font-weight:800;color:var(--wp-muted);text-transform:uppercase;">Fiche remplie par</div>
+        <div style="font-weight:800;color:var(--wp-ink);margin-top:3px;">
+          {{ poste.rempli_par_nom or poste.saisie_par.nom }}
+        </div>
+      </div>
+      <div class="col-md-3">
+        <div style="font-size:.72rem;font-weight:800;color:var(--wp-muted);text-transform:uppercase;">Fiche signée</div>
+        <div style="font-weight:800;color:var(--wp-ink);margin-top:3px;">
+          {% if poste.fiche_papier_signee %}Oui{% else %}Non{% endif %}
+        </div>
+      </div>
+      <div class="col-md-12">
+        <div style="font-size:.72rem;font-weight:800;color:var(--wp-muted);text-transform:uppercase;">Pièce jointe</div>
+        <div style="font-weight:800;color:var(--wp-ink);margin-top:3px;">
+          {% if poste.fiche_papier_fichier %}
+          <a href="{{ url_for('saisie.fiche_papier_jointe', poste_id=poste.id) }}" target="_blank">
+            {{ poste.fiche_papier_nom_original or 'Voir la fiche papier' }}
+          </a>
+          {% else %}
+          Aucune
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% set arrets_commentes = poste.arrets | selectattr('notes') | list %}
+{% if poste.notes or arrets_commentes %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-sky);">
+  <div class="wp-card-header">
+    <i class="bi bi-chat-left-text" style="color:var(--wp-sky);"></i>
+    Commentaires transmis au chef
+  </div>
+  <div style="padding:1rem 1.25rem;">
+    {% if poste.notes %}
+    <div style="font-size:.9rem;color:var(--wp-ink);line-height:1.5;{% if arrets_commentes %}padding-bottom:.85rem;border-bottom:1px dashed #e5e0d6;{% endif %}">
+      <strong>Observation générale :</strong> {{ poste.notes }}
+    </div>
+    {% endif %}
+    {% if arrets_commentes %}
+    <div style="{% if poste.notes %}padding-top:.85rem;{% endif %}">
+      {% for arret in arrets_commentes %}
+      <div style="font-size:.84rem;color:var(--wp-muted);line-height:1.45;{% if not loop.last %}margin-bottom:.65rem;{% endif %}">
+        <strong style="color:var(--wp-ink);">{{ arret.machine }} · {{ arret.heure_debut }} → {{ arret.heure_fin }}</strong>
+        : {{ arret.notes }}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+
+{% if anomalies %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-ochre);background:#fffaf0;">
+  <div class="wp-card-header" style="color:var(--wp-ochre);">
+    <i class="bi bi-shield-exclamation"></i>
+    Alertes avant envoi
+    <span class="ms-auto" style="font-size:.75rem;color:var(--wp-muted);font-weight:500;">
+      {{ anomalies | length }} point{{ 's' if anomalies | length > 1 }} à vérifier
+    </span>
+  </div>
+  <div style="padding:1rem 1.25rem;">
+    {% for a in anomalies %}
+    <div class="d-flex gap-3 align-items-start"
+         style="padding:.75rem 0;{% if not loop.last %}border-bottom:1px dashed #e5e0d6;{% endif %}">
+      <span class="wp-pill wp-pill-neutral" style="flex:0 0 auto;">{{ a.code }}</span>
+      <div>
+        <div style="font-weight:800;color:var(--wp-ink);font-size:.9rem;">{{ a.titre }}</div>
+        <div style="color:var(--wp-muted);font-size:.82rem;line-height:1.45;margin-top:3px;">
+          {{ a.description }}
+        </div>
+        <div style="color:var(--wp-leaf);font-size:.78rem;margin-top:6px;font-style:italic;">
+          <i class="bi bi-lightbulb"></i> {{ a.suggestion }}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-7">
+    <div class="wp-card h-100">
+      <div class="wp-card-header">
+        <i class="bi bi-boxes" style="color:var(--wp-leaf);"></i>
+        Production à transmettre
+      </div>
+      <div class="table-responsive">
+        <table class="wp-table">
+          <thead>
+            <tr>
+              <th>Essence</th>
+              <th>Créneau</th>
+              <th class="text-end">Entrée</th>
+              <th class="text-end">Conforme</th>
+              <th class="text-end">Déclassé</th>
+              <th class="text-end">Déchets</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for prod in poste.productions %}
+            <tr>
+              <td><span class="wp-pill wp-pill-info">{{ prod.essence }}</span></td>
+              <td style="color:var(--wp-muted);font-size:.82rem;">{{ prod.creneau_traitement }}</td>
+              <td class="text-end">{{ prod.volume_entree }} m³</td>
+              <td class="text-end" style="color:var(--wp-leaf);font-weight:700;">{{ prod.volume_conforme }} m³</td>
+              <td class="text-end" style="color:var(--wp-ochre);">{{ prod.volume_declass }} m³</td>
+              <td class="text-end" style="color:var(--wp-terracotta);">{{ prod.volume_dechets }} m³</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="wp-card h-100">
+      <div class="wp-card-header">
+        <i class="bi bi-tools" style="color:var(--wp-terracotta);"></i>
+        Arrêts à transmettre
+      </div>
+      {% if poste.arrets %}
+      <div class="table-responsive">
+        <table class="wp-table">
+          <thead>
+            <tr>
+              <th>Machine</th>
+              <th>Horaire</th>
+              <th>Cause</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in poste.arrets %}
+            <tr>
+              <td style="font-weight:700;">{{ a.machine }}</td>
+              <td style="color:var(--wp-muted);font-size:.82rem;">{{ a.heure_debut }} → {{ a.heure_fin }}</td>
+              <td style="font-size:.84rem;">
+                {{ a.cause }}
+                <div style="font-size:.72rem;color:var(--wp-muted);margin-top:2px;">
+                  {{ a.categorie }} · {{ a.duree_min }} min
+                  {% if a.duree_prevue_min is not none %} · prévu {{ a.duree_prevue_min }} min{% endif %}
+                </div>
+                {% if a.notes %}
+                <div style="font-size:.72rem;color:var(--wp-sky);margin-top:4px;line-height:1.35;">
+                  <i class="bi bi-chat-left-text"></i> {{ a.notes }}
+                </div>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div style="padding:2rem;text-align:center;color:var(--wp-muted);">
+        <i class="bi bi-check-circle" style="color:var(--wp-leaf);font-size:1.35rem;"></i>
+        <p style="margin:8px 0 0;font-size:.9rem;">
+          {% if poste.aucun_arret_confirme %}
+          Aucun arrêt confirmé.
+          {% else %}
+          Aucun arrêt saisi.
+          {% endif %}
+        </p>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="d-flex justify-content-end gap-2 flex-wrap">
+  <a href="{{ url_for('saisie.modifier_equipe', equipe_id=poste.id) }}"
+     class="btn btn-outline-primary d-flex align-items-center gap-2">
+    <i class="bi bi-pencil"></i>
+    Modifier la fiche
+  </a>
+  {% if peut_soumettre_final %}
+  <form method="POST"
+        action="{{ url_for('saisie.soumettre_equipe', equipe_id=poste.id) }}"
+        onsubmit="return confirm('Envoyer cette fiche au chef pour validation ?')">
+    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+    <button type="submit" class="btn btn-primary d-flex align-items-center gap-2">
+      <i class="bi bi-send-check"></i>
+      {% if anomalies or points_attention %}Envoyer quand même{% else %}Envoyer au chef{% endif %}
+    </button>
+  </form>
+  {% endif %}
+</div>
+
+{% endblock %}

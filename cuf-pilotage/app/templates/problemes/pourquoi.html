@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% block title %}5 Pourquoi · wood_pilot{% endblock %}
+{% block page_title %}5 Pourquoi{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <div class="wp-section-title mb-1">
+      <i class="bi bi-question-diamond"></i> 5 Pourquoi
+    </div>
+    <div style="font-size:.84rem;color:var(--wp-muted);">
+      Cause analysée : <strong>{{ cause.categorie_6m }} · {{ cause.description }}</strong>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('problemes.ishikawa', probleme_id=probleme.id) }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Autres causes
+    </a>
+    <a href="{{ url_for('problemes.selectionner_racine', probleme_id=probleme.id) }}" class="btn btn-sm btn-primary">
+      Sélection racine <i class="bi bi-arrow-right"></i>
+    </a>
+  </div>
+</div>
+
+<div id="solidite-box" class="wp-card mb-4 p-3">
+  <span class="badge bg-{{ solidite.couleur }}">{{ solidite.label }}</span>
+  <span style="font-size:.84rem;color:var(--wp-muted);margin-left:.5rem;">{{ solidite.detail }}</span>
+</div>
+
+<div class="d-grid gap-3">
+  {% for n in niveaux %}
+  <div class="wp-card wp-pourquoi-card {% if not n.debloque %}wp-locked{% endif %}" data-level="{{ n.niveau }}">
+    <div class="p-3">
+      <div class="d-flex justify-content-between gap-2 mb-2">
+        <div style="font-weight:900;color:var(--wp-ink);">Niveau {{ n.niveau }}</div>
+        <span class="badge bg-{% if n.complete %}success{% elif n.debloque %}warning{% else %}secondary{% endif %}">
+          {% if n.complete %}Renseigné{% elif n.debloque %}À remplir{% else %}Verrouillé{% endif %}
+        </span>
+      </div>
+      <div class="question" style="font-weight:800;margin-bottom:.65rem;">{{ n.question }}</div>
+      <textarea class="form-control reponse" rows="3" {% if not n.debloque %}disabled{% endif %}
+                placeholder="Réponse courte et concrète">{{ n.reponse }}</textarea>
+      <div class="d-flex justify-content-end mt-2">
+        <button type="button" class="btn btn-sm btn-primary btn-save-pourquoi" {% if not n.debloque %}disabled{% endif %}>
+          Enregistrer
+        </button>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const tokenPourquoi = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+function majSolidite(solidite) {
+  if (!solidite) return;
+  document.getElementById('solidite-box').innerHTML =
+    '<span class="badge bg-' + solidite.couleur + '">' + escHtml(solidite.label) + '</span>'
+    + '<span style="font-size:.84rem;color:var(--wp-muted);margin-left:.5rem;">' + escHtml(solidite.detail) + '</span>';
+}
+
+document.querySelectorAll('.btn-save-pourquoi').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const card = btn.closest('.wp-pourquoi-card');
+    const niveau = parseInt(card.dataset.level, 10);
+    const reponse = card.querySelector('.reponse').value.trim();
+    if (!reponse) return alert('La réponse est obligatoire.');
+    btn.disabled = true;
+    fetch('{{ url_for("problemes.sauver_pourquoi", probleme_id=probleme.id, cause_id=cause.id) }}', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'X-CSRFToken': tokenPourquoi},
+      body: JSON.stringify({niveau: niveau, reponse: reponse})
+    })
+    .then(r => r.json().then(data => ({ok: r.ok, data: data})))
+    .then(({ok, data}) => {
+      if (!ok) throw new Error(data.erreur || 'Erreur');
+      card.querySelector('.badge').className = 'badge bg-success';
+      card.querySelector('.badge').textContent = 'Renseigné';
+      const next = document.querySelector('.wp-pourquoi-card[data-level="' + (niveau + 1) + '"]');
+      if (next && data.question_suivante) {
+        next.classList.remove('wp-locked');
+        next.querySelector('.question').textContent = data.question_suivante;
+        next.querySelector('.reponse').disabled = false;
+        next.querySelector('.btn-save-pourquoi').disabled = false;
+        next.querySelector('.badge').className = 'badge bg-warning';
+        next.querySelector('.badge').textContent = 'À remplir';
+      }
+      majSolidite(data.solidite);
+      btn.disabled = false;
+    })
+    .catch(err => {
+      alert(err.message);
+      btn.disabled = false;
+    });
+  });
+});
+
+function escHtml(str) {
+  return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+</script>
+{% endblock %}

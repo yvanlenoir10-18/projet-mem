@@ -1,0 +1,291 @@
+{% extends 'base.html' %}
+{% block title %}
+  {% if mode == 'liste' %}Utilisateurs
+  {% elif mode == 'nouveau' %}Nouvel utilisateur
+  {% else %}Modifier le compte{% endif %}
+{% endblock %}
+{% block page_title %}
+  {% if mode == 'liste' %}Gestion des utilisateurs
+  {% elif mode == 'nouveau' %}Créer un compte
+  {% else %}Modifier — {{ utilisateur.nom }}{% endif %}
+{% endblock %}
+
+{% block content %}
+
+{# ═══════════════════ MODE LISTE ═══════════════════ #}
+{% if mode == 'liste' %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 style="font-size:1.35rem;font-weight:800;color:var(--wp-ink);margin:0;">
+      Comptes utilisateurs
+    </h1>
+    <p style="color:var(--wp-muted);font-size:.82rem;margin:4px 0 0;">
+      {{ utilisateurs | length }} compte{{ 's' if utilisateurs | length != 1 }}
+    </p>
+  </div>
+  <a href="{{ url_for('admin.creer_utilisateur') }}"
+     class="btn btn-primary d-flex align-items-center gap-2">
+    <i class="bi bi-person-plus"></i> Nouvel utilisateur
+  </a>
+</div>
+
+<div class="wp-card">
+  <table class="wp-table">
+    <thead>
+      <tr>
+        <th>Utilisateur</th>
+        <th>Email</th>
+        <th>Rôle</th>
+        <th>Statut</th>
+        <th>Créé le</th>
+        <th class="text-end">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for u in utilisateurs %}
+    {# Couleur de l'avatar selon le rôle #}
+    {% if u.role == 'admin' %}{% set av = 'terra' %}
+    {% elif u.role == 'chef' %}{% set av = 'leaf' %}
+    {% elif u.role == 'pdg' %}{% set av = 'sky' %}
+    {% else %}{% set av = 'emerald' %}{% endif %}
+
+    {# Pill de rôle #}
+    {% if u.role == 'admin' %}{% set rp = 'danger' %}{% set rl = 'Admin' %}
+    {% elif u.role == 'chef' %}{% set rp = 'warning' %}{% set rl = 'Chef' %}
+    {% elif u.role == 'prod' %}{% set rp = 'success' %}{% set rl = 'Chef de Production' %}
+    {% elif u.role == 'pdg' %}{% set rp = 'info' %}{% set rl = 'PDG' %}
+    {% else %}{% set rp = 'neutral' %}{% set rl = 'Opérateur' %}{% endif %}
+
+    <tr>
+      <td>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="wp-avatar wp-avatar-{{ av }}">{{ u.initiales }}</div>
+          <div>
+            <div style="font-weight:700;font-size:.875rem;">{{ u.nom }}</div>
+          </div>
+        </div>
+      </td>
+      <td style="color:var(--wp-muted);font-size:.84rem;" class="wp-mono">
+        {{ u.email }}
+      </td>
+      <td><span class="wp-pill wp-pill-{{ rp }}">{{ rl }}</span></td>
+      <td>
+        {% if u.actif %}
+        <span class="wp-pill wp-pill-success">
+          <i class="bi bi-check-circle"></i> Actif
+        </span>
+        {% else %}
+        <span class="wp-pill wp-pill-neutral">
+          <i class="bi bi-x-circle"></i> Inactif
+        </span>
+        {% endif %}
+      </td>
+      <td style="color:var(--wp-muted);font-size:.82rem;">
+        {{ u.cree_le.strftime('%d/%m/%Y') if u.cree_le else '—' }}
+      </td>
+      <td class="text-end text-nowrap">
+        <a href="{{ url_for('admin.modifier_utilisateur', user_id=u.id) }}"
+           class="wp-icon-btn" title="Modifier" style="text-decoration:none;display:inline-flex;">
+          <i class="bi bi-pencil"></i>
+        </a>
+        {% if u.id != current_user.id %}
+        <form method="POST"
+              action="{{ url_for('admin.supprimer_utilisateur', user_id=u.id) }}"
+              class="d-inline"
+              onsubmit="return confirm('Supprimer le compte de {{ u.nom }} ? Cette action est irréversible.')">
+          {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+          <button type="submit" class="wp-icon-btn border-0"
+                  title="Supprimer" style="color:var(--wp-terracotta);">
+            <i class="bi bi-trash"></i>
+          </button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% else %}
+    <tr>
+      <td colspan="6" style="text-align:center;padding:3rem;color:var(--wp-muted);">
+        <i class="bi bi-people" style="font-size:2rem;display:block;margin-bottom:.75rem;"></i>
+        Aucun utilisateur trouvé.
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+
+{# ═══════════════════ MODE CRÉATION ═══════════════════ #}
+{% elif mode == 'nouveau' %}
+
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('admin.liste_utilisateurs') }}"
+     class="wp-icon-btn" style="text-decoration:none;" aria-label="Retour">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h1 style="font-size:1.35rem;font-weight:800;color:var(--wp-ink);margin:0;">
+    Créer un compte
+  </h1>
+</div>
+
+<div class="row justify-content-center">
+<div class="col-md-6">
+  <div class="wp-card">
+    <div class="wp-card-header">
+      <i class="bi bi-person-plus" style="color:var(--wp-emerald);"></i>
+      Informations du compte
+    </div>
+    <div style="padding:24px;">
+      <form method="POST">
+        {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+        <div class="mb-3">
+          <label class="form-label">
+            Nom complet <span style="color:var(--wp-terracotta);">*</span>
+          </label>
+          <input type="text" name="nom" class="form-control"
+                 placeholder="Ex : Jean Mbala" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">
+            Email <span style="color:var(--wp-terracotta);">*</span>
+          </label>
+          <input type="email" name="email" class="form-control"
+                 placeholder="jean.mbala@cuf.cm" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">
+            Rôle <span style="color:var(--wp-terracotta);">*</span>
+          </label>
+          <select name="role" class="form-select" required>
+            {% for r in roles %}
+            <option value="{{ r }}">
+              {% if r == 'admin' %}Administrateur
+              {% elif r == 'chef' %}Chef Scierie (ancien profil)
+              {% elif r == 'prod' %}Chef de Production (nouveau cockpit)
+              {% elif r == 'pdg' %}PDG / Direction
+              {% else %}Opérateur (saisie){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+          <div class="form-text" style="color:var(--wp-muted);">
+            Opérateur : saisie — Chef : analyses + config — PDG : tableau financier — Admin : tout
+          </div>
+        </div>
+        <div class="mb-4">
+          <label class="form-label">
+            Mot de passe <span style="color:var(--wp-terracotta);">*</span>
+          </label>
+          <input type="password" name="password" class="form-control"
+                 placeholder="Minimum 6 caractères" minlength="6" required>
+        </div>
+        <div class="d-flex gap-2">
+          <button type="submit" class="btn btn-primary d-flex align-items-center gap-2">
+            <i class="bi bi-check-lg"></i> Créer le compte
+          </button>
+          <a href="{{ url_for('admin.liste_utilisateurs') }}"
+             class="btn btn-outline-secondary">Annuler</a>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+</div>
+
+
+{# ═══════════════════ MODE MODIFICATION ═══════════════════ #}
+{% elif mode == 'modifier' %}
+
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('admin.liste_utilisateurs') }}"
+     class="wp-icon-btn" style="text-decoration:none;" aria-label="Retour">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <h1 style="font-size:1.35rem;font-weight:800;color:var(--wp-ink);margin:0;">
+      Modifier le compte
+    </h1>
+    <p style="color:var(--wp-muted);font-size:.82rem;margin:4px 0 0;">
+      {{ utilisateur.nom }}
+    </p>
+  </div>
+</div>
+
+<div class="row justify-content-center">
+<div class="col-md-6">
+
+  <div class="wp-card mb-3">
+    <div class="wp-card-header">
+      <i class="bi bi-pencil-square" style="color:var(--wp-emerald);"></i>
+      Informations du compte
+    </div>
+    <div style="padding:24px;">
+      <form method="POST"
+            action="{{ url_for('admin.modifier_utilisateur', user_id=utilisateur.id) }}">
+        {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+        <div class="mb-3">
+          <label class="form-label">Nom complet</label>
+          <input type="text" name="nom" class="form-control"
+                 value="{{ utilisateur.nom }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-control"
+                 value="{{ utilisateur.email }}" required>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Rôle</label>
+          <select name="role" class="form-select">
+            {% for r in roles %}
+            <option value="{{ r }}" {% if r == utilisateur.role %}selected{% endif %}>
+              {% if r == 'admin' %}Administrateur
+              {% elif r == 'chef' %}Chef Scierie (ancien profil)
+              {% elif r == 'prod' %}Chef de Production (nouveau cockpit)
+              {% elif r == 'pdg' %}PDG / Direction
+              {% else %}Opérateur (saisie){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="mb-4">
+          <label class="form-label">Statut du compte</label>
+          <select name="actif" class="form-select">
+            <option value="1" {% if utilisateur.actif %}selected{% endif %}>Actif</option>
+            <option value="0" {% if not utilisateur.actif %}selected{% endif %}>
+              Inactif (accès bloqué)
+            </option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary d-flex align-items-center gap-2">
+          <i class="bi bi-save"></i> Enregistrer les modifications
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <div class="wp-card" style="border:1.5px solid rgba(216,113,73,0.3);">
+    <div class="wp-card-header" style="color:var(--wp-terracotta);">
+      <i class="bi bi-shield-lock"></i> Réinitialiser le mot de passe
+    </div>
+    <div style="padding:24px;">
+      <form method="POST"
+            action="{{ url_for('admin.reset_mot_de_passe', user_id=utilisateur.id) }}">
+        {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+        <div class="mb-3">
+          <label class="form-label">Nouveau mot de passe</label>
+          <input type="password" name="nouveau_mdp" class="form-control"
+                 placeholder="Minimum 6 caractères" minlength="6" required>
+        </div>
+        <button type="submit" class="btn btn-danger d-flex align-items-center gap-2"
+                onclick="return confirm('Réinitialiser le mot de passe de {{ utilisateur.nom }} ?')">
+          <i class="bi bi-key"></i> Réinitialiser
+        </button>
+      </form>
+    </div>
+  </div>
+
+</div>
+</div>
+
+{% endif %}
+{% endblock %}

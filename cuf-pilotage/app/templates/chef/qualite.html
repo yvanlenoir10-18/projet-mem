@@ -1,0 +1,283 @@
+{% extends 'base.html' %}
+{% block title %}Qualité / Matière · wood_pilot{% endblock %}
+{% block page_title %}Qualité / Matière{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <div class="wp-section-title mb-1">
+      <i class="bi bi-tree"></i> Qualité / Matière
+    </div>
+    <div style="font-size:.84rem;color:var(--wp-muted);">
+      Où part la matière : conforme, déclassé, déchets et rendement par essence.
+    </div>
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <a href="{{ url_for('dashboard.production_chef', jours=jours, mode=mode) }}" class="btn btn-sm btn-outline-primary">
+      Production & Objectifs
+    </a>
+    <a href="{{ url_for('dashboard.vue_chef') }}" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left"></i> Aujourd'hui
+    </a>
+  </div>
+</div>
+
+<form method="GET" action="{{ url_for('dashboard.qualite_chef') }}" class="wp-card mb-4">
+  <div class="p-3">
+    <div class="row g-3 align-items-end">
+      <div class="col-6 col-md-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Période</label>
+        <select name="jours" class="form-select">
+          <option value="7" {% if jours == 7 %}selected{% endif %}>7 derniers jours</option>
+          <option value="30" {% if jours == 30 %}selected{% endif %}>30 derniers jours</option>
+          <option value="90" {% if jours == 90 %}selected{% endif %}>90 derniers jours</option>
+          <option value="0" {% if jours == 0 %}selected{% endif %}>Toutes les dates</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Lecture</label>
+        <select name="mode" class="form-select">
+          <option value="officiel" {% if mode == 'officiel' %}selected{% endif %}>Officiel : validées seulement</option>
+          <option value="temps_reel" {% if mode == 'temps_reel' %}selected{% endif %}>Temps réel : inclure chez le chef</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-3 d-flex gap-2">
+        <button class="btn btn-primary flex-fill">
+          <i class="bi bi-funnel"></i> Filtrer
+        </button>
+        <a href="{{ url_for('dashboard.qualite_chef') }}" class="btn btn-outline-secondary">
+          Réinitialiser
+        </a>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Rendement matière</div>
+      <div class="wp-kpi-value" style="color:var(--wp-{% if resume.couleur == 'success' %}leaf{% elif resume.couleur == 'warning' %}ochre{% else %}terracotta{% endif %});">
+        {{ resume.rendement }}%
+      </div>
+      <div class="wp-kpi-sub">Seuil {{ resume.seuil_rendement }}%</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Volume entrant</div>
+      <div class="wp-kpi-value">{{ resume.entree }}<span class="unit"> m³</span></div>
+      <div class="wp-kpi-sub">{{ label_periode }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Déclassé</div>
+      <div class="wp-kpi-value" style="color:var(--wp-ochre);">{{ resume.declass }}<span class="unit"> m³</span></div>
+      <div class="wp-kpi-sub">{{ resume.declass_pct }}% des planches · seuil {{ resume.seuil_declass }}%</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Déchets</div>
+      <div class="wp-kpi-value" style="color:var(--wp-terracotta);">{{ resume.dechets }}<span class="unit"> m³</span></div>
+      <div class="wp-kpi-sub">{{ resume.dechets_pct }}% du volume entrant</div>
+    </div>
+  </div>
+</div>
+
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-diagram-2"></i>
+    Répartition matière
+  </div>
+  <div class="p-3">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="wp-quality-band wp-quality-ok">
+          <div class="wp-quality-label">Conforme</div>
+          <div class="wp-quality-value">{{ resume.conforme }} m³</div>
+          <div class="wp-quality-sub">vendu normal / contrat</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="wp-quality-band wp-quality-warn">
+          <div class="wp-quality-label">Déclassé</div>
+          <div class="wp-quality-value">{{ resume.declass }} m³</div>
+          <div class="wp-quality-sub">vendable mais pas conforme</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="wp-quality-band wp-quality-danger">
+          <div class="wp-quality-label">Déchets</div>
+          <div class="wp-quality-value">{{ resume.dechets }} m³</div>
+          <div class="wp-quality-sub">non valorisés dans l'app V1</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if not essences %}
+<div class="wp-card p-5 text-center" style="color:var(--wp-muted);">
+  Aucune donnée matière ne correspond aux filtres.
+</div>
+{% else %}
+
+<div class="row g-3 mb-4">
+  <div class="col-xl-7">
+    <div class="wp-card h-100">
+      <div class="wp-card-header">
+        <i class="bi bi-tree"></i>
+        Essences à surveiller
+      </div>
+      <div class="table-responsive">
+        <table class="wp-table align-middle">
+          <thead>
+            <tr>
+              <th>Essence</th>
+              <th class="text-end">Entrée</th>
+              <th class="text-end">Conforme</th>
+              <th class="text-end">Déclassé</th>
+              <th class="text-end">Déchets</th>
+              <th class="text-end">Rend.</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for e in essences %}
+            <tr>
+              <td>
+                <div style="font-weight:900;">{{ e.essence }}</div>
+                <div style="font-size:.72rem;color:var(--wp-muted);">{{ e.nb_postes }} poste{{ 's' if e.nb_postes > 1 }}</div>
+              </td>
+              <td class="text-end">{{ e.entree }} m³</td>
+              <td class="text-end">{{ e.conforme }} m³</td>
+              <td class="text-end">{{ e.declass }} m³<br><span style="font-size:.7rem;color:var(--wp-muted);">{{ e.declass_pct }}%</span></td>
+              <td class="text-end">{{ e.dechets }} m³<br><span style="font-size:.7rem;color:var(--wp-muted);">{{ e.dechets_pct }}%</span></td>
+              <td class="text-end"><span class="badge bg-{{ e.couleur }}">{{ e.rendement }}%</span></td>
+              <td class="text-end">
+                {% if e.couleur != 'success' %}
+                <div class="btn-group btn-group-sm">
+                  <a href="{{ e.analyse_url }}" class="btn btn-outline-primary">Analyser</a>
+                  <a href="{{ url_for('dashboard.nouvelle_action_chef',
+                                      origine_type='libre',
+                                      origine_label='Qualité essence ' ~ e.essence,
+                                      origine_url=url_for('dashboard.qualite_chef', jours=jours, mode=mode),
+                                      titre='Action qualité ' ~ e.essence,
+                                      type_action='qualite',
+                                      responsable='Chef équipe',
+                                      description='Vérifier le déclassement ou le rendement matière de ' ~ e.essence ~ ' : rendement ' ~ e.rendement ~ '%, déclassé ' ~ e.declass_pct ~ '%.') }}"
+                     class="btn btn-outline-success">Action</a>
+                </div>
+                {% else %}
+                <span style="color:var(--wp-muted);">—</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-xl-5">
+    <div class="wp-card h-100">
+      <div class="wp-card-header">
+        <i class="bi bi-arrow-left-right"></i>
+        Matin vs Après-midi
+      </div>
+      <div class="table-responsive">
+        <table class="wp-table align-middle">
+          <thead>
+            <tr>
+              <th>Poste</th>
+              <th class="text-end">Rend.</th>
+              <th class="text-end">Déclassé</th>
+              <th class="text-end">Déchets</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in shifts %}
+            <tr>
+              <td>
+                <div style="font-weight:900;">{{ s.shift }}</div>
+                <div style="font-size:.72rem;color:var(--wp-muted);">{{ s.nb_postes }} poste{{ 's' if s.nb_postes > 1 }}</div>
+              </td>
+              <td class="text-end">{{ s.rendement }}%</td>
+              <td class="text-end">{{ s.declass }} m³<br><span style="font-size:.7rem;color:var(--wp-muted);">{{ s.declass_pct }}%</span></td>
+              <td class="text-end">{{ s.dechets }} m³<br><span style="font-size:.7rem;color:var(--wp-muted);">{{ s.dechets_pct }}%</span></td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="wp-card">
+  <div class="wp-card-header">
+    <i class="bi bi-exclamation-diamond" style="color:var(--wp-ochre);"></i>
+    Fiches qualité à contrôler
+    <span class="ms-auto" style="font-size:.74rem;color:var(--wp-muted);font-weight:500;">
+      rendement bas, déclassement ou déchets élevés
+    </span>
+  </div>
+  {% if fiches_a_surveiller %}
+  <div class="table-responsive">
+    <table class="wp-table align-middle">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Équipe</th>
+          <th>Opérateur</th>
+          <th>Essences</th>
+          <th class="text-end">Rend.</th>
+          <th class="text-end">Déclassé</th>
+          <th class="text-end">Déchets</th>
+          <th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in fiches_a_surveiller %}
+        <tr>
+          <td>{{ f.date_fmt }}</td>
+          <td><span class="wp-pill wp-pill-neutral">{{ f.shift }}</span></td>
+          <td>{{ f.operateur }}</td>
+          <td style="font-size:.82rem;color:var(--wp-muted);">{{ f.essences }}</td>
+          <td class="text-end">{{ f.rendement }}%</td>
+          <td class="text-end">{{ f.declass }} m³<br><span style="font-size:.7rem;color:var(--wp-muted);">{{ f.declass_pct }}%</span></td>
+          <td class="text-end">{{ f.dechets }} m³<br><span style="font-size:.7rem;color:var(--wp-muted);">{{ f.dechets_pct }}%</span></td>
+          <td class="text-end">
+            <div class="btn-group btn-group-sm">
+              <a href="{{ f.href }}" class="btn btn-outline-primary">Fiche</a>
+              <a href="{{ f.analyse_url }}" class="btn btn-primary">Analyser</a>
+              <a href="{{ url_for('dashboard.nouvelle_action_chef',
+                                  origine_type='fiche',
+                                  equipe_id=f.id,
+                                  origine_label='Fiche qualité #' ~ f.id,
+                                  origine_url=f.href,
+                                  titre='Action qualité fiche #' ~ f.id,
+                                  type_action='qualite',
+                                  responsable='Chef équipe',
+                                  description='Contrôler la qualité matière de la fiche #' ~ f.id ~ ' : rendement ' ~ f.rendement ~ '%, déclassé ' ~ f.declass_pct ~ '%.') }}"
+                 class="btn btn-outline-success">Action</a>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="p-4 text-center" style="color:var(--wp-leaf);font-weight:800;">
+    <i class="bi bi-check-circle"></i> Aucune fiche qualité critique dans cette période.
+  </div>
+  {% endif %}
+</div>
+
+{% endif %}
+
+{% endblock %}

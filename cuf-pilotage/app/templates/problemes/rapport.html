@@ -1,0 +1,162 @@
+{% extends 'base.html' %}
+{% block title %}Rapport A3 · wood_pilot{% endblock %}
+{% block page_title %}Rapport A3{% endblock %}
+
+{% block head %}
+<style>
+@media print {
+  .wp-sidebar, .wp-topbar, .btn, .wp-no-print { display:none !important; }
+  .wp-main { margin:0 !important; }
+  .wp-content { padding:0 !important; }
+  .wp-card { box-shadow:none !important; break-inside:avoid; }
+  body { background:#fff !important; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4 wp-no-print">
+  <div>
+    <div class="wp-section-title mb-1">
+      <i class="bi bi-file-earmark-text"></i> Rapport A3
+    </div>
+    <div style="font-size:.84rem;color:var(--wp-muted);">{{ probleme.titre }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{{ url_for('problemes.ishikawa', probleme_id=probleme.id) }}" class="btn btn-sm btn-outline-secondary">Modifier</a>
+    <a href="{{ url_for('dashboard.nouvelle_action_chef',
+                        origine_type='probleme',
+                        probleme_id=probleme.id,
+                        origine_label='Résolution #' ~ probleme.id ~ ' - ' ~ probleme.titre,
+                        origine_url=url_for('problemes.rapport', probleme_id=probleme.id),
+                        titre='Action suite analyse #' ~ probleme.id,
+                        type_action='organisation',
+                        description=probleme.actions_correctives or ('Traiter la cause racine : ' ~ (racine.description if racine else probleme.titre)),
+                        responsable=probleme.responsable_action or 'Chef scierie',
+                        echeance=probleme.delai_action.isoformat() if probleme.delai_action else '') }}"
+       class="btn btn-sm btn-success">
+      <i class="bi bi-check2-square"></i> Créer action
+    </a>
+    <button onclick="window.print()" class="btn btn-sm btn-primary">
+      <i class="bi bi-printer"></i> Imprimer
+    </button>
+  </div>
+</div>
+
+<div class="wp-a3-rapport">
+  <div class="wp-card mb-4">
+    <div class="p-4">
+      <div class="d-flex justify-content-between flex-wrap gap-3">
+        <div>
+          <div style="font-size:.78rem;color:var(--wp-muted);font-weight:800;">ANALYSE</div>
+          <h2 style="margin:0;color:var(--wp-ink);font-weight:900;">{{ probleme.titre }}</h2>
+          <div style="font-size:.84rem;color:var(--wp-muted);margin-top:.35rem;">
+            Créé le {{ probleme.cree_le.strftime('%d/%m/%Y à %H:%M') if probleme.cree_le else '—' }}
+            · {{ probleme.cree_par.nom if probleme.cree_par else '—' }}
+          </div>
+        </div>
+        <div>
+          <span class="badge bg-{% if probleme.statut == 'clos' %}secondary{% elif probleme.statut == 'cause_identifiee' %}success{% else %}warning{% endif %}">
+            {{ probleme.statut }}
+          </span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-lg-6">
+      <div class="wp-card h-100">
+        <div class="wp-card-header">1. Contexte du problème</div>
+        <div class="p-3 wp-a3-section">
+          <p><strong>Quoi :</strong> {{ probleme.contexte_quoi or probleme.description or '—' }}</p>
+          <p><strong>Quand :</strong> {{ probleme.contexte_quand or '—' }}</p>
+          <p><strong>Où :</strong> {{ probleme.contexte_ou or '—' }}</p>
+          <p><strong>Combien :</strong> {{ probleme.contexte_combien or '—' }}</p>
+          <p><strong>Source :</strong>
+            {{ origines.get(probleme.origine_type, probleme.origine_type) }}
+            {% if probleme.origine_label %}· {{ probleme.origine_label }}{% endif %}
+            {% if probleme.origine_url %}
+            <a class="wp-no-print" href="{{ probleme.origine_url }}">ouvrir</a>
+            {% endif %}
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="wp-card h-100">
+        <div class="wp-card-header">2. Causes identifiées — 6M</div>
+        <div class="p-3">
+          {% for cat, causes in grouped_causes.items() %}
+          <div class="mb-2">
+            <strong>{{ cat }} ({{ causes|length }}) :</strong>
+            {% if causes %}
+              {{ causes|map(attribute='description')|join(', ') }}
+            {% else %}
+              <span style="color:var(--wp-muted);">aucune cause saisie</span>
+            {% endif %}
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-6">
+      <div class="wp-card h-100">
+        <div class="wp-card-header">3. Cause racine + 5 Pourquoi</div>
+        <div class="p-3">
+          {% if racine %}
+          <div class="mb-3">
+            <span class="wp-pill wp-pill-neutral">{{ racine.categorie_6m }}</span>
+            <strong style="margin-left:.4rem;">{{ racine.description }}</strong>
+          </div>
+          {% for n in niveaux if n.reponse %}
+          <div class="wp-a3-why">
+            <div><strong>N{{ n.niveau }} :</strong> {{ n.question }}</div>
+            <div style="color:var(--wp-muted);">{{ n.reponse }}</div>
+          </div>
+          {% endfor %}
+          {% else %}
+          <div style="color:var(--wp-muted);">Cause racine non sélectionnée.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-6">
+      <div class="wp-card h-100">
+        <div class="wp-card-header">4. Action et lecture mémoire</div>
+        <div class="p-3 wp-a3-section">
+          <p><strong>Action :</strong> {{ probleme.actions_correctives or '—' }}</p>
+          <p><strong>Responsable :</strong> {{ probleme.responsable_action or '—' }}</p>
+          <p><strong>Délai :</strong> {{ probleme.delai_action.strftime('%d/%m/%Y') if probleme.delai_action else '—' }}</p>
+          <p><strong>Statut action :</strong> {{ statuts_action.get(probleme.statut_action, probleme.statut_action) }}</p>
+          {% if probleme.classe_sans_action_motif %}
+          <p><strong>Motif sans action :</strong> {{ probleme.classe_sans_action_motif }}</p>
+          {% endif %}
+          {% if interpretation_h2 %}
+          <div class="wp-h2-box">
+            <strong>H2 :</strong> {{ interpretation_h2.texte }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="d-flex justify-content-end gap-2 mt-4 wp-no-print">
+  {% if probleme.statut == 'cause_identifiee' %}
+  <form method="POST" action="{{ url_for('problemes.clore', probleme_id=probleme.id) }}">
+    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+    <button class="btn btn-success">Clôturer ce problème</button>
+  </form>
+  {% elif probleme.statut == 'clos' %}
+  <form method="POST" action="{{ url_for('problemes.rouvrir', probleme_id=probleme.id) }}">
+    {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+    <button class="btn btn-outline-warning">Rouvrir</button>
+  </form>
+  {% endif %}
+</div>
+
+{% endblock %}

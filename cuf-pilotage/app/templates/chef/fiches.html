@@ -1,0 +1,224 @@
+{% extends 'base.html' %}
+{% block title %}Fiches chef · wood_pilot{% endblock %}
+{% block page_title %}Fiches à contrôler{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <div class="wp-section-title mb-1">
+      <i class="bi bi-clipboard-check"></i> Fiches chef
+    </div>
+    <div style="font-size:.84rem;color:var(--wp-muted);">
+      Contrôler, filtrer et ouvrir rapidement les fiches opérateur.
+    </div>
+  </div>
+  <a href="{{ url_for('dashboard.vue_chef') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Retour dashboard
+  </a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-2">
+    <a class="wp-kpi d-block" style="text-decoration:none;color:inherit;"
+       href="{{ url_for('dashboard.fiches_chef', statut='a_verifier', periode=filtres.periode) }}">
+      <div class="wp-kpi-label">Chez le chef</div>
+      <div class="wp-kpi-value">{{ compteurs_base.a_verifier }}</div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-2">
+    <a class="wp-kpi d-block" style="text-decoration:none;color:inherit;"
+       href="{{ url_for('dashboard.fiches_chef', statut='a_corriger', periode=filtres.periode) }}">
+      <div class="wp-kpi-label">À corriger</div>
+      <div class="wp-kpi-value" style="color:var(--wp-ochre);">{{ compteurs_base.a_corriger }}</div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-2">
+    <a class="wp-kpi d-block" style="text-decoration:none;color:inherit;"
+       href="{{ url_for('dashboard.fiches_chef', statut='brouillon', periode=filtres.periode) }}">
+      <div class="wp-kpi-label">Brouillons</div>
+      <div class="wp-kpi-value">{{ compteurs_base.brouillons }}</div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-2">
+    <a class="wp-kpi d-block" style="text-decoration:none;color:inherit;"
+       href="{{ url_for('dashboard.fiches_chef', statut='validees', periode=filtres.periode) }}">
+      <div class="wp-kpi-label">Validées</div>
+      <div class="wp-kpi-value" style="color:var(--wp-leaf);">{{ compteurs_base.validees }}</div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-2">
+    <a class="wp-kpi d-block" style="text-decoration:none;color:inherit;"
+       href="{{ url_for('dashboard.fiches_chef', statut=filtres.statut, periode=filtres.periode, anomalies='bloquantes') }}">
+      <div class="wp-kpi-label">Bloquantes</div>
+      <div class="wp-kpi-value" style="color:var(--wp-terracotta);">{{ compteurs_base.bloquantes }}</div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-2">
+    <a class="wp-kpi d-block" style="text-decoration:none;color:inherit;"
+       href="{{ url_for('dashboard.fiches_chef', statut=filtres.statut, periode=filtres.periode, anomalies='avertissements') }}">
+      <div class="wp-kpi-label">Avertissements</div>
+      <div class="wp-kpi-value" style="color:var(--wp-ochre);">{{ compteurs_base.warnings }}</div>
+    </a>
+  </div>
+</div>
+
+<form method="GET" action="{{ url_for('dashboard.fiches_chef') }}" class="wp-card mb-4">
+  <div class="p-3">
+    <div class="row g-3 align-items-end">
+      <div class="col-12 col-lg-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Recherche rapide</label>
+        <input type="search"
+               name="q"
+               value="{{ filtres.q }}"
+               class="form-control"
+               placeholder="N° fiche, opérateur, machine, essence">
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Statut</label>
+        <select name="statut" class="form-select">
+          {% for value, label in statuts.items() %}
+          <option value="{{ value }}" {% if filtres.statut == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Période</label>
+        <select name="periode" class="form-select">
+          <option value="aujourd_hui" {% if filtres.periode == 'aujourd_hui' %}selected{% endif %}>Aujourd'hui</option>
+          <option value="semaine" {% if filtres.periode == 'semaine' %}selected{% endif %}>Cette semaine</option>
+          <option value="mois" {% if filtres.periode == 'mois' %}selected{% endif %}>Ce mois</option>
+          <option value="30j" {% if filtres.periode == '30j' %}selected{% endif %}>30 derniers jours</option>
+          <option value="tout" {% if filtres.periode == 'tout' %}selected{% endif %}>Toutes les dates</option>
+        </select>
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Équipe</label>
+        <select name="equipe" class="form-select">
+          <option value="">Toutes</option>
+          <option value="Matin" {% if filtres.equipe == 'Matin' %}selected{% endif %}>Matin</option>
+          <option value="Apres-midi" {% if filtres.equipe == 'Apres-midi' %}selected{% endif %}>Après-midi</option>
+        </select>
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Anomalies</label>
+        <select name="anomalies" class="form-select">
+          <option value="">Toutes</option>
+          <option value="bloquantes" {% if filtres.anomalies == 'bloquantes' %}selected{% endif %}>Bloquantes</option>
+          <option value="avertissements" {% if filtres.anomalies == 'avertissements' %}selected{% endif %}>Avertissements</option>
+          <option value="sans" {% if filtres.anomalies == 'sans' %}selected{% endif %}>Sans anomalie</option>
+        </select>
+      </div>
+      <div class="col-12 col-lg-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Utilisateur ayant saisi</label>
+        <select name="operateur_id" class="form-select">
+          <option value="">Tous</option>
+          {% for u in utilisateurs %}
+          <option value="{{ u.id }}" {% if filtres.operateur_id == u.id %}selected{% endif %}>
+            {{ u.nom }} · {{ u.role }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-lg-3 d-flex gap-2">
+        <button class="btn btn-primary flex-fill">
+          <i class="bi bi-funnel"></i> Filtrer
+        </button>
+        <a href="{{ url_for('dashboard.fiches_chef') }}" class="btn btn-outline-secondary">
+          Réinitialiser
+        </a>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+  <div style="font-weight:850;color:var(--wp-ink);">
+    {{ compteurs_resultats.total }} fiche{{ 's' if compteurs_resultats.total > 1 }} · {{ label_periode }}
+  </div>
+  <div style="font-size:.78rem;color:var(--wp-muted);">
+    Tri : plus récentes en premier.
+  </div>
+</div>
+
+{% if fiches %}
+<div class="wp-card">
+  <div class="table-responsive">
+    <table class="wp-table align-middle">
+      <thead>
+        <tr>
+          <th>Fiche</th>
+          <th>Date</th>
+          <th>Équipe</th>
+          <th>Opérateur</th>
+          <th>Essences</th>
+          <th class="text-end">Volume</th>
+          <th class="text-end">TRS</th>
+          <th class="text-end">Arrêts</th>
+          <th>Anomalies</th>
+          <th>Statut</th>
+          <th class="text-end">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for fiche in fiches %}
+        <tr>
+          <td style="font-weight:900;color:var(--wp-ink);">#{{ fiche.id }}</td>
+          <td>{{ fiche.date_fmt }}</td>
+          <td>{{ fiche.equipe }}</td>
+          <td>
+            <div style="font-weight:800;color:var(--wp-ink);">{{ fiche.operateur }}</div>
+            {% if fiche.rempli_par != fiche.operateur %}
+            <div style="font-size:.72rem;color:var(--wp-muted);">remplie par {{ fiche.rempli_par }}</div>
+            {% endif %}
+          </td>
+          <td style="max-width:170px;">
+            <span style="font-size:.82rem;color:var(--wp-muted);">{{ fiche.essences }}</span>
+          </td>
+          <td class="text-end" style="font-weight:800;">{{ fiche.volume }} m³</td>
+          <td class="text-end">
+            {% if fiche.trs is not none %}
+            {% set trs_color = 'var(--wp-leaf)' if fiche.trs >= 70 else ('var(--wp-ochre)' if fiche.trs >= 50 else 'var(--wp-terracotta)') %}
+            <strong style="color:{{ trs_color }};">{{ fiche.trs }}%</strong>
+            {% else %}
+            <span style="color:var(--wp-muted);">—</span>
+            {% endif %}
+          </td>
+          <td class="text-end">{{ fiche.arrets_fmt }}</td>
+          <td>
+            {% if fiche.nb_bloquantes > 0 %}
+            <span class="wp-pill wp-pill-danger">{{ fiche.nb_bloquantes }} bloquant{{ 's' if fiche.nb_bloquantes > 1 }}</span>
+            {% elif fiche.nb_warnings > 0 %}
+            <span class="wp-pill wp-pill-warning">{{ fiche.nb_warnings }} avert.</span>
+            {% else %}
+            <span class="wp-pill wp-pill-success">OK</span>
+            {% endif %}
+            {% if fiche.premiere_anomalie %}
+            <div style="font-size:.7rem;color:var(--wp-muted);margin-top:4px;max-width:230px;">
+              {{ fiche.premiere_anomalie }}
+            </div>
+            {% endif %}
+          </td>
+          <td><span class="badge bg-{{ fiche.statut_couleur }}">{{ fiche.statut_label }}</span></td>
+          <td class="text-end">
+            <a href="{{ fiche.href }}" class="btn btn-sm btn-{{ fiche.action.couleur }}">
+              {{ fiche.action.label }}
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="wp-card p-4 text-center">
+  <i class="bi bi-inbox fs-2 d-block mb-2" style="color:var(--wp-muted);"></i>
+  <div style="font-weight:850;color:var(--wp-ink);">Aucune fiche ne correspond aux filtres.</div>
+  <div style="font-size:.82rem;color:var(--wp-muted);margin-top:.35rem;">
+    Essaie une autre période ou retire le filtre anomalies.
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,160 +1,574 @@
 {% extends 'base.html' %}
 {% block title %}Vue Direction{% endblock %}
+{% block page_title %}Tableau de bord Direction{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h4><i class="bi bi-speedometer2 text-dark"></i> Tableau de bord Direction</h4>
-    <div class="d-flex align-items-center gap-2">
-        <span class="text-muted me-2">{{ mois_courant }}</span>
-        <div class="dropdown">
-            <button class="btn btn-sm btn-success dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="bi bi-file-earmark-excel"></i> Exporter Excel
-            </button>
-            <ul class="dropdown-menu dropdown-menu-end">
-                <li><h6 class="dropdown-header">Choisir le mois</h6></li>
-                {% for m in mois_options %}
-                <li>
-                    <a class="dropdown-item {% if m.actif %}fw-bold{% endif %}"
-                       href="{{ url_for('dashboard.export_excel', mois=m.mois, annee=m.annee) }}">
-                        {% if m.actif %}<i class="bi bi-check2 text-success me-1"></i>{% else %}<span class="me-3"></span>{% endif %}
-                        {{ m.label }}
-                    </a>
-                </li>
-                {% endfor %}
-            </ul>
-        </div>
+
+{# ── Alertes ── #}
+{% if prix_manquants|default(false) %}
+<div class="alert alert-warning alert-dismissible fade show mb-3" role="alert">
+  <i class="bi bi-exclamation-triangle-fill me-2"></i>
+  <strong>Prix manquants</strong> — Manque à gagner sous-estimé.
+  <a href="{{ url_for('admin.parametres') }}" class="fw-bold" style="color:inherit;">Configurer les prix →</a>
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{% if nb_brouillons|default(0) > 0 %}
+<div class="alert alert-warning alert-dismissible fade show mb-3" role="alert">
+  <i class="bi bi-clock me-2"></i>
+  <strong>{{ nb_brouillons }} poste{% if nb_brouillons > 1 %}s{% endif %} non validé{% if nb_brouillons > 1 %}s{% endif %}</strong>
+  non inclus dans les calculs.
+  <a href="{{ url_for('saisie.historique') }}" class="fw-bold" style="color:inherit;">Voir →</a>
+  <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
+
+{# ── Barre période + export ── #}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+  <div>
+    <span style="font-size:.78rem;color:var(--wp-muted);">{{ mois_courant }}</span>
+    {% if mode_libre %}
+    <span class="wp-pill wp-pill-info ms-2">Période libre</span>
+    {% endif %}
+  </div>
+  <div class="d-flex gap-2 flex-wrap">
+    <div class="dropdown">
+      <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+        <i class="bi bi-calendar3"></i> Mois
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><h6 class="dropdown-header" style="font-size:.7rem;">Choisir le mois</h6></li>
+        {% for m in mois_options %}
+        <li>
+          <a class="dropdown-item {% if m.actif and not mode_libre %}fw-bold{% endif %}"
+             href="{{ url_for('dashboard.vue_pdg', mois=m.mois, annee=m.annee) }}">
+            {% if m.actif and not mode_libre %}<i class="bi bi-check2 text-success me-1"></i>{% else %}<span class="me-3"></span>{% endif %}
+            {{ m.label }}
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
     </div>
+    <button class="btn btn-sm btn-outline-primary {% if mode_libre %}active{% endif %}"
+            type="button" data-bs-toggle="collapse" data-bs-target="#filtreLibre">
+      <i class="bi bi-calendar-range"></i> Période
+    </button>
+    <div class="dropdown">
+      <button class="btn btn-sm btn-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+        <i class="bi bi-file-earmark-excel"></i> Excel
+      </button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><h6 class="dropdown-header" style="font-size:.7rem;">Choisir le mois</h6></li>
+        {% for m in mois_options %}
+        <li>
+          <a class="dropdown-item {% if m.actif %}fw-bold{% endif %}"
+             href="{{ url_for('dashboard.export_excel', mois=m.mois, annee=m.annee) }}">
+            {% if m.actif %}<i class="bi bi-check2 text-success me-1"></i>{% else %}<span class="me-3"></span>{% endif %}
+            {{ m.label }}
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
 </div>
 
-<!-- 5 KPI principaux -->
+{# Filtre période libre #}
+<div class="collapse mb-3 {% if mode_libre %}show{% endif %}" id="filtreLibre">
+  <div class="wp-card p-3">
+    <form method="get" class="d-flex align-items-center gap-3 flex-wrap">
+      <span class="wp-kpi-label mb-0">Du</span>
+      <input type="date" name="date_debut" class="form-control form-control-sm" style="width:150px;"
+             value="{{ debut_filtre if mode_libre else '' }}">
+      <span class="wp-kpi-label mb-0">Au</span>
+      <input type="date" name="date_fin" class="form-control form-control-sm" style="width:150px;"
+             value="{{ fin_filtre if mode_libre else '' }}">
+      <button type="submit" class="btn btn-sm btn-primary">Appliquer</button>
+      {% if mode_libre %}
+      <a href="{{ url_for('dashboard.vue_pdg') }}" class="btn btn-sm btn-outline-primary">Revenir au mois</a>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+{# ── P13 · Vue exécutive 4 horizons (jour / semaine / mois / année) ── #}
+{% if vue_executive %}
+{% set horizons = [('jour', 'Aujourd\'hui', 'bi-sun'),
+                   ('semaine', 'Cette semaine', 'bi-calendar-week'),
+                   ('mois', 'Ce mois', 'bi-calendar-month'),
+                   ('annee', 'Cette année', 'bi-calendar-range')] %}
+
+<div class="wp-card mb-4">
+  <div class="wp-card-header" style="justify-content:space-between;">
+    <span><i class="bi bi-eye-fill" style="color:var(--wp-ink);"></i>
+      Vue exécutive · 4 horizons
+    </span>
+    <span style="font-weight:400;color:var(--wp-muted);font-size:.78rem;">
+      Valeur courante <strong style="color:var(--wp-muted);">↗</strong> évolution vs période précédente
+    </span>
+  </div>
+
+  <div class="row g-0" style="border-top:1px solid #e9e3d5;">
+    {% for code, titre, icone in horizons %}
+    {% set h = vue_executive[code] %}
+    <div class="col-md-6 col-xl-3"
+         style="{% if not loop.last %}border-right:1px solid #e9e3d5;{% endif %}
+                padding:1rem 1.25rem;">
+
+      <div class="d-flex align-items-center gap-2 mb-3"
+           style="color:var(--wp-ink);font-weight:700;font-size:.85rem;">
+        <i class="bi {{ icone }}" style="color:var(--wp-leaf);"></i>
+        {{ titre }}
+        <span style="color:var(--wp-muted);font-weight:500;font-size:.72rem;">
+          ({{ h.label }})
+        </span>
+      </div>
+
+      {# Volume conforme #}
+      <div class="mb-3">
+        <div class="wp-kpi-label" style="font-size:.7rem;">Volume conforme</div>
+        <div style="display:flex;align-items:baseline;gap:8px;">
+          <span style="font-size:1.35rem;font-weight:800;color:var(--wp-ink);">
+            {{ h.courant.volume_conforme }} <span style="font-size:.72rem;font-weight:500;color:var(--wp-muted);">m³</span>
+          </span>
+          {% set d = h.deltas.volume_conforme %}
+          <span class="wp-delta wp-delta-{{ d.couleur }}">
+            {% if d.direction == 'up' %}<i class="bi bi-arrow-up-short"></i>
+            {% elif d.direction == 'down' %}<i class="bi bi-arrow-down-short"></i>
+            {% elif d.direction == 'stable' %}<i class="bi bi-dash"></i>
+            {% endif %}
+            {{ d.label }}
+          </span>
+        </div>
+      </div>
+
+      {# TRS moyen #}
+      <div class="mb-3">
+        <div class="wp-kpi-label" style="font-size:.7rem;">TRS moyen</div>
+        <div style="display:flex;align-items:baseline;gap:8px;">
+          {% set trs_v = h.courant.trs_moyen %}
+          <span style="font-size:1.35rem;font-weight:800;
+                       color:{% if trs_v is none %}var(--wp-muted)
+                             {% elif trs_v >= 70 %}var(--wp-leaf)
+                             {% elif trs_v >= 50 %}var(--wp-ochre)
+                             {% else %}var(--wp-terracotta){% endif %};">
+            {% if trs_v is none %}—{% else %}{{ trs_v }}<span style="font-size:.72rem;font-weight:500;">%</span>{% endif %}
+          </span>
+          {% set d = h.deltas.trs_moyen %}
+          <span class="wp-delta wp-delta-{{ d.couleur }}">
+            {% if d.direction == 'up' %}<i class="bi bi-arrow-up-short"></i>
+            {% elif d.direction == 'down' %}<i class="bi bi-arrow-down-short"></i>
+            {% elif d.direction == 'stable' %}<i class="bi bi-dash"></i>
+            {% endif %}
+            {{ d.label }}
+          </span>
+        </div>
+      </div>
+
+      {# Manque à gagner #}
+      <div class="mb-3">
+        <div class="wp-kpi-label" style="font-size:.7rem;">Manque à gagner estimé</div>
+        <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;">
+          <span style="font-size:1.15rem;font-weight:700;color:var(--wp-terracotta);">
+            {{ "{:,.0f}".format(h.courant.manque_a_gagner).replace(",", " ") }}
+            <span style="font-size:.7rem;font-weight:500;color:var(--wp-muted);">FCFA</span>
+          </span>
+          {% set d = h.deltas.manque_a_gagner %}
+          <span class="wp-delta wp-delta-{{ d.couleur }}">
+            {% if d.direction == 'up' %}<i class="bi bi-arrow-up-short"></i>
+            {% elif d.direction == 'down' %}<i class="bi bi-arrow-down-short"></i>
+            {% elif d.direction == 'stable' %}<i class="bi bi-dash"></i>
+            {% endif %}
+            {{ d.label }}
+          </span>
+        </div>
+      </div>
+
+      {# Nombre de postes #}
+      <div>
+        <div class="wp-kpi-label" style="font-size:.7rem;">Postes saisis</div>
+        <div style="display:flex;align-items:baseline;gap:8px;">
+          <span style="font-size:1.1rem;font-weight:700;color:var(--wp-ink);">
+            {{ h.courant.nb_postes }}
+          </span>
+          {% set d = h.deltas.nb_postes %}
+          <span class="wp-delta wp-delta-{{ d.couleur }}">
+            {% if d.direction == 'up' %}<i class="bi bi-arrow-up-short"></i>
+            {% elif d.direction == 'down' %}<i class="bi bi-arrow-down-short"></i>
+            {% elif d.direction == 'stable' %}<i class="bi bi-dash"></i>
+            {% endif %}
+            {{ d.label }}
+          </span>
+        </div>
+      </div>
+
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ── P14 · Top 3 recommandations Direction ── #}
+{% if top_recos_pdg %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-terracotta);">
+  <div class="wp-card-header" style="background:#fff8f6;">
+    <i class="bi bi-lightbulb-fill" style="color:var(--wp-terracotta);"></i>
+    Recommandations prioritaires
+    <span class="wp-pill wp-pill-neutral ms-2" style="font-size:.65rem;">{{ top_recos_pdg|length }} action{{ 's' if top_recos_pdg|length > 1 }}</span>
+    <a href="{{ url_for('recommandations.index') }}" class="btn btn-sm btn-outline-secondary ms-auto" style="font-size:.72rem;">
+      Voir tout <i class="bi bi-arrow-right"></i>
+    </a>
+  </div>
+  <div class="p-3">
+    {% for reco in top_recos_pdg %}
+    {% set prio_label = 'Haute' if reco.priorite == 3 else ('Moyenne' if reco.priorite == 2 else 'Basse') %}
+    {% set prio_class = 'wp-reco-prio-haute' if reco.priorite == 3 else ('wp-reco-prio-moyenne' if reco.priorite == 2 else 'wp-reco-prio-basse') %}
+    <div class="d-flex align-items-start gap-3 {% if not loop.last %}mb-3 pb-3{% endif %}" style="{% if not loop.last %}border-bottom:1px solid #f0ebe2;{% endif %}">
+      <div class="wp-reco-top-num">{{ loop.index }}</div>
+      <div style="flex:1;">
+        <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+          <i class="bi {{ reco.icone }}" style="color:var(--wp-terracotta);"></i>
+          <span style="font-weight:600;font-size:.88rem;color:var(--wp-ink);">{{ reco.titre }}</span>
+          <span class="wp-pill {{ prio_class }}">{{ prio_label }}</span>
+        </div>
+        <div style="font-size:.78rem;color:var(--wp-muted);">
+          {%- if reco.fiche -%}{{ reco.fiche.action | truncate(120) }}{%- elif reco.solutions -%}{{ reco.solutions[0].titre }}{%- endif -%}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{# ── 4 KPI Cards ── #}
 <div class="row g-3 mb-4">
-    <!-- TRS avec traffic light -->
-    <div class="col-md-4">
-        <div class="card kpi-card {{ couleur_trs }} h-100 shadow-sm">
-            <div class="card-body text-center py-4">
-                <div class="text-muted mb-1">TRS Chaîne 4 — Ce mois</div>
-                <div class="display-4 fw-bold text-{{ couleur_trs }}">{{ trs_moyen }}%</div>
-                <div class="mt-2">
-                    {% if couleur_trs == 'success' %}
-                    <span class="badge bg-success fs-6">✓ Objectif atteint</span>
-                    {% elif couleur_trs == 'warning' %}
-                    <span class="badge bg-warning text-dark fs-6">⚠ À surveiller</span>
-                    {% else %}
-                    <span class="badge bg-danger fs-6">✗ En dessous de l'objectif</span>
-                    {% endif %}
-                </div>
-                <div class="text-muted small mt-2">Benchmark international : 60%+</div>
-            </div>
-        </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="wp-kpi h-100">
+      <div class="wp-kpi-label">TRS Chaîne 4</div>
+      {% set trs_color = 'var(--wp-leaf)' if couleur_trs == 'success' else ('var(--wp-ochre)' if couleur_trs == 'warning' else 'var(--wp-terracotta)') %}
+      <div class="wp-kpi-value" style="color:{{ trs_color }};">{{ trs_moyen }}<span class="unit">%</span></div>
+      {% if delta_trs is not none %}
+      <div class="wp-delta {% if delta_trs > 0 %}wp-delta-up{% elif delta_trs < 0 %}wp-delta-down{% else %}wp-delta-flat{% endif %}">
+        {% if delta_trs > 0 %}<i class="bi bi-arrow-up-short"></i>+{{ delta_trs }}%
+        {% elif delta_trs < 0 %}<i class="bi bi-arrow-down-short"></i>{{ delta_trs }}%
+        {% else %}<i class="bi bi-dash"></i> stable{% endif %}
+        <span style="font-weight:400;color:var(--wp-muted);"> vs période préc.</span>
+      </div>
+      {% endif %}
+      <div class="wp-kpi-sub">Benchmark scieries africaines : 60%+</div>
     </div>
+  </div>
 
-    <!-- Production vs objectif -->
-    <div class="col-md-4">
-        <div class="card h-100 shadow-sm">
-            <div class="card-body text-center py-4">
-                <div class="text-muted mb-1">Production ce mois</div>
-                <div class="display-5 fw-bold">{{ production_reelle }} m³</div>
-                <div class="text-muted small">Objectif : {{ production_cible }} m³</div>
-                <div class="progress mt-2" style="height: 12px;">
-                    {% set pct = [(production_reelle / production_cible * 100)|int, 100]|min if production_cible > 0 else 0 %}
-                    <div class="progress-bar bg-{{ 'success' if pct >= 90 else ('warning' if pct >= 70 else 'danger') }}"
-                         style="width: {{ pct }}%">{{ pct }}%</div>
-                </div>
-                <div class="small text-muted mt-1">{{ nb_postes }} postes enregistrés</div>
-            </div>
-        </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="wp-kpi h-100">
+      <div class="wp-kpi-label">Production</div>
+      <div class="wp-kpi-value">{{ production_reelle }}<span class="unit">m³</span></div>
+      <div class="wp-kpi-sub">Objectif : {{ production_cible }} m³ · {{ nb_postes }} postes</div>
+      {% set pct = [(production_reelle / production_cible * 100)|int, 100]|min if production_cible > 0 else 0 %}
+      <div class="progress mt-2" style="height:6px;">
+        <div class="progress-bar" style="width:{{ pct }}%;
+          background:{% if pct >= 90 %}var(--wp-leaf){% elif pct >= 70 %}var(--wp-ochre){% else %}var(--wp-terracotta){% endif %};"></div>
+      </div>
+      <div class="wp-kpi-sub mt-1">{{ pct }}% de l'objectif</div>
     </div>
+  </div>
 
-    <!-- Pertes financières -->
-    <div class="col-md-4">
-        <div class="card kpi-card danger h-100 shadow-sm">
-            <div class="card-body text-center py-4">
-                <div class="text-muted mb-1">Pertes financières estimées</div>
-                <div class="display-5 fw-bold text-danger">
-                    {{ "{:,.0f}".format(perte_fcfa) }} FCFA
-                </div>
-                <div class="text-muted small">Production non réalisée vs objectif</div>
-                <div class="mt-2">
-                    <a href="{{ url_for('dashboard.vue_chef') }}" class="btn btn-sm btn-outline-danger">
-                        Voir les causes →
-                    </a>
-                </div>
-            </div>
-        </div>
+  <div class="col-md-6 col-xl-3">
+    <div class="wp-kpi h-100">
+      <div class="wp-kpi-label">Manque à gagner estimé</div>
+      <div class="wp-kpi-value" style="color:var(--wp-terracotta);font-size:1.6rem;">
+        {{ "{:,.0f}".format(manque_periode.manque_a_gagner_estime).replace(",", " ") }}
+      </div>
+      <div class="wp-kpi-sub">FCFA · valeur potentielle − réelle valorisée</div>
+      <div class="wp-kpi-sub" style="margin-top:6px;">
+        Réel valorisé : {{ "{:,.0f}".format(manque_periode.valeur_reelle_valorisee).replace(",", " ") }} FCFA
+      </div>
+      <a href="{{ url_for('dashboard.pertes') }}" class="btn btn-sm mt-2"
+         style="background:rgba(216,113,73,.1);color:var(--wp-terracotta);font-size:.73rem;padding:3px 10px;">
+        Causes D/P/Q →
+      </a>
     </div>
+  </div>
+
+  {% set coul_rm_var = 'var(--wp-leaf)' if rendement_global >= 60 else ('var(--wp-ochre)' if rendement_global >= 40 else 'var(--wp-terracotta)') %}
+  <div class="col-md-6 col-xl-3">
+    <div class="wp-kpi h-100">
+      <div class="wp-kpi-label">Rendement matière</div>
+      <div class="wp-kpi-value" style="color:{{ coul_rm_var }};">{{ rendement_global }}<span class="unit">%</span></div>
+      <div class="wp-kpi-sub">Vol. sorti / Vol. entré</div>
+      <div class="wp-kpi-sub">Benchmark Afrique centrale : 35%</div>
+    </div>
+  </div>
 </div>
 
-<div class="row g-3">
-    <!-- Top 3 causes d'arrêt -->
-    <div class="col-md-5">
-        <div class="card shadow-sm">
-            <div class="card-header bg-dark text-white">
-                <i class="bi bi-exclamation-triangle"></i> Top 3 causes de perte
-            </div>
-            <div class="card-body p-0">
-                {% if pareto %}
-                <table class="table mb-0">
-                    <thead><tr><th>#</th><th>Cause</th><th>Durée</th><th>% des pertes</th></tr></thead>
-                    <tbody>
-                        {% for c in pareto %}
-                        <tr>
-                            <td><span class="badge bg-danger">{{ loop.index }}</span></td>
-                            <td>{{ c.cause }}</td>
-                            <td>{{ c.duree }} min</td>
-                            <td>
-                                <div class="progress" style="height:8px;">
-                                    <div class="progress-bar bg-danger" style="width:{{ c.pct }}%"></div>
-                                </div>
-                                {{ c.pct }}%
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% else %}
-                <p class="p-3 text-muted">Aucun arrêt enregistré ce mois.</p>
-                {% endif %}
-            </div>
+{# ── Décision financière : où agit l'argent (leviers D/P/Q) ── #}
+{% if perte_dpq %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-ink);">
+  <div class="wp-card-header" style="justify-content:space-between;">
+    <span><i class="bi bi-cash-stack" style="color:var(--wp-ink);"></i> Décision financière — où agit l'argent</span>
+    <a href="{{ url_for('dashboard.pertes') }}" class="btn btn-sm btn-outline-secondary" style="font-size:.72rem;">
+      Analyse détaillée des pertes <i class="bi bi-arrow-right"></i>
+    </a>
+  </div>
+  <div class="p-3">
+    <div class="row g-3">
+
+      {# Valeur produite #}
+      <div class="col-md-6 col-xl-3">
+        <div class="wp-kpi h-100" style="background:#f6faf4;">
+          <div class="wp-kpi-label">Valeur produite (valorisée)</div>
+          <div class="wp-kpi-value" style="color:var(--wp-leaf);font-size:1.5rem;">
+            {{ "{:,.0f}".format(valeur_produite).replace(",", " ") }}
+          </div>
+          <div class="wp-kpi-sub">FCFA · conforme + déclassé aux prix courants</div>
         </div>
+      </div>
+
+      {# Perte Disponibilité (arrêts) #}
+      <div class="col-md-6 col-xl-3">
+        <div class="wp-kpi h-100">
+          <div class="wp-kpi-label"><i class="bi bi-pause-circle" style="color:var(--wp-terracotta);"></i> Levier Disponibilité</div>
+          <div class="wp-kpi-value" style="color:var(--wp-terracotta);font-size:1.5rem;">
+            {{ "{:,.0f}".format(perte_dpq.d).replace(",", " ") }}
+          </div>
+          <div class="wp-kpi-sub">FCFA perdus en <strong>arrêts machine</strong></div>
+          {% if perte_dpq.total > 0 %}
+          <div class="progress mt-2" style="height:6px;">
+            <div class="progress-bar" style="width:{{ (perte_dpq.d / perte_dpq.total * 100)|int }}%;background:var(--wp-terracotta);"></div>
+          </div>
+          <div class="wp-kpi-sub mt-1">{{ (perte_dpq.d / perte_dpq.total * 100)|int }}% des pertes</div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# Perte Performance (cadence) #}
+      <div class="col-md-6 col-xl-3">
+        <div class="wp-kpi h-100">
+          <div class="wp-kpi-label"><i class="bi bi-speedometer2" style="color:var(--wp-ochre);"></i> Levier Performance</div>
+          <div class="wp-kpi-value" style="color:var(--wp-ochre);font-size:1.5rem;">
+            {{ "{:,.0f}".format(perte_dpq.p).replace(",", " ") }}
+          </div>
+          <div class="wp-kpi-sub">FCFA perdus en <strong>cadence</strong> (ralentis)</div>
+          {% if perte_dpq.total > 0 %}
+          <div class="progress mt-2" style="height:6px;">
+            <div class="progress-bar" style="width:{{ (perte_dpq.p / perte_dpq.total * 100)|int }}%;background:var(--wp-ochre);"></div>
+          </div>
+          <div class="wp-kpi-sub mt-1">{{ (perte_dpq.p / perte_dpq.total * 100)|int }}% des pertes</div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# Perte Qualité (déclassé/déchets) #}
+      <div class="col-md-6 col-xl-3">
+        <div class="wp-kpi h-100">
+          <div class="wp-kpi-label"><i class="bi bi-droplet-half" style="color:var(--wp-terracotta);"></i> Levier Qualité</div>
+          <div class="wp-kpi-value" style="color:var(--wp-terracotta);font-size:1.5rem;">
+            {{ "{:,.0f}".format(perte_dpq.q).replace(",", " ") }}
+          </div>
+          <div class="wp-kpi-sub">FCFA perdus en <strong>déclassé + déchets</strong></div>
+          {% if perte_dpq.total > 0 %}
+          <div class="progress mt-2" style="height:6px;">
+            <div class="progress-bar" style="width:{{ (perte_dpq.q / perte_dpq.total * 100)|int }}%;background:var(--wp-terracotta);"></div>
+          </div>
+          <div class="wp-kpi-sub mt-1">{{ (perte_dpq.q / perte_dpq.total * 100)|int }}% des pertes</div>
+          {% endif %}
+        </div>
+      </div>
+
     </div>
 
-    <!-- Tendance TRS sur 6 mois -->
-    <div class="col-md-7">
-        <div class="card shadow-sm">
-            <div class="card-header">Tendance TRS — 6 derniers mois</div>
-            <div class="card-body">
-                <canvas id="chartTendance" height="150"></canvas>
-            </div>
+    <div class="d-flex flex-wrap gap-4 mt-3 pt-3" style="border-top:1px solid var(--wp-line);">
+      <div>
+        <span class="wp-kpi-label">Total pertes chiffrées</span>
+        <div style="font-weight:800;color:var(--wp-terracotta);font-size:1.05rem;">
+          {{ "{:,.0f}".format(perte_dpq.total).replace(",", " ") }} FCFA
         </div>
+      </div>
+      <div>
+        <span class="wp-kpi-label">Manque à gagner estimé</span>
+        <div style="font-weight:800;color:var(--wp-terracotta);font-size:1.05rem;">
+          {{ "{:,.0f}".format(manque_periode.manque_a_gagner_estime).replace(",", " ") }} FCFA
+        </div>
+      </div>
+      <div style="flex:1;min-width:220px;">
+        <span class="wp-kpi-label">Lecture Direction</span>
+        <div style="font-size:.8rem;color:var(--wp-muted);">
+          Le levier le plus coûteux indique où un investissement rapporte le plus.
+          Cliquer « Analyse détaillée » pour voir la répartition par machine et par essence.
+        </div>
+      </div>
     </div>
+  </div>
 </div>
+{% endif %}
+
+{# ── Ligne 2 : rendement par essence + TRS 12 mois ── #}
+<div class="row g-3 mb-4">
+  {% if rendement_par_essence %}
+  <div class="col-md-4">
+    <div class="wp-card h-100">
+      <div class="wp-card-header"><i class="bi bi-tree"></i> Rendement par essence</div>
+      <table class="wp-table">
+        <thead><tr><th>Essence</th><th class="text-end">Rdt.</th><th></th></tr></thead>
+        <tbody>
+          {% for e in rendement_par_essence %}
+          {% set col = 'var(--wp-leaf)' if e.couleur == 'success' else ('var(--wp-ochre)' if e.couleur == 'warning' else 'var(--wp-terracotta)') %}
+          <tr>
+            <td><span class="wp-essence"><span class="wp-essence-mark"><i class="bi bi-tree"></i></span>{{ e.essence }}</span></td>
+            <td class="text-end" style="font-weight:700;color:{{ col }};">{{ e.rendement }}%</td>
+            <td style="width:90px;">
+              <div class="progress" style="height:6px;">
+                <div class="progress-bar" style="width:{{ [e.rendement, 100]|min }}%;background:{{ col }};"></div>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="col-md-{{ '8' if rendement_par_essence else '12' }}">
+    <div class="wp-card h-100">
+      <div class="wp-card-header">
+        <i class="bi bi-graph-up"></i> TRS mensuel — 12 derniers mois
+        <span class="wp-pill wp-pill-danger ms-auto">Benchmark 60%</span>
+      </div>
+      <div class="p-4"><canvas id="chartTendance" height="130"></canvas></div>
+    </div>
+  </div>
+</div>
+
+{# ── Pareto top 5 ── #}
+<div class="wp-card">
+  <div class="wp-card-header">
+    <i class="bi bi-bar-chart-steps"></i> Top 5 causes d'arrêt (Pareto)
+    <span class="wp-pill wp-pill-warning ms-auto">Gras = 80% du temps perdu</span>
+  </div>
+  {% if pareto %}
+  <div class="row g-0">
+    <div class="col-md-6" style="border-right:1px solid var(--wp-line);">
+      <div class="p-4"><canvas id="chartPareto" height="200"></canvas></div>
+    </div>
+    <div class="col-md-6">
+      <table class="wp-table">
+        <thead>
+          <tr>
+            <th>#</th><th>Cause</th><th>Durée</th><th>Inc.</th><th>%</th><th>Cum.</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in pareto %}
+          {% set vital = c.pct_cumule <= 80 %}
+          <tr {% if not vital %}style="opacity:.6;"{% endif %}>
+            <td>
+              <span class="wp-pill {% if loop.index == 1 %}wp-pill-danger{% elif loop.index == 2 %}wp-pill-warning{% else %}wp-pill-neutral{% endif %}">
+                {{ loop.index }}
+              </span>
+            </td>
+            <td>
+              <div style="{% if vital %}font-weight:700;{% endif %}font-size:.82rem;">{{ c.cause }}</div>
+              <span class="wp-pill wp-pill-neutral" style="font-size:.6rem;">{{ c.categorie }}</span>
+            </td>
+            <td class="wp-mono">{{ c.duree }} min</td>
+            <td class="wp-mono">{{ c.count }}</td>
+            <td style="color:var(--wp-terracotta);font-weight:700;">{{ c.pct }}%</td>
+            <td><span class="wp-pill {% if vital %}wp-pill-danger{% else %}wp-pill-neutral{% endif %}">{{ c.pct_cumule }}%</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% else %}
+  <div class="p-4 text-center" style="color:var(--wp-muted);">Aucun arrêt enregistré sur cette période.</div>
+  {% endif %}
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
-// Tendance TRS sur 6 mois
-new Chart(document.getElementById('chartTendance'), {
+const tendanceData = {{ tendance | tojson }};
+const paretoData   = {{ pareto  | tojson }};
+
+function couleurCategorie(cat) {
+  if (cat === 'Mécanique')             return '#D87149';
+  if (cat === 'Organisationnelle')     return '#C5973A';
+  if (cat === 'Maintenance planifiée') return '#6FA8B5';
+  if (cat === 'Approvisionnement')     return '#8C6A4A';
+  return '#6B7A6F';
+}
+
+if (paretoData.length) {
+  new Chart(document.getElementById('chartPareto'), {
     type: 'bar',
     data: {
-        labels: {{ tendance | map(attribute='mois') | list | tojson }},
-        datasets: [{
-            label: 'TRS (%)',
-            data:  {{ tendance | map(attribute='trs') | list | tojson }},
-            backgroundColor: function(ctx) {
-                const v = ctx.parsed.y;
-                return v >= 70 ? '#198754' : (v >= 50 ? '#ffc107' : '#dc3545');
-            },
-        }]
+      labels: paretoData.map(c => c.cause.length > 26 ? c.cause.substring(0, 26) + '…' : c.cause),
+      datasets: [{
+        data: paretoData.map(c => c.duree),
+        backgroundColor: paretoData.map(c => couleurCategorie(c.categorie)),
+        borderRadius: 6,
+      }]
     },
     options: {
-        scales: {
-            y: { min: 0, max: 100, ticks: { callback: v => v + '%' } }
-        },
-        plugins: {
-            legend: { display: false },
-            tooltip: { callbacks: { label: ctx => ctx.parsed.y + '%' } }
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const d = paretoData[ctx.dataIndex];
+              return [ctx.parsed.x + ' min — ' + d.count + ' incident(s)', d.pct + '% · cumul ' + d.pct_cumule + '%'];
+            }
+          }
         }
+      },
+      scales: { x: { ticks: { callback: v => v + ' min' } } }
     }
+  });
+}
+
+new Chart(document.getElementById('chartTendance'), {
+  type: 'bar',
+  data: {
+    labels: tendanceData.map(t => t.mois),
+    datasets: [
+      {
+        label: 'TRS (%)',
+        data: tendanceData.map(t => t.trs),
+        backgroundColor: tendanceData.map(t =>
+          t.trs >= 70 ? '#3F8A5C' : (t.trs >= 50 ? '#C5973A' : '#D87149')
+        ),
+        borderRadius: 6,
+        order: 2,
+      },
+      {
+        label: 'Benchmark 60 %',
+        type: 'line',
+        data: tendanceData.map(() => 60),
+        borderColor: '#D87149',
+        borderWidth: 2,
+        borderDash: [6, 4],
+        pointRadius: 0,
+        fill: false,
+        order: 1,
+      }
+    ]
+  },
+  options: {
+    scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' } } },
+    plugins: {
+      legend: { labels: { filter: item => item.text === 'Benchmark 60 %' } },
+      tooltip: {
+        filter: item => item.dataset.label !== 'Benchmark 60 %',
+        callbacks: { label: ctx => ctx.parsed.y + '%' }
+      }
+    }
+  }
 });
 </script>
 {% endblock %}

@@ -1,0 +1,291 @@
+{% extends 'base.html' %}
+{% block title %}Nouvelle action Chef · wood_pilot{% endblock %}
+{% block page_title %}Nouvelle action Chef{% endblock %}
+
+{% block content %}
+
+{% set guides_action = {
+  'maintenance': {
+    'titre': 'Maintenance',
+    'objectif': 'Réduire les arrêts machine et éviter que la panne revienne.',
+    'exemple': 'Vérifier courroie, roulements, lame ou graissage, puis noter le résultat.'
+  },
+  'approvisionnement': {
+    'titre': 'Approvisionnement bois',
+    'objectif': 'Éviter que la ligne attende le bois ou travaille avec une matière mal préparée.',
+    'exemple': 'Coordonner parc et scierie avant le poste, confirmer les grumes disponibles.'
+  },
+  'qualite': {
+    'titre': 'Qualité / matière',
+    'objectif': 'Comprendre pourquoi le déclassement ou les déchets augmentent.',
+    'exemple': 'Vérifier qualité grumes, réglage coupe, dimensions demandées et tri final.'
+  },
+  'controle_fiche': {
+    'titre': 'Contrôle fiche',
+    'objectif': 'Corriger une donnée terrain avant qu’elle influence les KPI.',
+    'exemple': 'Faire préciser un arrêt long, un horaire incohérent ou un volume douteux.'
+  },
+  'organisation': {
+    'titre': 'Organisation poste',
+    'objectif': 'Réduire l’écart à l’objectif par une meilleure organisation du poste.',
+    'exemple': 'Réorganiser ordre des contrats, effectif, consignes ou passage des essences.'
+  },
+  'formation': {
+    'titre': 'Formation / consigne',
+    'objectif': 'Éviter qu’une erreur de méthode ou de saisie se répète.',
+    'exemple': 'Rappeler la règle de commentaire d’arrêt ou la méthode de classement.'
+  },
+  'surveillance': {
+    'titre': 'Surveillance',
+    'objectif': 'Suivre un signal faible avant de décider une action plus lourde.',
+    'exemple': 'Observer la machine ou l’essence pendant 2 postes et comparer les résultats.'
+  },
+  'autre': {
+    'titre': 'Autre',
+    'objectif': 'Formaliser une décision simple qui ne rentre pas dans les catégories précédentes.',
+    'exemple': 'Décrire clairement ce qui doit être fait, par qui, et à quelle date.'
+  }
+} %}
+{% set guide = guides_action.get(action.type_action, guides_action.get('autre')) %}
+
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('dashboard.actions_chef') }}"
+     class="wp-icon-btn" style="text-decoration:none;" aria-label="Retour">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <div class="wp-section-title mb-1">
+      <i class="bi bi-check2-square"></i> Créer une action
+    </div>
+    <div style="font-size:.84rem;color:var(--wp-muted);">
+      Une décision simple, un responsable, un délai et un statut.
+    </div>
+  </div>
+</div>
+
+<div class="row g-4">
+  <div class="col-lg-8">
+    <form method="POST" action="{{ url_for('dashboard.nouvelle_action_chef') }}" class="wp-card">
+      {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+      <input type="hidden" name="origine_type" value="{{ action.origine_type }}">
+      <input type="hidden" name="origine_label" value="{{ action.origine_label or '' }}">
+      <input type="hidden" name="origine_url" value="{{ action.origine_url or '' }}">
+      <input type="hidden" name="equipe_id" value="{{ action.equipe_id or '' }}">
+      <input type="hidden" name="probleme_id" value="{{ action.probleme_id or '' }}">
+      <input type="hidden" name="machine" value="{{ action.machine or '' }}">
+
+      <div class="wp-card-header">
+        <i class="bi bi-pencil-square"></i> Décision du chef
+      </div>
+      <div class="p-3">
+        {% if action.origine_label %}
+        <div class="mb-3" style="border-left:4px solid var(--wp-sky);background:#f7fbff;padding:.9rem;border-radius:8px;">
+          <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+            <div>
+              <div style="font-size:.72rem;color:var(--wp-muted);font-weight:900;text-transform:uppercase;">
+                Origine de l'action · {{ origines.get(action.origine_type, action.origine_type) }}
+              </div>
+              <div style="font-weight:900;color:var(--wp-ink);">{{ action.origine_label }}</div>
+              <div style="font-size:.78rem;color:var(--wp-muted);margin-top:.25rem;">
+                Cette action doit répondre à ce signal précis, pas à un problème général.
+              </div>
+            </div>
+            {% if action.origine_url %}
+            <a href="{{ action.origine_url }}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-box-arrow-up-right"></i> Ouvrir la source
+            </a>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="mb-3" id="guideAction"
+             style="border:1px solid #e6e0d5;background:#fffaf0;padding:.9rem;border-radius:8px;">
+          <div style="font-size:.72rem;color:var(--wp-muted);font-weight:900;text-transform:uppercase;">
+            Aide décision
+          </div>
+          <div style="font-weight:900;color:var(--wp-ink);" data-guide-title>{{ guide.titre }}</div>
+          <div style="font-size:.82rem;color:var(--wp-muted);line-height:1.4;margin-top:.25rem;" data-guide-objectif>
+            {{ guide.objectif }}
+          </div>
+          <div style="font-size:.78rem;color:var(--wp-ink);line-height:1.4;margin-top:.45rem;" data-guide-exemple>
+            Exemple : {{ guide.exemple }}
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Décision à suivre</label>
+          <input type="text" name="titre" class="form-control" required
+                 value="{{ action.titre }}"
+                 placeholder="Exemple : Vérifier la Bicoupe après arrêts répétés">
+          <div class="form-text" style="font-size:.75rem;">
+            Formulez une décision courte : on doit comprendre l'action dès le titre.
+          </div>
+        </div>
+
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Nature de l'action</label>
+            <select name="type_action" class="form-select" id="typeAction">
+              {% for code, label in types_action %}
+              <option value="{{ code }}" {% if action.type_action == code %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Statut initial</label>
+            <select name="statut" class="form-select" id="statutAction">
+              {% for code, meta in statuts.items() %}
+              <option value="{{ code }}" {% if action.statut == code %}selected{% endif %}>{{ meta[0] }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <div class="mt-3">
+          <label class="form-label">Description concrète</label>
+          <textarea name="description" class="form-control" rows="4" required
+                    placeholder="Exemple : Appeler maintenance, contrôler courroie et roulements, puis noter le résultat avant le prochain poste.">{{ action.description }}</textarea>
+          <div class="form-text" style="font-size:.75rem;">
+            Décrivez ce qui doit être fait, le résultat attendu et ce qu'il faudra vérifier ensuite.
+          </div>
+        </div>
+
+        <div class="row g-3 mt-1">
+          <div class="col-md-6">
+            <label class="form-label">Responsable</label>
+            <input type="text" name="responsable" class="form-control" required
+                   value="{{ action.responsable }}"
+                   list="responsables-suggeres"
+                   placeholder="Maintenance, Chef parc, Chef équipe...">
+            <div class="form-text" style="font-size:.75rem;">
+              Texte libre pour rester réaliste terrain : personne, équipe ou service.
+            </div>
+            <datalist id="responsables-suggeres">
+              {% for responsable in responsables_suggeres|default([]) %}
+              <option value="{{ responsable }}">
+              {% endfor %}
+            </datalist>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Délai / date de suivi</label>
+            <input type="date" name="echeance" class="form-control"
+                   id="echeanceAction"
+                   value="{{ action.echeance }}">
+            <div class="d-flex gap-2 flex-wrap mt-2">
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-delai-jours="0">Aujourd'hui</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-delai-jours="1">Demain</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-delai-jours="3">Dans 3 jours</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-delai-jours="7">Dans 7 jours</button>
+              <button type="button" class="btn btn-sm btn-outline-secondary" data-delai-clear>Sans délai</button>
+            </div>
+            <div class="form-text" style="font-size:.75rem;">
+              Si le délai est dépassé, l'action apparaîtra dans les alertes du chef.
+            </div>
+          </div>
+        </div>
+
+        <div class="mt-3" id="motifSansAction" style="display:{% if action.statut == 'classe_sans_action' %}block{% else %}none{% endif %};">
+          <label class="form-label">Motif du classement sans action</label>
+          <textarea name="motif_classe_sans_action" class="form-control" rows="2"
+                    placeholder="Exemple : écart faible, situation déjà connue, pièce déjà commandée.">{{ action.motif_classe_sans_action }}</textarea>
+        </div>
+
+        <div class="mt-3" id="resultatAction" style="display:{% if action.statut == 'fait' %}block{% else %}none{% endif %};">
+          <label class="form-label">Résultat obtenu</label>
+          <textarea name="note_resultat" class="form-control" rows="2"
+                    placeholder="Exemple : courroie retendue, essai concluant, surveiller pendant 7 jours.">{{ action.note_resultat }}</textarea>
+          <div class="form-text" style="font-size:.75rem;">
+            Obligatoire uniquement si l'action est créée directement avec le statut `Fait`.
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 mt-4">
+          <a href="{{ url_for('dashboard.actions_chef') }}" class="btn btn-outline-secondary">Annuler</a>
+          <button class="btn btn-primary">
+            <i class="bi bi-check2-square"></i> Créer l'action
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="wp-card mb-3">
+      <div class="wp-card-header">
+        <i class="bi bi-lightbulb"></i> Exemples utiles
+      </div>
+      <div class="p-3 d-grid gap-3" style="font-size:.84rem;color:var(--wp-muted);">
+        <div>
+          <strong style="color:var(--wp-ink);">Machine</strong><br>
+          Bicoupe arrêtée 3 fois : contrôler courroie et roulements avant vendredi.
+        </div>
+        <div>
+          <strong style="color:var(--wp-ink);">Approvisionnement</strong><br>
+          Manque de bois : synchroniser parc et ligne avant le poste matin.
+        </div>
+        <div>
+          <strong style="color:var(--wp-ink);">Qualité</strong><br>
+          Déclassé Ayous élevé : vérifier réglage coupe et qualité grumes.
+        </div>
+        <div>
+          <strong style="color:var(--wp-ink);">Fiche</strong><br>
+          Arrêt long sans commentaire : rappeler la règle de commentaire terrain.
+        </div>
+      </div>
+    </div>
+
+    <div class="wp-card" style="border-left:4px solid var(--wp-leaf);">
+      <div class="p-3" style="font-size:.84rem;color:var(--wp-muted);line-height:1.45;">
+        <strong style="color:var(--wp-ink);">Choix V1 :</strong>
+        le responsable reste en texte libre. C'est plus réaliste au début, car la personne responsable n'a pas toujours un compte dans l'application.
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const guidesAction = {{ guides_action|tojson }};
+const typeAction = document.getElementById('typeAction');
+const guideAction = document.getElementById('guideAction');
+if (typeAction && guideAction) {
+  const title = guideAction.querySelector('[data-guide-title]');
+  const objectif = guideAction.querySelector('[data-guide-objectif]');
+  const exemple = guideAction.querySelector('[data-guide-exemple]');
+  typeAction.addEventListener('change', () => {
+    const guide = guidesAction[typeAction.value] || guidesAction.autre;
+    if (title) title.textContent = guide.titre;
+    if (objectif) objectif.textContent = guide.objectif;
+    if (exemple) exemple.textContent = `Exemple : ${guide.exemple}`;
+  });
+}
+
+const statutAction = document.getElementById('statutAction');
+const motifSansAction = document.getElementById('motifSansAction');
+const resultatAction = document.getElementById('resultatAction');
+if (statutAction && motifSansAction && resultatAction) {
+  statutAction.addEventListener('change', () => {
+    motifSansAction.style.display = statutAction.value === 'classe_sans_action' ? 'block' : 'none';
+    resultatAction.style.display = statutAction.value === 'fait' ? 'block' : 'none';
+  });
+}
+
+const echeanceAction = document.getElementById('echeanceAction');
+if (echeanceAction) {
+  document.querySelectorAll('[data-delai-jours]').forEach((bouton) => {
+    bouton.addEventListener('click', () => {
+      const jours = Number.parseInt(bouton.dataset.delaiJours, 10) || 0;
+      const cible = new Date();
+      cible.setDate(cible.getDate() + jours);
+      echeanceAction.value = cible.toISOString().slice(0, 10);
+    });
+  });
+  document.querySelectorAll('[data-delai-clear]').forEach((bouton) => {
+    bouton.addEventListener('click', () => {
+      echeanceAction.value = '';
+    });
+  });
+}
+</script>
+
+{% endblock %}

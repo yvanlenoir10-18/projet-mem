@@ -1,0 +1,282 @@
+{% extends 'base.html' %}
+{% block title %}Machines & Arrêts · wood_pilot{% endblock %}
+{% block page_title %}Machines & Arrêts{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <div class="wp-section-title mb-1">
+      <i class="bi bi-tools"></i> Machines & Arrêts
+    </div>
+    <div style="font-size:.84rem;color:var(--wp-muted);">
+      Diagnostic chef : quelles machines bloquent la production, quelles causes reviennent, quelles fiches ouvrir.
+    </div>
+  </div>
+  <a href="{{ url_for('analyse.arrets', jours=jours) }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-bar-chart-steps"></i> Pareto détaillé
+  </a>
+</div>
+
+<form method="GET" action="{{ url_for('dashboard.machines_chef') }}" class="wp-card mb-4">
+  <div class="p-3">
+    <div class="row g-3 align-items-end">
+      <div class="col-6 col-md-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Période</label>
+        <select name="jours" class="form-select">
+          <option value="7" {% if jours == 7 %}selected{% endif %}>7 derniers jours</option>
+          <option value="30" {% if jours == 30 %}selected{% endif %}>30 derniers jours</option>
+          <option value="90" {% if jours == 90 %}selected{% endif %}>90 derniers jours</option>
+          <option value="0" {% if jours == 0 %}selected{% endif %}>Toutes les dates</option>
+        </select>
+      </div>
+      <div class="col-6 col-md-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Lecture</label>
+        <select name="mode" class="form-select">
+          <option value="officiel" {% if mode == 'officiel' %}selected{% endif %}>Officiel : validées seulement</option>
+          <option value="temps_reel" {% if mode == 'temps_reel' %}selected{% endif %}>Temps réel : inclure chez le chef</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Machine</label>
+        <select name="machine" class="form-select">
+          <option value="">Toutes les machines</option>
+          {% for m in machines_options %}
+          <option value="{{ m }}" {% if machine == m %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-3 d-flex gap-2">
+        <button class="btn btn-primary flex-fill">
+          <i class="bi bi-funnel"></i> Filtrer
+        </button>
+        <a href="{{ url_for('dashboard.machines_chef') }}" class="btn btn-outline-secondary">
+          Réinitialiser
+        </a>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Durée arrêts</div>
+      <div class="wp-kpi-value" style="color:var(--wp-terracotta);">{{ synthese.total_duree_fmt }}</div>
+      <div class="wp-kpi-sub">{{ label_periode }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Nombre d'arrêts</div>
+      <div class="wp-kpi-value">{{ synthese.total_arrets }}</div>
+      <div class="wp-kpi-sub">{{ synthese.machines_touchees }} machine{{ 's' if synthese.machines_touchees > 1 }} touchée{{ 's' if synthese.machines_touchees > 1 }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Machine prioritaire</div>
+      {% if synthese.machine_top %}
+      <div class="wp-kpi-value" style="font-size:1.35rem;">{{ synthese.machine_top.machine }}</div>
+      <div class="wp-kpi-sub">{{ synthese.machine_top.duree_fmt }} · {{ synthese.machine_top.count }} arrêt{{ 's' if synthese.machine_top.count > 1 }}</div>
+      {% else %}
+      <div class="wp-kpi-value">—</div>
+      <div class="wp-kpi-sub">Aucun arrêt</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Arrêts longs</div>
+      <div class="wp-kpi-value" style="color:var(--wp-ochre);">{{ synthese.arrets_longs }}</div>
+      <div class="wp-kpi-sub">45 min et plus</div>
+    </div>
+  </div>
+</div>
+
+{% if recurrences %}
+<div class="wp-card mb-4" style="border-left:4px solid var(--wp-ochre);">
+  <div class="wp-card-header">
+    <i class="bi bi-arrow-repeat" style="color:var(--wp-ochre);"></i>
+    Récurrences à surveiller
+  </div>
+  <div class="p-3 d-grid gap-2">
+    {% for r in recurrences %}
+    <a href="{{ r.href }}"
+       style="text-decoration:none;color:inherit;border:1px solid {% if r.niveau == 'danger' %}rgba(216,113,73,.35){% else %}rgba(197,151,58,.35){% endif %};border-radius:8px;padding:.8rem;background:#fff;">
+      <div style="font-weight:900;color:{% if r.niveau == 'danger' %}var(--wp-terracotta){% else %}var(--wp-ochre){% endif %};">
+        <i class="bi {% if r.niveau == 'danger' %}bi-exclamation-octagon{% else %}bi-exclamation-triangle{% endif %}"></i>
+        {{ r.titre }}
+      </div>
+      <div style="font-size:.8rem;color:var(--wp-muted);margin-top:.25rem;">{{ r.detail }}</div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-gear-wide-connected"></i>
+    Machines à problème
+    <span class="ms-auto" style="font-size:.74rem;color:var(--wp-muted);font-weight:500;">
+      Statut calculé sur durée et fréquence
+    </span>
+  </div>
+  <div class="table-responsive">
+    <table class="wp-table align-middle">
+      <thead>
+        <tr>
+          <th>Machine</th>
+          <th class="text-end">Durée</th>
+          <th class="text-end">Nb</th>
+          <th class="text-end">Moy.</th>
+          <th>Cause dominante</th>
+          <th>Matin / Après-midi</th>
+          <th>Statut</th>
+          <th class="text-end">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in machines %}
+        <tr>
+          <td style="font-weight:900;color:var(--wp-ink);">{{ m.machine }}</td>
+          <td class="text-end" style="font-weight:800;color:var(--wp-terracotta);">{{ m.duree_fmt }}</td>
+          <td class="text-end">{{ m.count }}</td>
+          <td class="text-end">{{ m.moyenne }} min</td>
+          <td>
+            {% if m.cause_principale %}
+            <div style="font-weight:800;color:var(--wp-ink);font-size:.84rem;">{{ m.cause_principale.nom }}</div>
+            <div style="font-size:.72rem;color:var(--wp-muted);">{{ m.cause_principale.duree }} min · {{ m.cause_principale.count }} fois</div>
+            {% else %}
+            <span style="color:var(--wp-muted);">—</span>
+            {% endif %}
+          </td>
+          <td style="font-size:.78rem;color:var(--wp-muted);">
+            M : <strong style="color:var(--wp-ink);">{{ m.matin.duree|default(0) }} min</strong>
+            · AM : <strong style="color:var(--wp-ink);">{{ m.apres_midi.duree|default(0) }} min</strong>
+          </td>
+          <td><span class="badge bg-{{ m.couleur }}">{{ m.statut }}</span></td>
+          <td class="text-end">
+            <div class="btn-group btn-group-sm">
+              <a class="btn btn-outline-primary"
+                 href="{{ url_for('dashboard.machines_chef', jours=jours, mode=mode, machine=m.machine) }}">
+                Détail
+              </a>
+              {% if m.cause_principale %}
+              <a class="btn btn-primary"
+                 href="{{ url_for('problemes.nouveau',
+                                  origine_type='machine',
+                                  origine_label=m.machine ~ ' - ' ~ m.cause_principale.nom,
+                                  contexte_ou=m.machine,
+                                  contexte_combien=m.duree_fmt ~ ' sur ' ~ label_periode,
+                                  pareto_cause=m.cause_principale.nom,
+                                  origine_url=url_for('dashboard.machines_chef', jours=jours, mode=mode, machine=m.machine)) }}">
+                Analyser
+              </a>
+              <a class="btn btn-outline-success"
+                 href="{{ url_for('dashboard.nouvelle_action_chef',
+                                  origine_type='machine',
+                                  machine=m.machine,
+                                  origine_label=m.machine ~ ' - ' ~ m.cause_principale.nom,
+                                  origine_url=url_for('dashboard.machines_chef', jours=jours, mode=mode, machine=m.machine),
+                                  titre='Action sur ' ~ m.machine,
+                                  type_action='maintenance',
+                                  responsable='Maintenance',
+                                  description='Vérifier ' ~ m.machine ~ ' à cause de ' ~ m.cause_principale.nom ~ ' (' ~ m.duree_fmt ~ ' sur ' ~ label_periode ~ ').') }}">
+                Action
+              </a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-lg-5">
+    <div class="wp-card h-100">
+      <div class="wp-card-header">
+        <i class="bi bi-clock-history" style="color:var(--wp-ochre);"></i>
+        Arrêts longs
+      </div>
+      {% if arrets_longs %}
+      <div class="p-3 d-grid gap-2">
+        {% for a in arrets_longs %}
+        <a href="{{ a.href }}"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-radius:8px;padding:.75rem;background:#fff;">
+          <div class="d-flex justify-content-between gap-2">
+            <strong>{{ a.machine }} · {{ a.duree_fmt }}</strong>
+            <span style="font-size:.75rem;color:var(--wp-muted);">{{ a.date_fmt }} · {{ a.shift }}</span>
+          </div>
+          <div style="font-size:.78rem;color:var(--wp-muted);margin-top:.25rem;">
+            {{ a.cause }}{% if a.notes %} · {{ a.notes[:80] }}{% endif %}
+          </div>
+        </a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="p-4 text-center" style="color:var(--wp-muted);">Aucun arrêt long sur cette période.</div>
+      {% endif %}
+    </div>
+  </div>
+  <div class="col-lg-7">
+    <div class="wp-card h-100">
+      <div class="wp-card-header">
+        <i class="bi bi-list-ul"></i>
+        Derniers arrêts analysés
+      </div>
+      {% if arrets %}
+      <div style="max-height:420px;overflow:auto;">
+        <table class="wp-table align-middle">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Machine</th>
+              <th>Horaire</th>
+              <th class="text-end">Durée</th>
+              <th>Cause</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for a in arrets %}
+            <tr>
+              <td>
+                <a href="{{ a.href }}" style="font-weight:800;color:var(--wp-emerald);text-decoration:none;">
+                  {{ a.date_fmt }}
+                </a>
+                <div style="font-size:.7rem;color:var(--wp-muted);">{{ a.shift }}</div>
+              </td>
+              <td style="font-weight:800;">{{ a.machine }}</td>
+              <td style="font-size:.78rem;color:var(--wp-muted);">{{ a.heure_debut }} → {{ a.heure_fin }}</td>
+              <td class="text-end" style="font-weight:800;color:var(--wp-terracotta);">{{ a.duree_fmt }}</td>
+              <td style="font-size:.82rem;">
+                {{ a.cause }}
+                <div style="font-size:.7rem;color:var(--wp-muted);">{{ a.operateur }} · {{ a.essences }}</div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="p-4 text-center" style="color:var(--wp-muted);">Aucun arrêt ne correspond aux filtres.</div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="wp-card p-3" style="background:#fffaf0;border-left:4px solid var(--wp-ochre);">
+  <div style="font-weight:900;color:var(--wp-ink);margin-bottom:.25rem;">
+    Comment lire cette page ?
+  </div>
+  <div style="font-size:.82rem;color:var(--wp-muted);line-height:1.45;">
+    Utilise cette vue pour diagnostiquer avant de décider. Une machine critique signifie qu'elle cumule beaucoup de minutes ou d'occurrences.
+    Les récurrences indiquent les problèmes qui reviennent souvent. Le mode officiel exclut les fiches non validées ; le mode temps réel inclut les fiches déjà chez le chef.
+  </div>
+</div>
+
+{% endblock %}

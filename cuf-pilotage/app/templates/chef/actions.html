@@ -1,0 +1,500 @@
+{% extends 'base.html' %}
+{% block title %}Actions Chef · wood_pilot{% endblock %}
+{% block page_title %}Actions Chef{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <div class="wp-section-title mb-1">
+      <i class="bi bi-check2-square"></i> Plan d'action chef
+    </div>
+    <div style="font-size:.84rem;color:var(--wp-muted);">
+      Décisions opérationnelles à suivre après une fiche, une machine, une analyse ou une alerte.
+    </div>
+  </div>
+  <a href="{{ url_for('dashboard.nouvelle_action_chef') }}" class="btn btn-sm btn-primary">
+    <i class="bi bi-plus-circle"></i> Nouvelle action
+  </a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('dashboard.actions_chef', statut='ouvertes') }}" class="wp-kpi d-block" style="text-decoration:none;color:inherit;">
+      <div class="wp-kpi-label">Ouvertes</div>
+      <div class="wp-kpi-value">{{ stats.ouvertes }}</div>
+      <div class="wp-kpi-sub">à faire + en cours</div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('dashboard.actions_chef', statut='retard') }}" class="wp-kpi d-block" style="text-decoration:none;color:inherit;">
+      <div class="wp-kpi-label">En retard</div>
+      <div class="wp-kpi-value" style="color:var(--wp-terracotta);">{{ stats.retard }}</div>
+      <div class="wp-kpi-sub">délai dépassé</div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('dashboard.actions_chef', statut='a_faire') }}" class="wp-kpi d-block" style="text-decoration:none;color:inherit;">
+      <div class="wp-kpi-label">À faire</div>
+      <div class="wp-kpi-value" style="color:var(--wp-ochre);">{{ stats.a_faire }}</div>
+      <div class="wp-kpi-sub">pas encore lancées</div>
+    </a>
+  </div>
+  <div class="col-6 col-lg-3">
+    <a href="{{ url_for('dashboard.actions_chef', statut='en_cours') }}" class="wp-kpi d-block" style="text-decoration:none;color:inherit;">
+      <div class="wp-kpi-label">En cours</div>
+      <div class="wp-kpi-value" style="color:var(--wp-sky);">{{ stats.en_cours }}</div>
+      <div class="wp-kpi-sub">suivi opérationnel</div>
+    </a>
+  </div>
+</div>
+
+{% set boucle = stats_boucle|default({}) %}
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-arrow-repeat"></i> Boucle d'amélioration
+    <span class="ms-auto" style="font-size:.74rem;color:var(--wp-muted);font-weight:500;">
+      Effets observés sur les actions machine terminées depuis 30 jours
+    </span>
+  </div>
+  <div class="p-3">
+    <div class="row row-cols-2 row-cols-lg-5 g-2">
+      <div class="col">
+        <a href="{{ url_for('dashboard.actions_chef', statut='ouvertes') }}"
+           class="d-block h-100"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-sky);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">Ouvertes</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-sky);">{{ boucle.ouvertes|default(0) }}</div>
+          <div style="font-size:.72rem;color:var(--wp-muted);">à mener</div>
+        </a>
+      </div>
+      <div class="col">
+        <a href="{{ url_for('dashboard.actions_chef', statut='fait', efficacite='efficaces') }}"
+           class="d-block h-100"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-leaf);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">Efficaces</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-leaf);">{{ boucle.efficaces|default(0) }}</div>
+          <div style="font-size:.72rem;color:var(--wp-muted);">effet visible</div>
+        </a>
+      </div>
+      <div class="col">
+        <a href="{{ url_for('dashboard.actions_chef', statut='fait', efficacite='observation') }}"
+           class="d-block h-100"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-sky);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">À observer</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-sky);">{{ boucle.observation|default(0) }}</div>
+          <div style="font-size:.72rem;color:var(--wp-muted);">recul insuffisant</div>
+        </a>
+      </div>
+      <div class="col">
+        <a href="{{ url_for('dashboard.actions_chef', statut='fait', efficacite='a_surveiller') }}"
+           class="d-block h-100"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-ochre);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">À surveiller</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-ochre);">{{ boucle.a_surveiller|default(0) }}</div>
+          <div style="font-size:.72rem;color:var(--wp-muted);">effet encore faible</div>
+        </a>
+      </div>
+      <div class="col">
+        <a href="{{ url_for('dashboard.actions_chef', statut='fait', efficacite='a_revoir') }}"
+           class="d-block h-100"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-terracotta);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">À revoir</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-terracotta);">{{ boucle.a_revoir|default(0) }}</div>
+          <div style="font-size:.72rem;color:var(--wp-muted);">action insuffisante</div>
+        </a>
+      </div>
+    </div>
+    <div style="font-size:.72rem;color:var(--wp-muted);margin-top:.65rem;">
+      {{ boucle.terminees_machine|default(0) }} action{{ 's' if boucle.terminees_machine|default(0) > 1 }} machine terminée{{ 's' if boucle.terminees_machine|default(0) > 1 }} analysée{{ 's' if boucle.terminees_machine|default(0) > 1 }}.
+    </div>
+  </div>
+</div>
+
+{% set effets_machines = efficacite_par_machine|default([]) %}
+{% if effets_machines %}
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-tools"></i> Effets par machine
+    <span class="ms-auto" style="font-size:.74rem;color:var(--wp-muted);font-weight:500;">
+      Les machines avec des actions à revoir remontent en premier
+    </span>
+  </div>
+  <div class="p-3">
+    <div class="row g-2">
+      {% for item in effets_machines %}
+      <div class="col-12 col-md-6 col-xl-3">
+        <a href="{{ url_for('dashboard.actions_chef', statut='fait', machine=item.machine) }}"
+           class="d-block h-100"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid {% if item.a_revoir %}var(--wp-terracotta){% elif item.a_surveiller %}var(--wp-ochre){% elif item.observation %}var(--wp-sky){% else %}var(--wp-leaf){% endif %};border-radius:8px;padding:.8rem;background:#fff;">
+          <div class="d-flex justify-content-between align-items-center gap-2">
+            <strong style="font-size:.86rem;color:var(--wp-ink);">{{ item.machine }}</strong>
+            <span style="font-size:.7rem;color:var(--wp-muted);">{{ item.terminees }} terminée{{ 's' if item.terminees > 1 }}</span>
+          </div>
+          <div class="d-flex gap-2 flex-wrap mt-2" style="font-size:.73rem;color:var(--wp-muted);">
+            {% if item.efficaces %}<span style="color:var(--wp-leaf);font-weight:800;">{{ item.efficaces }} efficace{{ 's' if item.efficaces > 1 }}</span>{% endif %}
+            {% if item.observation %}<span style="color:var(--wp-sky);font-weight:800;">{{ item.observation }} à observer</span>{% endif %}
+            {% if item.a_surveiller %}<span style="color:var(--wp-ochre);font-weight:800;">{{ item.a_surveiller }} à surveiller</span>{% endif %}
+            {% if item.a_revoir %}<span style="color:var(--wp-terracotta);font-weight:800;">{{ item.a_revoir }} à revoir</span>{% endif %}
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if responsables_actions %}
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-people"></i> Par responsable
+    <span class="ms-auto" style="font-size:.74rem;color:var(--wp-muted);font-weight:500;">
+      Qui porte les actions ouvertes ?
+    </span>
+  </div>
+  <div class="p-3">
+    <div class="row g-2">
+      {% for item in responsables_actions %}
+      <div class="col-12 col-md-6 col-xl-3">
+        <a href="{{ url_for('dashboard.actions_chef', statut='ouvertes', responsable=item.responsable) }}"
+           class="d-block"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid {% if item.retard %}var(--wp-terracotta){% elif item.aujourd_hui %}var(--wp-ochre){% else %}var(--wp-sky){% endif %};border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.86rem;font-weight:900;color:var(--wp-ink);">{{ item.responsable }}</div>
+          <div class="d-flex gap-2 flex-wrap mt-2" style="font-size:.75rem;color:var(--wp-muted);">
+            <span>{{ item.ouvertes }} ouverte{{ 's' if item.ouvertes > 1 }}</span>
+            {% if item.retard %}<span style="color:var(--wp-terracotta);font-weight:800;">{{ item.retard }} retard</span>{% endif %}
+            {% if item.aujourd_hui %}<span style="color:var(--wp-ochre);font-weight:800;">{{ item.aujourd_hui }} aujourd'hui</span>{% endif %}
+            {% if item.en_cours %}<span>{{ item.en_cours }} en cours</span>{% endif %}
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if machines_actions %}
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-gear-wide-connected"></i> Par machine
+    <span class="ms-auto" style="font-size:.74rem;color:var(--wp-muted);font-weight:500;">
+      Où faut-il concentrer le suivi ?
+    </span>
+  </div>
+  <div class="p-3">
+    <div class="row g-2">
+      {% for item in machines_actions %}
+      <div class="col-12 col-md-6 col-xl-3">
+        <a href="{{ url_for('dashboard.actions_chef', statut='ouvertes', machine=item.machine) }}"
+           class="d-block"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid {% if item.retard %}var(--wp-terracotta){% elif item.aujourd_hui %}var(--wp-ochre){% else %}var(--wp-sky){% endif %};border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.86rem;font-weight:900;color:var(--wp-ink);">{{ item.machine }}</div>
+          <div class="d-flex gap-2 flex-wrap mt-2" style="font-size:.75rem;color:var(--wp-muted);">
+            <span>{{ item.ouvertes }} ouverte{{ 's' if item.ouvertes > 1 }}</span>
+            {% if item.retard %}<span style="color:var(--wp-terracotta);font-weight:800;">{{ item.retard }} retard</span>{% endif %}
+            {% if item.aujourd_hui %}<span style="color:var(--wp-ochre);font-weight:800;">{{ item.aujourd_hui }} aujourd'hui</span>{% endif %}
+            {% if item.en_cours %}<span>{{ item.en_cours }} en cours</span>{% endif %}
+          </div>
+        </a>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-calendar-check"></i> À traiter par délai
+    <span class="ms-auto" style="font-size:.74rem;color:var(--wp-muted);font-weight:500;">
+      Lecture rapide du suivi
+    </span>
+  </div>
+  <div class="p-3">
+    <div class="row g-2">
+      <div class="col-6 col-lg-3">
+        <a href="{{ url_for('dashboard.actions_chef', statut='retard') }}"
+           class="d-block"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-terracotta);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">En retard</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-terracotta);">{{ stats.retard }}</div>
+          <div style="font-size:.75rem;color:var(--wp-muted);">à traiter en premier</div>
+        </a>
+      </div>
+      <div class="col-6 col-lg-3">
+        <a href="{{ url_for('dashboard.actions_chef', statut='aujourd_hui') }}"
+           class="d-block"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-ochre);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">Aujourd'hui</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-ochre);">{{ stats.aujourd_hui }}</div>
+          <div style="font-size:.75rem;color:var(--wp-muted);">à vérifier ce jour</div>
+        </a>
+      </div>
+      <div class="col-6 col-lg-3">
+        <a href="{{ url_for('dashboard.actions_chef', statut='bientot') }}"
+           class="d-block"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-sky);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">Sous 3 jours</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-sky);">{{ stats.bientot }}</div>
+          <div style="font-size:.75rem;color:var(--wp-muted);">à anticiper</div>
+        </a>
+      </div>
+      <div class="col-6 col-lg-3">
+        <a href="{{ url_for('dashboard.actions_chef', statut='sans_delai') }}"
+           class="d-block"
+           style="text-decoration:none;color:inherit;border:1px solid #eadfce;border-left:4px solid var(--wp-muted);border-radius:8px;padding:.8rem;background:#fff;">
+          <div style="font-size:.74rem;color:var(--wp-muted);font-weight:800;">Sans délai</div>
+          <div style="font-size:1.35rem;font-weight:900;color:var(--wp-ink);">{{ stats.sans_delai }}</div>
+          <div style="font-size:.75rem;color:var(--wp-muted);">à dater si possible</div>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<form method="GET" action="{{ url_for('dashboard.actions_chef') }}" class="wp-card mb-4">
+  <div class="p-3">
+    <div class="row g-3 align-items-end">
+      <div class="col-6 col-lg-2">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Statut</label>
+        <select name="statut" class="form-select">
+          <option value="ouvertes" {% if filtres.statut == 'ouvertes' %}selected{% endif %}>Ouvertes</option>
+          <option value="retard" {% if filtres.statut == 'retard' %}selected{% endif %}>En retard</option>
+          <option value="aujourd_hui" {% if filtres.statut == 'aujourd_hui' %}selected{% endif %}>Aujourd'hui</option>
+          <option value="bientot" {% if filtres.statut == 'bientot' %}selected{% endif %}>Sous 3 jours</option>
+          <option value="sans_delai" {% if filtres.statut == 'sans_delai' %}selected{% endif %}>Sans délai</option>
+          {% for code, meta in statuts.items() %}
+          <option value="{{ code }}" {% if filtres.statut == code %}selected{% endif %}>{{ meta[0] }}</option>
+          {% endfor %}
+          <option value="tous" {% if filtres.statut == 'tous' %}selected{% endif %}>Toutes</option>
+        </select>
+      </div>
+      <div class="col-6 col-lg-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Responsable</label>
+        <select name="responsable" class="form-select">
+          <option value="">Tous</option>
+          {% for responsable in responsables_connus %}
+          <option value="{{ responsable }}" {% if filtres.responsable == responsable %}selected{% endif %}>{{ responsable }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-lg-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Machine</label>
+        <select name="machine" class="form-select">
+          <option value="">Toutes</option>
+          {% for machine in machines_connues %}
+          <option value="{{ machine }}" {% if filtres.machine == machine %}selected{% endif %}>{{ machine }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-lg-2">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Origine</label>
+        <select name="origine_type" class="form-select">
+          <option value="">Toutes</option>
+          {% for code, label in origines.items() %}
+          <option value="{{ code }}" {% if filtres.origine_type == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-6 col-lg-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Efficacité</label>
+        <select name="efficacite" class="form-select">
+          <option value="">Toutes</option>
+          <option value="efficaces" {% if filtres.efficacite == 'efficaces' %}selected{% endif %}>Efficaces</option>
+          <option value="observation" {% if filtres.efficacite == 'observation' %}selected{% endif %}>À observer</option>
+          <option value="a_surveiller" {% if filtres.efficacite == 'a_surveiller' %}selected{% endif %}>À surveiller</option>
+          <option value="a_revoir" {% if filtres.efficacite == 'a_revoir' %}selected{% endif %}>À revoir</option>
+        </select>
+      </div>
+      <div class="col-12 col-lg-3">
+        <label class="form-label" style="font-weight:800;font-size:.82rem;">Recherche</label>
+        <input type="search" name="q" value="{{ filtres.q }}" class="form-control"
+               placeholder="Machine, responsable, action...">
+      </div>
+      <div class="col-12 col-lg-2 d-flex gap-2">
+        <button class="btn btn-primary flex-fill"><i class="bi bi-funnel"></i> Filtrer</button>
+        <a href="{{ url_for('dashboard.actions_chef') }}" class="btn btn-outline-secondary">Reset</a>
+      </div>
+    </div>
+  </div>
+</form>
+
+{% if actions %}
+<div class="d-grid gap-3">
+  {% for action in actions %}
+  <div class="wp-card" style="border-left:4px solid {% if action.retard %}var(--wp-terracotta){% elif action.statut == 'en_cours' %}var(--wp-sky){% elif action.statut == 'fait' %}var(--wp-leaf){% else %}var(--wp-ochre){% endif %};">
+    <div class="p-3">
+      <div class="d-flex justify-content-between align-items-start flex-wrap gap-3">
+        <div style="min-width:0;flex:1;">
+          <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+            <span class="badge bg-{{ action.statut_couleur }}">{{ action.statut_label }}</span>
+            <span class="badge bg-{{ action.signal_temporel.couleur }}">
+              <i class="bi {{ action.signal_temporel.icon }}"></i> {{ action.signal_temporel.label }}
+            </span>
+            <span class="wp-pill wp-pill-neutral">{{ action.type_label }}</span>
+            {% if action.origine_label %}
+            <span style="font-size:.76rem;color:var(--wp-muted);">
+              Source : {{ action.origine_label }}
+            </span>
+            {% endif %}
+          </div>
+          <h2 style="font-size:1rem;font-weight:900;color:var(--wp-ink);margin:0 0 .35rem;">
+            {{ action.titre }}
+          </h2>
+          <div style="font-size:.84rem;color:var(--wp-muted);line-height:1.45;">
+            {{ action.description }}
+          </div>
+          {% if action.motif_classe_sans_action %}
+          <div style="font-size:.8rem;color:var(--wp-muted);margin-top:.5rem;">
+            <strong>Motif sans action :</strong> {{ action.motif_classe_sans_action }}
+          </div>
+          {% endif %}
+          {% if action.note_resultat %}
+          <div style="font-size:.8rem;color:var(--wp-muted);margin-top:.5rem;">
+            <strong>Résultat obtenu :</strong> {{ action.note_resultat }}
+          </div>
+          {% endif %}
+          {% if action.bilan_efficacite %}
+          <div class="mt-3"
+               style="border:1px solid #eadfce;border-left:4px solid var(--wp-{% if action.bilan_efficacite.couleur == 'success' %}leaf{% elif action.bilan_efficacite.couleur == 'danger' %}terracotta{% elif action.bilan_efficacite.couleur == 'warning' %}ochre{% else %}sky{% endif %});border-radius:8px;padding:.75rem;background:#fff;">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <strong style="font-size:.8rem;color:var(--wp-ink);">
+                <i class="bi {{ action.bilan_efficacite.icon }}"></i>
+                Bilan machine : {{ action.bilan_efficacite.label }}
+              </strong>
+              {% if action.bilan_efficacite.fenetre_jours %}
+              <span style="font-size:.72rem;color:var(--wp-muted);">
+                sur {{ action.bilan_efficacite.fenetre_jours }} jour{{ 's' if action.bilan_efficacite.fenetre_jours > 1 }} avant / après
+              </span>
+              {% endif %}
+            </div>
+            <div style="font-size:.76rem;color:var(--wp-muted);margin-top:.3rem;">
+              {{ action.bilan_efficacite.detail }}
+            </div>
+            {% if action.bilan_efficacite.avant and action.bilan_efficacite.apres %}
+            <div class="d-flex gap-3 flex-wrap mt-2" style="font-size:.75rem;color:var(--wp-muted);">
+              <span>Avant : <strong style="color:var(--wp-ink);">{{ action.bilan_efficacite.avant.minutes_fmt }}</strong> · {{ action.bilan_efficacite.avant.count }} arrêt{{ 's' if action.bilan_efficacite.avant.count > 1 }}</span>
+              <span>Après : <strong style="color:var(--wp-ink);">{{ action.bilan_efficacite.apres.minutes_fmt }}</strong> · {{ action.bilan_efficacite.apres.count }} arrêt{{ 's' if action.bilan_efficacite.apres.count > 1 }}</span>
+            </div>
+            {% endif %}
+            <div style="font-size:.7rem;color:var(--wp-muted);margin-top:.35rem;">
+              Comparaison basée sur les fiches validées de {{ action.machine }}.
+            </div>
+          </div>
+          {% endif %}
+          <div class="d-flex gap-3 flex-wrap mt-3" style="font-size:.78rem;color:var(--wp-muted);">
+            <span><i class="bi bi-person"></i> Responsable : <strong style="color:var(--wp-ink);">{{ action.responsable }}</strong></span>
+            <span><i class="bi bi-calendar-event"></i> Délai : <strong style="color:var(--wp-ink);">{{ action.echeance_fmt }}</strong></span>
+            <span><i class="bi {{ action.signal_temporel.icon }}"></i> <strong style="color:var(--wp-ink);">{{ action.signal_temporel.detail }}</strong></span>
+            <span><i class="bi bi-person-check"></i> Créée par : {{ action.cree_par }}</span>
+            {% if action.machine %}<span><i class="bi bi-tools"></i> {{ action.machine }}</span>{% endif %}
+          </div>
+          {% if action.evenements %}
+          <details class="mt-3">
+            <summary style="font-size:.78rem;font-weight:800;color:var(--wp-ink);cursor:pointer;">
+              <i class="bi bi-clock-history"></i> Historique de l'action
+            </summary>
+            <div class="mt-2 d-grid gap-2">
+              {% for evenement in action.evenements %}
+              <div style="border-left:3px solid var(--wp-sky);padding-left:.65rem;font-size:.76rem;color:var(--wp-muted);">
+                <strong style="color:var(--wp-ink);">{{ evenement.titre }}</strong>
+                <span> · {{ evenement.auteur }} · {{ evenement.date_fmt }}</span>
+                {% if evenement.note %}
+                <div style="margin-top:.12rem;">{{ evenement.note }}</div>
+                {% endif %}
+              </div>
+              {% endfor %}
+            </div>
+          </details>
+          {% endif %}
+        </div>
+        <div class="d-flex flex-column gap-2" style="min-width:220px;">
+          {% if action.origine_url %}
+          <a href="{{ action.origine_url }}" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-box-arrow-up-right"></i> Ouvrir la source
+          </a>
+          {% endif %}
+          {% if action.statut in ['a_faire', 'en_cours'] %}
+          <div class="d-grid gap-2">
+            {% if action.statut == 'a_faire' %}
+            <form method="POST" action="{{ url_for('dashboard.changer_statut_action_chef', action_id=action.id) }}">
+              {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+              <input type="hidden" name="statut" value="en_cours">
+              <button class="btn btn-sm btn-outline-primary w-100">
+                <i class="bi bi-play-circle"></i> Démarrer
+              </button>
+            </form>
+            {% endif %}
+            <form method="POST"
+                  action="{{ url_for('dashboard.changer_statut_action_chef', action_id=action.id) }}"
+                  onsubmit="return demanderResultatAction(this);">
+              {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+              <input type="hidden" name="statut" value="fait">
+              <input type="hidden" name="note_resultat" value="">
+              <button class="btn btn-sm btn-success w-100">
+                <i class="bi bi-check2-circle"></i> Marquer fait
+              </button>
+            </form>
+          </div>
+          {% endif %}
+          <form method="POST" action="{{ url_for('dashboard.changer_statut_action_chef', action_id=action.id) }}">
+            {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+            <label class="form-label" style="font-size:.76rem;font-weight:800;">Statut avancé</label>
+            <select name="statut" class="form-select form-select-sm mb-2" onchange="afficherDetailsStatutAction(this.form, this.value);">
+              {% for code, meta in statuts.items() %}
+              <option value="{{ code }}" {% if action.statut == code %}selected{% endif %}>{{ meta[0] }}</option>
+              {% endfor %}
+            </select>
+            <textarea name="motif_classe_sans_action"
+                      class="form-control form-control-sm motif-action mb-2"
+                      rows="2"
+                      style="display:{% if action.statut == 'classe_sans_action' %}block{% else %}none{% endif %};"
+                      placeholder="Motif obligatoire si classé sans action">{{ action.motif_classe_sans_action or '' }}</textarea>
+            <textarea name="note_resultat"
+                      class="form-control form-control-sm resultat-action mb-2"
+                      rows="2"
+                      style="display:{% if action.statut == 'fait' %}block{% else %}none{% endif %};"
+                      placeholder="Résultat obtenu obligatoire si fait">{{ action.note_resultat or '' }}</textarea>
+            <button class="btn btn-sm btn-primary w-100">Mettre à jour</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="wp-card p-4 text-center">
+  <i class="bi bi-check2-circle fs-2 d-block mb-2" style="color:var(--wp-muted);"></i>
+  <div style="font-weight:800;color:var(--wp-ink);">Aucune action dans cette vue.</div>
+  <div style="font-size:.84rem;color:var(--wp-muted);margin-top:.3rem;">
+    Créez une action quand un problème exige un suivi : maintenance, bois, qualité, formation ou contrôle.
+  </div>
+  <a href="{{ url_for('dashboard.nouvelle_action_chef') }}" class="btn btn-primary mt-3">
+    Créer une action
+  </a>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+function demanderResultatAction(formulaire) {
+  const resultat = window.prompt('Résultat obtenu (minimum 5 caractères) :');
+  if (!resultat || resultat.trim().length < 5) {
+    window.alert('Ajoutez une courte note de résultat avant de clôturer cette action.');
+    return false;
+  }
+  formulaire.querySelector('[name="note_resultat"]').value = resultat.trim();
+  return true;
+}
+
+function afficherDetailsStatutAction(formulaire, statut) {
+  formulaire.querySelector('.motif-action').style.display = statut === 'classe_sans_action' ? 'block' : 'none';
+  formulaire.querySelector('.resultat-action').style.display = statut === 'fait' ? 'block' : 'none';
+}
+</script>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% block title %}Le Point — Chef Scierie V2{% endblock %}
+{% block page_title %}Le Point · Chaîne 4{% endblock %}
+
+{% block content %}
+{# ── Chef Scierie V2 — Vue 1 « LE POINT » ──────────────────────────────────────
+   Ordre validé : ce qui ne va pas d'abord → causes/conséquences à la demande.
+   Route parallèle : /chef reste le fallback intact.
+#}
+
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+  <div class="btn-group">
+    <a href="?jours=7"  class="btn btn-sm btn-outline-primary {% if jours==7 %}active{% endif %}">7 j</a>
+    <a href="?jours=30" class="btn btn-sm btn-outline-primary {% if jours==30 %}active{% endif %}">30 j</a>
+  </div>
+  <a href="{{ url_for('dashboard.vue_chef') }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-grid-1x2"></i> Vue détaillée
+  </a>
+</div>
+
+{% if not statut_global %}
+  <div class="wp-card" style="padding:28px;text-align:center;color:var(--wp-muted);">
+    <i class="bi bi-hourglass-split" style="font-size:1.6rem;"></i>
+    <div style="margin-top:8px;">En attente de saisies sur la période ({{ label_periode }}).</div>
+  </div>
+{% else %}
+
+  {# ── 1. CE QUI NE VA PAS : verdict + TRS + manque ──────────────────────── #}
+  <div class="wp-card" style="padding:22px;border-left:6px solid {{ statut_global.border }};
+                              background:{{ statut_global.bg }};margin-bottom:16px;">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+      <i class="bi {{ statut_global.icon }}" style="font-size:2.2rem;color:{{ statut_global.color }};"></i>
+      <div style="flex:1;min-width:200px;">
+        <div style="font-size:1.5rem;font-weight:800;color:{{ statut_global.color }};line-height:1.1;">
+          {{ statut_global.label }}
+        </div>
+        <div style="color:var(--wp-muted);font-size:.9rem;margin-top:2px;">
+          {{ statut_global.detail }}
+        </div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:2rem;font-weight:800;color:{{ statut_global.color }};line-height:1;">
+          {{ trs_moyen }} %
+        </div>
+        <div style="color:var(--wp-muted);font-size:.8rem;">TRS · objectif 60 %</div>
+      </div>
+    </div>
+
+    {% if cascade and cascade.statut == 'perte' %}
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--wp-line);
+                font-size:1.05rem;">
+      Manque à gagner :
+      <strong style="color:{{ statut_global.color }};">
+        {{ "{:,.0f}".format(cascade.manque).replace(",", " ") }} FCFA
+      </strong>
+      <span style="color:var(--wp-muted);font-size:.85rem;">
+        · {{ cascade.nb_postes_deficit }} poste{{ 's' if cascade.nb_postes_deficit > 1 }} en déficit · {{ label_periode }}
+      </span>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ── 2. OÙ AGIR MAINTENANT : 3 priorités ───────────────────────────────── #}
+  <div style="font-weight:700;margin:18px 0 8px;font-size:1.05rem;">
+    <i class="bi bi-list-check"></i> Où agir maintenant ?
+  </div>
+
+  {% if priorites_chef %}
+    {% for prio in priorites_chef %}
+    <div class="wp-card" style="padding:16px;margin-bottom:10px;
+         border-left:4px solid {% if prio.niveau=='danger' %}var(--wp-terracotta){% elif prio.niveau=='warning' %}var(--wp-ochre){% else %}var(--wp-leaf){% endif %};">
+      <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <i class="bi {{ prio.icon }}" style="font-size:1.4rem;color:var(--wp-ink);"></i>
+        <div style="flex:1;min-width:220px;">
+          <div style="font-weight:700;font-size:1.05rem;">{{ loop.index }}. {{ prio.titre }}</div>
+          <div style="color:var(--wp-ink);margin-top:3px;">{{ prio.signal }}</div>
+          <div style="color:var(--wp-muted);font-size:.85rem;margin-top:4px;">{{ prio.decision }}</div>
+        </div>
+        <div class="d-flex flex-column gap-2">
+          <a href="{{ prio.href }}" class="btn btn-sm btn-primary" style="white-space:nowrap;">
+            {{ prio.cta }}
+          </a>
+          {% if prio.action_secondaire %}
+          <a href="{{ prio.action_secondaire.href }}"
+             class="btn btn-sm btn-outline-{{ prio.action_secondaire.couleur }}" style="white-space:nowrap;">
+            <i class="bi {{ prio.action_secondaire.icon }}"></i> {{ prio.action_secondaire.label }}
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  {% else %}
+    <div class="wp-card" style="padding:16px;color:var(--wp-muted);">
+      Aucune priorité urgente détectée sur la période.
+    </div>
+  {% endif %}
+
+  {# ── 3. POURQUOI : cascade révélée à la demande (dévoilement progressif) ── #}
+  <div style="margin:20px 0;">
+    <button class="btn btn-outline-primary w-100" type="button"
+            data-bs-toggle="collapse" data-bs-target="#pourquoi"
+            style="padding:14px;font-size:1.05rem;font-weight:600;">
+      <i class="bi bi-question-circle"></i> Pourquoi ce résultat ?
+    </button>
+  </div>
+
+  <div class="collapse" id="pourquoi">
+    {% include 'chef/_cascade_pertes.html' %}
+  </div>
+
+{% endif %}
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block title %}Cause racine · wood_pilot{% endblock %}
+{% block page_title %}Sélection cause racine{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <div class="wp-section-title mb-1">
+      <i class="bi bi-bullseye"></i> Sélectionner la cause racine
+    </div>
+    <div style="font-size:.84rem;color:var(--wp-muted);">
+      Étape 4 / 4 : choisir une cause crédible et décider quoi faire.
+    </div>
+  </div>
+  <a href="{{ url_for('problemes.ishikawa', probleme_id=probleme.id) }}" class="btn btn-sm btn-outline-secondary">
+    <i class="bi bi-arrow-left"></i> Ishikawa
+  </a>
+</div>
+
+<div class="wp-card mb-4 p-3">
+  <span class="badge bg-{{ solidite.couleur }}">{{ solidite.label }}</span>
+  <span style="font-size:.84rem;color:var(--wp-muted);margin-left:.5rem;">{{ solidite.detail }}</span>
+</div>
+
+<form method="POST" class="wp-card">
+  {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+  <div class="p-4">
+    <div class="mb-4">
+      <label class="form-label">Cause racine retenue</label>
+      <div class="d-grid gap-2">
+        {% for cause in causes %}
+        {% set profondeur = cause.pourquois|selectattr('reponse')|list|length %}
+        <label class="wp-root-option">
+          <input type="radio" name="cause_racine_id" value="{{ cause.id }}"
+                 {% if probleme.cause_racine_selectionnee_id == cause.id %}checked{% endif %}>
+          <div>
+            <div style="font-weight:900;">{{ cause.categorie_6m }} · {{ cause.description }}</div>
+            <div style="font-size:.78rem;color:var(--wp-muted);">
+              {{ profondeur }} pourquoi renseigné{{ 's' if profondeur > 1 }}.
+              {% if profondeur == 0 %}À compléter avant sélection.{% endif %}
+            </div>
+          </div>
+          <a href="{{ url_for('problemes.pourquoi', probleme_id=probleme.id, cause_id=cause.id) }}"
+             class="btn btn-sm btn-outline-primary ms-auto">Creuser</a>
+        </label>
+        {% else %}
+        <div class="alert alert-warning mb-0">Ajoute au moins une cause Ishikawa avant de choisir la racine.</div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label">Statut action</label>
+        <select name="statut_action" class="form-select">
+          {% for code, label in statuts_action.items() %}
+          <option value="{{ code }}" {% if probleme.statut_action == code %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Responsable</label>
+        <input name="responsable_action" class="form-control" maxlength="120"
+               value="{{ probleme.responsable_action or '' }}" placeholder="Ex. Chef maintenance">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Délai</label>
+        <input type="date" name="delai_action" class="form-control"
+               value="{{ probleme.delai_action.isoformat() if probleme.delai_action else '' }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label">Action décidée</label>
+        <textarea name="actions_correctives" class="form-control" rows="3"
+                  placeholder="Ex. Programmer un contrôle hebdomadaire de la courroie Bicoupe.">{{ probleme.actions_correctives or '' }}</textarea>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Motif si classé sans action</label>
+        <textarea name="classe_sans_action_motif" class="form-control" rows="2"
+                  placeholder="Ex. Cas ponctuel lié à une seule grume non représentative.">{{ probleme.classe_sans_action_motif or '' }}</textarea>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 mt-4">
+      <a href="{{ url_for('problemes.ishikawa', probleme_id=probleme.id) }}" class="btn btn-outline-secondary">Retour</a>
+      <button class="btn btn-primary" {% if not causes %}disabled{% endif %}>
+        Générer le rapport A3 <i class="bi bi-arrow-right"></i>
+      </button>
+    </div>
+  </div>
+</form>
+
+{% endblock %}

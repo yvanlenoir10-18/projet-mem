@@ -1,186 +1,943 @@
 {% extends 'base.html' %}
-{% block title %}{% if equipe %}Modifier l'équipe{% else %}Saisie d'une équipe{% endif %}{% endblock %}
+{% block title %}{% if equipe %}Modifier l'équipe{% else %}Saisie · Équipe{% endif %}{% endblock %}
+{% block page_title %}{% if equipe %}Modifier · {{ equipe.date.strftime('%d/%m/%Y') }}{% else %}Nouvelle saisie{% endif %}{% endblock %}
 
 {% block content %}
-<h4 class="mb-4">
-    {% if equipe %}
-    <i class="bi bi-pencil-square text-warning"></i>
-    Modifier l'équipe — {{ equipe.date.strftime('%d/%m/%Y') }} ({{ equipe.numero_equipe }})
-    {% else %}
-    <i class="bi bi-plus-circle text-success"></i>
-    Saisie d'une équipe — Chaîne 4
+
+{# ── Header ── #}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{{ url_for('saisie.historique') }}"
+     class="wp-icon-btn" style="text-decoration:none;" aria-label="Retour">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <h1 style="font-size:1.35rem;font-weight:800;color:var(--wp-ink);margin:0;">
+      {% if equipe %}Modifier l'équipe{% else %}Nouvelle saisie{% endif %}
+    </h1>
+    <p style="color:var(--wp-muted);font-size:.82rem;margin:4px 0 0;">
+      {% if equipe %}
+        {{ equipe.date.strftime('%d/%m/%Y') }} — {{ equipe.numero_equipe }}
+      {% else %}
+        Chaîne 4 · CUF Ebolowa
+      {% endif %}
+    </p>
+  </div>
+</div>
+
+{% if equipe and equipe.statut == 'a_corriger' and equipe.correction_motif %}
+<div class="wp-card mb-3"
+     style="border-left:4px solid var(--wp-ochre);background:#fffaf0;">
+  <div class="wp-card-header" style="color:var(--wp-ochre);">
+    <i class="bi bi-chat-left-text"></i>
+    Message du chef
+    {% if equipe.correction_demandee_par %}
+    <span class="ms-auto" style="font-size:.75rem;color:var(--wp-muted);font-weight:500;">
+      {{ equipe.correction_demandee_par }}
+      {% if equipe.correction_demandee_le %}· {{ equipe.correction_demandee_le.strftime('%d/%m/%Y à %H:%M') }}{% endif %}
+    </span>
     {% endif %}
-</h4>
-
-<form method="POST" action="{{ form_action }}" id="formEquipe">
-    <!-- BLOC 1 : En-tête de l'équipe -->
-    <div class="card mb-3">
-        <div class="card-header bg-dark text-white">
-            <i class="bi bi-calendar3"></i> Informations de l'équipe
-        </div>
-        <div class="card-body row g-3">
-            <div class="col-md-3">
-                <label class="form-label">Date <span class="text-danger">*</span></label>
-                <input type="date" name="date" class="form-control"
-                       value="{{ equipe.date.isoformat() if equipe else today }}" required>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Équipe <span class="text-danger">*</span></label>
-                <select name="numero_equipe" class="form-select" required>
-                    <option value="Matin"     {% if equipe and equipe.numero_equipe == 'Matin' %}selected{% endif %}>Matin</option>
-                    <option value="Apres-midi"{% if equipe and equipe.numero_equipe == 'Apres-midi' %}selected{% endif %}>Après-midi</option>
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="form-label">Effectif présent</label>
-                <input type="number" name="effectif" class="form-control"
-                       value="{{ equipe.effectif if equipe else 10 }}" min="1" max="30">
-            </div>
-        </div>
+  </div>
+  <div style="padding:1rem 1.25rem;color:var(--wp-ink);font-size:.92rem;line-height:1.5;">
+    {{ equipe.correction_motif }}
+    {% if equipe.correction_cible %}
+    <div style="margin-top:.85rem;">
+      <a href="#{{ equipe.correction_cible }}"
+         class="btn btn-sm btn-warning d-inline-flex align-items-center gap-2">
+        <i class="bi bi-arrow-down-circle"></i>
+        Aller à la zone à corriger
+      </a>
     </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 
-    <!-- BLOC 2 : Productions par essence -->
-    <div class="card mb-3">
-        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-boxes"></i> Productions (m³) — une ligne par essence</span>
-            <button type="button" class="btn btn-light btn-sm" onclick="ajouterProduction()">
-                <i class="bi bi-plus"></i> Ajouter une essence
-            </button>
-        </div>
-        <div class="card-body" id="conteneur-productions"></div>
+{% if request.args.get('reprise') == '1' %}
+<div class="wp-card mb-3"
+     style="border-left:4px solid var(--wp-terracotta);background:#fff7ed;">
+  <div class="wp-card-header" style="color:var(--wp-terracotta);">
+    <i class="bi bi-exclamation-triangle"></i>
+    Fiche reprise depuis une ancienne structure
+  </div>
+  <div style="padding:1rem 1.25rem;color:var(--wp-ink);font-size:.92rem;line-height:1.5;">
+    Une nouvelle fiche a été créée pour <strong>aujourd'hui</strong>. Vérifiez la date et le poste avant de saisir.
+    Les essences et créneaux sont repris, mais les volumes, arrêts, commentaires et pièce jointe ne sont pas copiés.
+    <div style="margin-top:.85rem;">
+      <a href="#field-date"
+         class="btn btn-sm btn-warning d-inline-flex align-items-center gap-2">
+        <i class="bi bi-calendar-check"></i>
+        Vérifier la date maintenant
+      </a>
     </div>
+  </div>
+</div>
+{% endif %}
 
-    <!-- BLOC 3 : Arrêts machine -->
-    <div class="card mb-3">
-        <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
-            <span><i class="bi bi-exclamation-triangle"></i> Arrêts machine</span>
-            <button type="button" class="btn btn-light btn-sm" onclick="ajouterArret()">
-                <i class="bi bi-plus"></i> Ajouter un arrêt
-            </button>
-        </div>
-        <div class="card-body" id="conteneur-arrets">
-            <p class="text-muted" id="msg-aucun-arret">
-                <i class="bi bi-check-circle text-success"></i>
-                Aucun arrêt — cliquez "Ajouter un arrêt" si des pannes ont eu lieu.
-            </p>
-        </div>
+<form method="POST" action="{{ form_action }}" id="formEquipe" enctype="multipart/form-data">
+  {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+  <input type="hidden"
+         name="aucun_arret_confirme"
+         id="aucun_arret_confirme"
+         value="{% if equipe and equipe.aucun_arret_confirme %}1{% else %}0{% endif %}">
+
+  <nav class="wp-step-nav mb-3" aria-label="Étapes de saisie">
+    <a href="#bloc-informations" class="wp-step-link">
+      <span class="wp-step-num">1</span>
+      <span><strong>En-tête</strong><small>Date, poste, responsable</small></span>
+    </a>
+    <a href="#bloc-productions" class="wp-step-link">
+      <span class="wp-step-num">2</span>
+      <span><strong>Production</strong><small>Essences et volumes</small></span>
+    </a>
+    <a href="#bloc-arrets" class="wp-step-link">
+      <span class="wp-step-num">3</span>
+      <span><strong>Arrêts</strong><small>Machines et causes</small></span>
+    </a>
+    <a href="#bloc-commentaires" class="wp-step-link">
+      <span class="wp-step-num">4</span>
+      <span><strong>Commentaires / papier</strong><small>Observation et preuve</small></span>
+    </a>
+    <a href="#actions-verification" class="wp-step-link">
+      <span class="wp-step-num">5</span>
+      <span><strong>Vérification</strong><small>Relire avant envoi</small></span>
+    </a>
+  </nav>
+
+  {# ── BLOC 1 : En-tête équipe ── #}
+  <div class="wp-card mb-3" id="bloc-informations">
+    <div class="wp-card-header">
+      <i class="bi bi-calendar3" style="color:var(--wp-emerald);"></i>
+      <span class="wp-step-chip">Étape 1</span>
+      Informations de l'équipe
     </div>
-
-    <!-- Notes -->
-    <div class="mb-3">
-        <label class="form-label">Notes / Observations</label>
-        <textarea name="notes" class="form-control" rows="2"
-                  placeholder="Observations particulières de l'équipe...">{{ equipe.notes if equipe else '' }}</textarea>
+    <div style="padding:20px;">
+      <div class="row g-3">
+        <div class="col-md-2" id="field-date">
+          <label class="form-label">
+            Date <span style="color:var(--wp-terracotta);">*</span>
+          </label>
+          <input type="date" name="date" class="form-control"
+                 value="{{ equipe.date.isoformat() if equipe else today }}" required>
+        </div>
+        <div class="col-md-2" id="field-equipe">
+          <label class="form-label">
+            Équipe <span style="color:var(--wp-terracotta);">*</span>
+          </label>
+          <select name="numero_equipe" class="form-select" required onchange="majHorairesCreneau()">
+            <option value="Matin"
+              {% if (equipe and equipe.numero_equipe == 'Matin') or (not equipe and shift_initial == 'Matin') %}selected{% endif %}>
+              Matin
+            </option>
+            <option value="Apres-midi"
+              {% if (equipe and equipe.numero_equipe == 'Apres-midi') or (not equipe and shift_initial == 'Apres-midi') %}selected{% endif %}>
+              Après-midi
+            </option>
+          </select>
+        </div>
+        <div class="col-md-2" id="field-effectif">
+          <label class="form-label">Effectif présent</label>
+          <input type="number" name="effectif" class="form-control"
+                 value="{{ equipe.effectif if equipe else effectif_defaut }}" min="1" max="30">
+        </div>
+        <div class="col-md-3" id="field-responsable">
+          <label class="form-label">
+            Responsable du poste <span style="color:var(--wp-terracotta);">*</span>
+          </label>
+          <input type="text" name="operateur_nom" class="form-control"
+                 value="{{ equipe.operateur_nom if equipe and equipe.operateur_nom else current_user.nom }}"
+                 placeholder="Nom du chef d'équipe ou responsable terrain" required>
+          <div class="form-text" style="font-size:.74rem;color:var(--wp-muted);">
+            Personne responsable des informations du poste.
+          </div>
+        </div>
+        <div class="col-md-3" id="field-rempli-par">
+          <label class="form-label">
+            Fiche remplie par <span style="color:var(--wp-terracotta);">*</span>
+          </label>
+          <input type="text" name="rempli_par_nom" class="form-control"
+                 value="{{ equipe.rempli_par_nom if equipe and equipe.rempli_par_nom else current_user.nom }}"
+                 placeholder="Nom de la personne qui saisit" required>
+          <div class="form-text" style="font-size:.74rem;color:var(--wp-muted);">
+            À changer si quelqu'un remplit la fiche à la place du responsable.
+          </div>
+        </div>
+      </div>
     </div>
+  </div>
 
-    <div class="d-flex gap-2">
-        <button type="submit" class="btn btn-success btn-lg">
-            <i class="bi bi-save"></i> {% if equipe %}Enregistrer les modifications{% else %}Enregistrer l'équipe{% endif %}
+  {# ── BLOC 2 : Productions ── #}
+  <div class="wp-card mb-3" id="bloc-productions">
+    <div class="wp-card-header" style="justify-content:space-between;">
+      <span style="display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-boxes" style="color:var(--wp-leaf);"></i>
+        <span class="wp-step-chip">Étape 2</span>
+        Production par essence
+      </span>
+      <button type="button"
+              class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+              onclick="ajouterProduction()">
+        <i class="bi bi-plus"></i> Ajouter une essence
+      </button>
+    </div>
+    <div class="wp-production-area">
+      <div class="wp-production-toolbar">
+        <div>
+          <strong>Ajouter un passage</strong>
+          <small>La même essence peut revenir plusieurs fois dans le poste.</small>
+        </div>
+        <div class="wp-production-quick">
+          {% for e in essences %}
+          <button type="button" onclick='ajouterProductionEssence({{ e | tojson }})'>
+            {{ e }}
+          </button>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="wp-production-help">
+        <div>
+          <span class="wp-help-badge success">Conforme</span>
+          <strong>Respecte le contrat ou la dimension attendue.</strong>
+          <small>Exemple : Ayous scié aux dimensions demandées par le client.</small>
+        </div>
+        <div>
+          <span class="wp-help-badge warning">Déclassé</span>
+          <strong>Vendable, mais pas conforme au contrat courant.</strong>
+          <small>Exemple : bonne planche, mais mauvaise dimension pour ce contrat.</small>
+        </div>
+        <div>
+          <span class="wp-help-badge danger">Déchets</span>
+          <strong>Sciure, dosses, chutes ou volume non utile.</strong>
+          <small>Non valorisé dans l'application pour l'instant.</small>
+        </div>
+      </div>
+      <div id="conteneur-productions" class="wp-production-list"></div>
+    </div>
+  </div>
+
+  {# ── BLOC 3 : Arrêts ── #}
+  <div class="wp-card mb-3" id="bloc-arrets">
+    <div class="wp-card-header" style="justify-content:space-between;">
+      <span style="display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-exclamation-triangle" style="color:var(--wp-terracotta);"></i>
+        <span class="wp-step-chip">Étape 3</span>
+        Arrêts machine
+      </span>
+      <div class="d-flex gap-2 flex-wrap">
+        <button type="button"
+                class="btn btn-sm btn-outline-success d-flex align-items-center gap-1"
+                onclick="confirmerAucunArret()">
+          <i class="bi bi-check-circle"></i> Aucun arrêt
         </button>
-        <a href="{{ url_for('saisie.historique') }}" class="btn btn-outline-secondary btn-lg">Annuler</a>
+        <button type="button"
+                class="btn btn-sm btn-outline-primary d-flex align-items-center gap-1"
+                onclick="ajouterArret()">
+          <i class="bi bi-plus"></i> Ajouter un arrêt
+        </button>
+      </div>
     </div>
+    <div style="padding:16px 20px;border-bottom:1px solid var(--wp-line);background:#fffaf0;">
+      <div style="font-weight:800;color:var(--wp-ink);font-size:.86rem;margin-bottom:8px;">
+        Utilisation rapide
+      </div>
+      <div style="font-size:.8rem;color:var(--wp-muted);line-height:1.45;margin-bottom:10px;">
+        Cliquez sur une cause ci-dessous pour créer un arrêt déjà classé, puis renseignez la machine et les heures.
+        La catégorie se remplit automatiquement.
+      </div>
+      <div class="d-flex gap-2 flex-wrap">
+        {% for cause in causes_arret %}
+        <button type="button"
+                class="btn btn-sm btn-outline-secondary"
+                onclick='ajouterArretAvecCause({{ cause.cause | tojson }})'>
+          {{ cause.cause }}
+        </button>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="wp-arret-area" id="conteneur-arrets">
+      <p class="wp-arret-empty" id="msg-aucun-arret">
+        <i class="bi bi-check-circle" style="color:var(--wp-leaf);"></i>
+        Aucun arrêt saisi — confirmez "Aucun arrêt" ou ajoutez un arrêt s'il y en a eu.
+      </p>
+    </div>
+  </div>
+
+  {# ── BLOC 4 : Commentaires et origine papier ── #}
+  <div class="wp-card mb-3" id="bloc-commentaires">
+    <div class="wp-card-header">
+      <i class="bi bi-clipboard-check" style="color:var(--wp-sky);"></i>
+      <span class="wp-step-chip">Étape 4</span>
+      Commentaires / papier
+    </div>
+    <div style="padding:20px;">
+      <div class="mb-3">
+        <label class="form-label">Commentaires pour le chef</label>
+        <textarea name="notes" class="form-control" rows="2"
+                  placeholder="Exemple : bois humide, attente parc, consigne reçue, problème terrain à signaler au chef...">{{ equipe.notes if equipe else '' }}</textarea>
+        <div class="form-text" style="font-size:.76rem;color:var(--wp-muted);">
+          Ce commentaire sera visible au chef production lors de la vérification de la fiche.
+        </div>
+      </div>
+
+      <div class="row g-3 align-items-end" id="bloc-origine">
+        <div class="col-md-4">
+          <label class="form-label">Mode de saisie</label>
+          <select name="mode_saisie" class="form-select">
+            <option value="directe"
+              {% if not equipe or equipe.mode_saisie != 'papier' %}selected{% endif %}>
+              Saisie directe dans l'application
+            </option>
+            <option value="papier"
+              {% if equipe and equipe.mode_saisie == 'papier' %}selected{% endif %}>
+              Ressaisie depuis fiche papier
+            </option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <div class="form-check" style="padding-top:8px;">
+            <input class="form-check-input"
+                   type="checkbox"
+                   id="fiche_papier_signee"
+                   name="fiche_papier_signee"
+                   value="1"
+                   {% if equipe and equipe.fiche_papier_signee %}checked{% endif %}>
+            <label class="form-check-label" for="fiche_papier_signee" style="font-weight:700;color:var(--wp-ink);">
+              Fiche papier signée disponible
+            </label>
+            <div class="form-text" style="font-size:.76rem;color:var(--wp-muted);">
+              À cocher si la saisie vient d'une fiche terrain signée.
+            </div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label">Joindre la fiche signée</label>
+          <input type="file"
+                 name="fiche_papier"
+                 class="form-control"
+                 accept=".pdf,.png,.jpg,.jpeg,.webp">
+          <div class="form-text" style="font-size:.76rem;color:var(--wp-muted);">
+            PDF ou photo : JPG, PNG, WEBP.
+          </div>
+          {% if equipe and equipe.fiche_papier_fichier %}
+          <div style="font-size:.78rem;margin-top:6px;">
+            <i class="bi bi-paperclip" style="color:var(--wp-leaf);"></i>
+            Fichier joint :
+            <a href="{{ url_for('saisie.fiche_papier_jointe', poste_id=equipe.id) }}" target="_blank">
+              {{ equipe.fiche_papier_nom_original or 'fiche papier' }}
+            </a>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="alerte-chevauchement" class="wp-overlap-alert" role="alert" hidden></div>
+
+  <div class="d-flex gap-2 flex-wrap align-items-center" id="actions-verification">
+    <span class="wp-step-chip">Étape 5</span>
+    <button type="submit"
+            name="action_apres"
+            value="historique"
+            class="btn btn-outline-secondary btn-touch d-flex align-items-center gap-2">
+      <i class="bi bi-save"></i>
+      Enregistrer brouillon
+    </button>
+    {% if not equipe or (equipe.statut in ('brouillon', 'a_corriger') and equipe.user_id == current_user.id) %}
+    <button type="submit"
+            name="action_apres"
+            value="verifier"
+            class="btn btn-primary btn-touch d-flex align-items-center gap-2">
+      <i class="bi bi-shield-check"></i>
+      Enregistrer et vérifier
+    </button>
+    {% endif %}
+    <a href="{{ url_for('saisie.historique') }}"
+       class="btn btn-outline-secondary btn-touch">
+      Annuler
+    </a>
+  </div>
+
 </form>
 {% endblock %}
 
 {% block scripts %}
 <script>
-// ── Templates HTML ────────────────────────────────────────────────────────────
-
 const essencesOptions = `
+    <option value="" disabled selected>— Choisir l'essence —</option>
     {% for e in essences %}
     <option value="{{ e }}">{{ e }}</option>
     {% endfor %}
 `;
 
+const causesArret = {{ causes_arret | tojson }};
+const aucunArretInitial = {% if equipe and equipe.aucun_arret_confirme %}true{% else %}false{% endif %};
+const capacitesEssences = {{ capacites_essences | tojson }};
+const horairesCreneaux = {{ horaires_creneaux | tojson }};
+const modeCreation = {% if equipe %}false{% else %}true{% endif %};
+
+function escapeHtml(value) {
+    return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+}
+
+const causeOptions = causesArret
+    .map(c => `<option value="${escapeHtml(c.cause)}">${escapeHtml(c.cause)}</option>`)
+    .join('');
+
 const templateProduction = (index) => `
-<div class="row g-2 mb-2 align-items-end border rounded p-2 bg-light" id="prod-${index}">
-    <div class="col-md-2">
-        <label class="form-label small fw-bold">Essence <span class="text-danger">*</span></label>
-        <select name="prod_essence[]" class="form-select form-select-sm" required>
-            ${essencesOptions}
-        </select>
+<section class="wp-production-card" id="prod-${index}" data-index="${index}">
+    <div class="wp-production-top">
+        <div class="wp-production-title">
+            <span class="wp-production-num">${index + 1}</span>
+            <div>
+                <strong>Passage d'essence</strong>
+                <small class="prod-resume-${index}">À compléter</small>
+            </div>
+        </div>
+        <div class="wp-production-actions">
+            <span class="wp-production-state prod-state-${index}">À compléter</span>
+            <button type="button"
+                    class="wp-production-helper-btn"
+                    onclick="basculerAssistantVolume(${index})"
+                    title="Calculer un volume avec nombre de pièces et dimensions">
+                <i class="bi bi-calculator"></i>
+                Calcul pièces
+            </button>
+            ${index > 0
+                ? `<button type="button"
+                           class="wp-production-delete"
+                           onclick="supprimerProduction(${index})"
+                           title="Supprimer ce passage">
+                     <i class="bi bi-trash"></i>
+                   </button>`
+                : ''}
+        </div>
     </div>
-    <div class="col-md-2">
-        <label class="form-label small">Grumes en entrée (m³) <span class="text-danger">*</span></label>
-        <input type="number" name="prod_volume_entree[]" class="form-control form-control-sm vol-entree-${index}"
-               step="0.1" min="0" placeholder="ex: 35.5" required oninput="majDechets(${index})">
+
+    <div class="wp-production-main">
+        <label class="wp-production-field wp-production-essence">
+            <span>Essence</span>
+            <select name="prod_essence[]"
+                    class="form-select prod-essence-${index}"
+                    onchange="majProduction(${index})"
+                    required>
+                ${essencesOptions}
+            </select>
+        </label>
+
+        <div class="wp-production-time">
+            <label class="wp-production-field">
+                <span>Début</span>
+                <div class="wp-production-time-row">
+                    <input type="time" name="prod_heure_debut[]"
+                           class="form-control prod-debut-${index}"
+                           required
+                           onchange="majProduction(${index})">
+                    <button type="button" onclick="mettreHeureMaintenant(${index}, 'debut')">Maintenant</button>
+                </div>
+            </label>
+            <label class="wp-production-field">
+                <span>Fin</span>
+                <div class="wp-production-time-row">
+                    <input type="time" name="prod_heure_fin[]"
+                           class="form-control prod-fin-${index}"
+                           required
+                           onchange="majProduction(${index})">
+                    <button type="button" onclick="mettreHeureMaintenant(${index}, 'fin')">Maintenant</button>
+                </div>
+            </label>
+            <div class="wp-production-duration">
+                <span>Durée</span>
+                <strong class="prod-duree-${index}">—</strong>
+            </div>
+        </div>
     </div>
-    <div class="col-md-2">
-        <label class="form-label small">Planches conformes (m³) <span class="text-danger">*</span></label>
-        <input type="number" name="prod_volume_conforme[]" class="form-control form-control-sm vol-conforme-${index}"
-               step="0.001" min="0" placeholder="ex: 12.5" required oninput="majDechets(${index})">
+
+    <div class="wp-production-volumes">
+        <label class="wp-production-field">
+            <span>Entrée grumes (m³)</span>
+            <input type="number" name="prod_volume_entree[]"
+                   class="form-control vol-entree-${index}"
+                   step="0.001" min="0" placeholder="ex: 35.5" required
+                   oninput="majProduction(${index})">
+        </label>
+        <label class="wp-production-field">
+            <span>Conformes (m³)</span>
+            <input type="number" name="prod_volume_conforme[]"
+                   class="form-control vol-conforme-${index}"
+                   step="0.001" min="0" placeholder="ex: 12.5" required
+                   oninput="majProduction(${index})">
+            <small class="wp-field-hint">Respecte le contrat ou la dimension attendue.</small>
+        </label>
+        <label class="wp-production-field">
+            <span>Déclassé (m³)</span>
+            <input type="number" name="prod_volume_declass[]"
+                   class="form-control vol-declass-${index}"
+                   step="0.001" min="0" placeholder="ex: 2.1" value="0"
+                   oninput="majProduction(${index})">
+            <small class="wp-field-hint">Vendable, mais pas conforme au contrat courant.</small>
+        </label>
+        <div class="wp-production-waste">
+            <span>Déchets estimés</span>
+            <strong id="dechets-${index}">—</strong>
+            <small class="wp-field-hint">Sciure, dosses, chutes : non valorisés ici.</small>
+        </div>
     </div>
-    <div class="col-md-2">
-        <label class="form-label small">Bois déclassé — vente locale (m³)</label>
-        <input type="number" name="prod_volume_declass[]" class="form-control form-control-sm vol-declass-${index}"
-               step="0.001" min="0" placeholder="ex: 2.1" value="0" oninput="majDechets(${index})">
+
+    <div class="wp-volume-helper helper-volume-${index}" hidden>
+        <div class="wp-volume-helper-head">
+            <div>
+                <strong>Calcul par pièces</strong>
+                <small>Longueur en mètre, largeur et épaisseur en centimètre.</small>
+            </div>
+            <span class="wp-volume-result calc-resultat-${index}">0.000 m³</span>
+        </div>
+
+        <div class="wp-volume-helper-grid">
+            <label class="wp-production-field">
+                <span>Pièces</span>
+                <input type="number"
+                       class="form-control calc-pieces-${index}"
+                       min="0" step="1" placeholder="ex: 80"
+                       oninput="majVolumeCalcule(${index})">
+            </label>
+            <label class="wp-production-field">
+                <span>Longueur (m)</span>
+                <input type="number"
+                       class="form-control calc-longueur-${index}"
+                       min="0" step="0.01" placeholder="ex: 5"
+                       oninput="majVolumeCalcule(${index})">
+            </label>
+            <label class="wp-production-field">
+                <span>Largeur (cm)</span>
+                <input type="number"
+                       class="form-control calc-largeur-${index}"
+                       min="0" step="0.1" placeholder="ex: 10"
+                       oninput="majVolumeCalcule(${index})">
+            </label>
+            <label class="wp-production-field">
+                <span>Épaisseur (cm)</span>
+                <input type="number"
+                       class="form-control calc-epaisseur-${index}"
+                       min="0" step="0.1" placeholder="ex: 5"
+                       oninput="majVolumeCalcule(${index})">
+            </label>
+            <label class="wp-production-field">
+                <span>Mettre dans</span>
+                <select class="form-select calc-cible-${index}">
+                    <option value="conforme">Conformes</option>
+                    <option value="declass">Déclassé</option>
+                    <option value="entree">Entrée grumes</option>
+                </select>
+            </label>
+            <div class="wp-volume-helper-actions">
+                <button type="button" onclick="appliquerVolumeCalcule(${index}, 'set')">Remplacer</button>
+                <button type="button" onclick="appliquerVolumeCalcule(${index}, 'add')">Ajouter</button>
+            </div>
+        </div>
+        <div class="wp-volume-formula calc-formule-${index}">
+            Exemple : 80 × 5 × 10 cm × 5 cm = 2.000 m³
+        </div>
     </div>
-    <div class="col-md-2">
-        <label class="form-label small text-muted">Déchets estimés (m³)</label>
-        <input type="text" class="form-control form-control-sm bg-light text-muted"
-               id="dechets-${index}" placeholder="calculé auto" readonly>
-    </div>
-    <div class="col-md-1">
-        ${index > 0 ? `<button type="button" class="btn btn-outline-danger btn-sm w-100 mt-4"
-                onclick="supprimerProduction(${index})"><i class="bi bi-trash"></i></button>` : '<div class="mt-4">&nbsp;</div>'}
-    </div>
-</div>`;
+
+    <div class="wp-production-alert prod-alert-${index}" hidden></div>
+</section>`;
 
 const templateArret = (index) => `
-<div class="row g-2 mb-2 align-items-end border rounded p-2" id="arret-${index}">
-    <div class="col-md-2">
-        <label class="form-label small">Machine</label>
-        <select name="arret_machine[]" class="form-select form-select-sm" required>
-            {% for m in machines %}
-            <option value="{{ m }}">{{ m }}</option>
-            {% endfor %}
-        </select>
+<section class="wp-arret-card" id="arret-${index}" data-index="${index}">
+    <div class="wp-arret-top">
+        <div class="wp-arret-title">
+            <span class="wp-arret-num">${index + 1}</span>
+            <div>
+                <strong>Arrêt machine</strong>
+                <small class="arret-resume-${index}">À compléter</small>
+            </div>
+        </div>
+        <div class="wp-arret-actions">
+            <span class="wp-arret-state arret-state-${index}">À compléter</span>
+            <button type="button"
+                    class="wp-arret-delete"
+                    onclick="supprimerArret(${index})"
+                    title="Supprimer cet arrêt">
+                <i class="bi bi-trash"></i>
+            </button>
+        </div>
     </div>
-    <div class="col-md-2">
-        <label class="form-label small">Heure début</label>
-        <input type="time" name="arret_debut[]" class="form-control form-control-sm" required>
-    </div>
-    <div class="col-md-2">
-        <label class="form-label small">Heure fin</label>
-        <input type="time" name="arret_fin[]" class="form-control form-control-sm" required>
-    </div>
-    <div class="col-md-3">
-        <label class="form-label small">Cause de l'arrêt</label>
-        <input type="text" name="arret_cause[]" class="form-control form-control-sm"
-               placeholder="Décrivez la cause..." required>
-    </div>
-    <div class="col-md-2">
-        <label class="form-label small">Catégorie</label>
-        <select name="arret_categorie[]" class="form-select form-select-sm">
-            {% for c in categories %}
-            <option value="{{ c }}">{{ c }}</option>
-            {% endfor %}
-        </select>
-    </div>
-    <div class="col-md-1">
-        <button type="button" class="btn btn-outline-danger btn-sm w-100"
-                onclick="supprimerArret(${index})"><i class="bi bi-trash"></i></button>
-    </div>
-</div>`;
 
-// ── État ──────────────────────────────────────────────────────────────────────
+    <div class="wp-arret-main">
+        <label class="wp-production-field">
+            <span>Machine</span>
+            <select name="arret_machine[]"
+                    class="form-select arret-machine-${index}"
+                    onchange="majArret(${index})"
+                    required>
+                {% for m in machines %}
+                <option value="{{ m }}">{{ m }}</option>
+                {% endfor %}
+            </select>
+        </label>
+
+        <div class="wp-arret-time">
+            <label class="wp-production-field">
+                <span>Début</span>
+                <div class="wp-arret-time-row">
+                    <input type="time"
+                           name="arret_debut[]"
+                           class="form-control arret-debut-${index}"
+                           required
+                           onchange="majArret(${index})">
+                    <button type="button" onclick="mettreHeureArretMaintenant(${index}, 'debut')">
+                        Maintenant
+                    </button>
+                </div>
+            </label>
+            <label class="wp-production-field">
+                <span>Fin</span>
+                <div class="wp-arret-time-row">
+                    <input type="time"
+                           name="arret_fin[]"
+                           class="form-control arret-fin-${index}"
+                           required
+                           onchange="majArret(${index})">
+                    <button type="button" onclick="mettreHeureArretMaintenant(${index}, 'fin')">
+                        Maintenant
+                    </button>
+                </div>
+            </label>
+            <label class="wp-production-field">
+                <span>Prévu (min)</span>
+                <input type="number"
+                       name="arret_duree_prevue[]"
+                       class="form-control arret-prevu-${index}"
+                       min="0" step="1" placeholder="ex: 30"
+                       title="Durée prévue, utile pour maintenance planifiée"
+                       oninput="majArret(${index})">
+            </label>
+            <div class="wp-arret-duration">
+                <span>Durée</span>
+                <strong class="arret-duree-${index}">—</strong>
+            </div>
+        </div>
+    </div>
+
+    <div class="wp-arret-cause-grid">
+        <label class="wp-production-field">
+            <span>Cause de l'arrêt</span>
+            <select name="arret_cause[]"
+                    class="form-select arret-cause-${index}"
+                    onchange="majCauseArret(${index})"
+                    required>
+                ${causeOptions}
+            </select>
+            <div class="form-text cause-help-${index}" style="font-size:.72rem;color:var(--wp-muted);line-height:1.35;"></div>
+        </label>
+        <label class="wp-production-field">
+            <span>Catégorie</span>
+            <input type="hidden"
+                   name="arret_categorie[]"
+                   class="arret-categorie-${index}">
+            <input type="text"
+                   class="form-control arret-categorie-affichage-${index}"
+                   value="Autre"
+                   readonly>
+            <div class="form-text" style="font-size:.72rem;color:var(--wp-muted);">
+                Déduite automatiquement de la cause choisie.
+            </div>
+        </label>
+    </div>
+
+    <div class="wp-arret-comment-grid">
+        <div class="cause-detail-wrap-${index}" style="display:none;">
+            <label class="wp-production-field">
+                <span class="cause-detail-label-${index}">Préciser la cause</span>
+                <input type="text"
+                       name="arret_cause_detail[]"
+                       class="form-control arret-cause-detail-${index}"
+                       placeholder="Exemple : lame cassée, lame émoussée, cause non prévue..."
+                       oninput="majArret(${index})">
+            </label>
+        </div>
+        <label class="wp-production-field">
+            <span>Commentaire terrain</span>
+            <input type="text"
+                   name="arret_notes[]"
+                   class="form-control arret-notes-${index}"
+                   placeholder="Détail panne, pièce attendue, action faite..."
+                   oninput="majArret(${index})">
+        </label>
+    </div>
+
+    <div class="wp-arret-alert arret-alert-${index}" hidden></div>
+</section>`;
 
 let compteurProd  = 0;
 let compteurArret = 0;
 
-function majDechets(index) {
+function heureMaintenant() {
+    const maintenant = new Date();
+    return `${String(maintenant.getHours()).padStart(2, '0')}:${String(maintenant.getMinutes()).padStart(2, '0')}`;
+}
+
+function minutesDepuisMinuit(valeur) {
+    if (!valeur || !valeur.includes(':')) return null;
+    const [h, m] = valeur.split(':').map(Number);
+    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+    return h * 60 + m;
+}
+
+function formatDuree(minutes) {
+    if (minutes === null || minutes < 0) return '—';
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (h === 0) return `${m} min`;
+    return `${h}h${String(m).padStart(2, '0')}`;
+}
+
+function mettreHeureMaintenant(index, champ) {
+    const cible = document.querySelector(champ === 'debut' ? `.prod-debut-${index}` : `.prod-fin-${index}`);
+    if (cible) {
+        cible.value = heureMaintenant();
+        majProduction(index);
+    }
+}
+
+// F5 — Préremplit les horaires du 1er passage selon le créneau choisi.
+// N'écrase jamais une heure saisie manuellement : agit si le champ est vide
+// ou s'il correspond encore à un horaire standard (donc auto-rempli, non touché).
+function majHorairesCreneau() {
+    if (!modeCreation) return;
+    const sel = document.querySelector('select[name="numero_equipe"]');
+    const h = sel ? horairesCreneaux[sel.value] : null;
+    if (!h) return;
+    const debut = document.querySelector('.prod-debut-0');
+    const fin   = document.querySelector('.prod-fin-0');
+    if (!debut || !fin) return;
+    const vide = !debut.value && !fin.value;
+    const estStandard = Object.values(horairesCreneaux).some(
+        c => c.debut === debut.value && c.fin === fin.value
+    );
+    if (vide || estStandard) {
+        debut.value = h.debut || '';
+        fin.value = h.fin || '';
+        majProduction(0);
+    }
+}
+
+function mettreHeureArretMaintenant(index, champ) {
+    const cible = document.querySelector(champ === 'debut' ? `.arret-debut-${index}` : `.arret-fin-${index}`);
+    if (cible) {
+        cible.value = heureMaintenant();
+        majArret(index);
+    }
+}
+
+function basculerAssistantVolume(index) {
+    const helper = document.querySelector(`.helper-volume-${index}`);
+    if (!helper) return;
+    helper.hidden = !helper.hidden;
+    if (!helper.hidden) majVolumeCalcule(index);
+}
+
+function volumeCalculePieces(index) {
+    const pieces = parseFloat(document.querySelector(`.calc-pieces-${index}`)?.value) || 0;
+    const longueurM = parseFloat(document.querySelector(`.calc-longueur-${index}`)?.value) || 0;
+    const largeurCm = parseFloat(document.querySelector(`.calc-largeur-${index}`)?.value) || 0;
+    const epaisseurCm = parseFloat(document.querySelector(`.calc-epaisseur-${index}`)?.value) || 0;
+    if (pieces <= 0 || longueurM <= 0 || largeurCm <= 0 || epaisseurCm <= 0) {
+        return 0;
+    }
+    return pieces * longueurM * (largeurCm / 100) * (epaisseurCm / 100);
+}
+
+function champVolumeCible(index) {
+    const cible = document.querySelector(`.calc-cible-${index}`)?.value || 'conforme';
+    if (cible === 'entree') return document.querySelector(`.vol-entree-${index}`);
+    if (cible === 'declass') return document.querySelector(`.vol-declass-${index}`);
+    return document.querySelector(`.vol-conforme-${index}`);
+}
+
+function majVolumeCalcule(index) {
+    const volume = volumeCalculePieces(index);
+    const resultat = document.querySelector(`.calc-resultat-${index}`);
+    const formule = document.querySelector(`.calc-formule-${index}`);
+    const pieces = document.querySelector(`.calc-pieces-${index}`)?.value || '0';
+    const longueurM = document.querySelector(`.calc-longueur-${index}`)?.value || '0';
+    const largeurCm = document.querySelector(`.calc-largeur-${index}`)?.value || '0';
+    const epaisseurCm = document.querySelector(`.calc-epaisseur-${index}`)?.value || '0';
+    if (resultat) resultat.textContent = `${volume.toFixed(3)} m³`;
+    if (formule) {
+        formule.textContent = `${pieces} × ${longueurM} × ${largeurCm} cm × ${epaisseurCm} cm = ${volume.toFixed(3)} m³`;
+    }
+    return volume;
+}
+
+function appliquerVolumeCalcule(index, mode) {
+    const volume = majVolumeCalcule(index);
+    const champ = champVolumeCible(index);
+    const alerte = document.querySelector(`.prod-alert-${index}`);
+    if (!champ || volume <= 0) {
+        if (alerte) {
+            alerte.hidden = false;
+            alerte.textContent = 'Renseignez pièces, longueur, largeur et épaisseur avant d’appliquer le volume.';
+        }
+        return;
+    }
+    const actuel = parseFloat(champ.value) || 0;
+    const nouveau = mode === 'add' ? actuel + volume : volume;
+    champ.value = nouveau.toFixed(3);
+    majProduction(index);
+}
+
+function majProduction(index) {
     const entree   = parseFloat(document.querySelector(`.vol-entree-${index}`)?.value)   || 0;
     const conforme = parseFloat(document.querySelector(`.vol-conforme-${index}`)?.value) || 0;
     const declass  = parseFloat(document.querySelector(`.vol-declass-${index}`)?.value)  || 0;
+    const essence  = document.querySelector(`.prod-essence-${index}`)?.value || 'Essence';
+    const debut    = document.querySelector(`.prod-debut-${index}`)?.value || '';
+    const fin      = document.querySelector(`.prod-fin-${index}`)?.value || '';
     const dechets  = Math.max(0, entree - conforme - declass);
-    const champ    = document.getElementById(`dechets-${index}`);
-    if (champ) champ.value = dechets > 0 ? dechets.toFixed(3) + ' m³' : '—';
+    const dureeDebut = minutesDepuisMinuit(debut);
+    const dureeFin = minutesDepuisMinuit(fin);
+    const duree = (dureeDebut !== null && dureeFin !== null) ? dureeFin - dureeDebut : null;
+    const totalSorti = conforme + declass;
+
+    const champDechets = document.getElementById(`dechets-${index}`);
+    const champDuree = document.querySelector(`.prod-duree-${index}`);
+    const resume = document.querySelector(`.prod-resume-${index}`);
+    const etat = document.querySelector(`.prod-state-${index}`);
+    const alerte = document.querySelector(`.prod-alert-${index}`);
+    const carte = document.getElementById(`prod-${index}`);
+
+    if (champDechets) champDechets.textContent = dechets > 0 ? `${dechets.toFixed(3)} m³` : '—';
+    if (champDuree) champDuree.textContent = formatDuree(duree);
+    if (resume) {
+        const horaire = debut && fin ? `${debut} → ${fin}` : 'horaires à compléter';
+        resume.textContent = `${essence} · ${horaire}`;
+    }
+
+    let message = '';
+    if (duree !== null && duree <= 0) {
+        message = "L'heure de fin doit être après l'heure de début.";
+    } else if (entree > 0 && totalSorti > entree + 0.01) {
+        message = 'Conforme + déclassé dépasse le volume entrée.';
+    }
+
+    // F4 — Poka-yoke : le bois produit (conforme + déclassé) ne peut pas
+    // dépasser la capacité théorique du créneau. Deux niveaux non-bloquants.
+    let rangeMessage = '';
+    let rangeIsWarning = false;
+    if (!message) {
+        const capaciteH = essence ? (capacitesEssences[essence] ?? null) : null;
+        if (capaciteH && duree !== null && duree > 0 && totalSorti > 0) {
+            const capaciteCreneau = capaciteH * (duree / 60);
+            if (totalSorti > capaciteCreneau * 1.3) {
+                rangeMessage = `Bois produit impossible pour ce créneau (max théorique : ${capaciteCreneau.toFixed(2)} m³ conforme + déclassé) — vérifiez la saisie.`;
+            } else if (totalSorti > capaciteCreneau) {
+                rangeMessage = `Production inhabituellement élevée — dépasse la capacité théorique du créneau (${capaciteCreneau.toFixed(2)} m³ conforme + déclassé).`;
+                rangeIsWarning = true;
+            }
+        }
+    }
+
+    const displayMessage = message || rangeMessage;
+    if (carte) {
+        carte.dataset.volMsg = displayMessage;
+        carte.dataset.volWarn = (rangeIsWarning && !message) ? '1' : '';
+    }
+
+    const complet = essence && debut && fin && entree > 0 && conforme >= 0 && declass >= 0 && !message;
+    if (etat) {
+        etat.textContent = complet ? 'Complet' : 'À compléter';
+        etat.classList.toggle('is-complete', complet);
+    }
+
+    rafraichirEtatProductions();
+}
+
+// Anti-chevauchement : la chaîne 4 est une machine unique, deux essences ne
+// peuvent pas être traitées sur des créneaux qui se recouvrent. Détection en
+// direct (alerte rouge) ; le serveur bloque définitivement la soumission.
+function intervallesProduction() {
+    const liste = [];
+    document.querySelectorAll('[id^="prod-"]').forEach(carte => {
+        const idx = carte.id.replace('prod-', '');
+        const debut = carte.querySelector(`.prod-debut-${idx}`)?.value || '';
+        const fin   = carte.querySelector(`.prod-fin-${idx}`)?.value || '';
+        const essence = carte.querySelector(`.prod-essence-${idx}`)?.value || 'Essence';
+        const d = minutesDepuisMinuit(debut);
+        const f = minutesDepuisMinuit(fin);
+        if (d !== null && f !== null && f > d) {
+            liste.push({ idx, d, f, essence, debut, fin });
+        }
+    });
+    return liste;
+}
+
+function rafraichirEtatProductions() {
+    const intervalles = intervallesProduction().sort((a, b) => a.d - b.d);
+    const enConflit = new Set();
+    let couvrant = null;
+    let messageConflit = '';
+    for (const it of intervalles) {
+        if (couvrant && it.d < couvrant.f) {           // chevauchement strict
+            enConflit.add(it.idx);
+            enConflit.add(couvrant.idx);
+            if (!messageConflit) {
+                messageConflit = `Chevauchement : « ${couvrant.essence} » (${couvrant.debut}–${couvrant.fin}) et « ${it.essence} » (${it.debut}–${it.fin}) se recouvrent. La chaîne ne traite qu'une essence à la fois.`;
+            }
+        }
+        if (!couvrant || it.f > couvrant.f) couvrant = it;
+    }
+
+    document.querySelectorAll('[id^="prod-"]').forEach(carte => {
+        const idx = carte.id.replace('prod-', '');
+        const alerte = carte.querySelector(`.prod-alert-${idx}`);
+        if (!alerte) return;
+        if (enConflit.has(idx)) {
+            alerte.hidden = false;
+            alerte.textContent = 'Chevauchement horaire avec une autre essence — corrigez les horaires.';
+            alerte.classList.remove('is-warning');
+            carte.classList.add('has-warning');
+        } else {
+            const volMsg = carte.dataset.volMsg || '';
+            alerte.hidden = !volMsg;
+            alerte.textContent = volMsg;
+            alerte.classList.toggle('is-warning', carte.dataset.volWarn === '1');
+            carte.classList.toggle('has-warning', Boolean(volMsg));
+        }
+    });
+
+    const banniere = document.getElementById('alerte-chevauchement');
+    if (banniere) {
+        banniere.hidden = !messageConflit;
+        banniere.textContent = messageConflit;
+    }
+    return enConflit.size > 0;
+}
+
+function majDechets(index) {
+    majProduction(index);
 }
 
 function ajouterProduction() {
     document.getElementById('conteneur-productions')
             .insertAdjacentHTML('beforeend', templateProduction(compteurProd));
+    majProduction(compteurProd);
     compteurProd++;
+}
+
+function ajouterProductionEssence(essence) {
+    ajouterProduction();
+    const idx = compteurProd - 1;
+    const sel = document.querySelector(`.prod-essence-${idx}`);
+    if (sel) {
+        sel.value = essence;
+        majProduction(idx);
+    }
 }
 
 function ajouterProductionAvecDonnees(data) {
@@ -188,24 +945,142 @@ function ajouterProductionAvecDonnees(data) {
     const idx = compteurProd - 1;
     const row = document.getElementById('prod-' + idx);
     if (!row) return;
-    row.querySelector('.vol-entree-'  + idx).value = data.volume_entree  || '';
-    row.querySelector('.vol-conforme-'+ idx).value = data.volume_conforme|| '';
-    row.querySelector('.vol-declass-' + idx).value = data.volume_declass || 0;
+    row.querySelector('.prod-debut-'   + idx).value = data.heure_debut || '';
+    row.querySelector('.prod-fin-'     + idx).value = data.heure_fin   || '';
+    row.querySelector('.vol-entree-'   + idx).value = data.volume_entree   || '';
+    row.querySelector('.vol-conforme-' + idx).value = data.volume_conforme || '';
+    row.querySelector('.vol-declass-'  + idx).value = data.volume_declass  || 0;
     const sel = row.querySelector('select[name="prod_essence[]"]');
     if (sel) sel.value = data.essence;
-    majDechets(idx);
+    majProduction(idx);
 }
 
 function supprimerProduction(index) {
     const el = document.getElementById('prod-' + index);
     if (el) el.remove();
+    rafraichirEtatProductions();
+}
+
+function majArret(index) {
+    const carte = document.getElementById(`arret-${index}`);
+    if (!carte) return;
+
+    const machine = document.querySelector(`.arret-machine-${index}`)?.value || 'Machine';
+    const debut = document.querySelector(`.arret-debut-${index}`)?.value || '';
+    const fin = document.querySelector(`.arret-fin-${index}`)?.value || '';
+    const cause = document.querySelector(`.arret-cause-${index}`)?.value || 'Cause';
+    const categorie = document.querySelector(`.arret-categorie-${index}`)?.value || '';
+    const notes = document.querySelector(`.arret-notes-${index}`)?.value || '';
+    const prevu = parseInt(document.querySelector(`.arret-prevu-${index}`)?.value || '0', 10) || 0;
+    const debutMin = minutesDepuisMinuit(debut);
+    const finMin = minutesDepuisMinuit(fin);
+    const duree = (debutMin !== null && finMin !== null) ? finMin - debutMin : null;
+
+    const dureeEl = document.querySelector(`.arret-duree-${index}`);
+    const resume = document.querySelector(`.arret-resume-${index}`);
+    const etat = document.querySelector(`.arret-state-${index}`);
+    const alerte = document.querySelector(`.arret-alert-${index}`);
+
+    if (dureeEl) dureeEl.textContent = formatDuree(duree);
+    if (resume) {
+        const horaire = debut && fin ? `${debut} → ${fin}` : 'horaires à compléter';
+        resume.textContent = `${machine} · ${horaire} · ${cause}`;
+    }
+
+    let message = '';
+    if (duree !== null && duree <= 0) {
+        message = 'L’heure de fin doit être après l’heure de début.';
+    } else if (duree !== null && duree >= 60 && notes.trim().length < 10) {
+        message = 'Arrêt long : ajoutez un commentaire terrain pour aider le chef à comprendre.';
+    } else if (categorie === 'Maintenance planifiée' && prevu > 0 && duree !== null && duree > prevu) {
+        message = `Maintenance dépassée de ${duree - prevu} min par rapport au temps prévu.`;
+    }
+
+    if (alerte) {
+        alerte.hidden = !message;
+        alerte.textContent = message;
+    }
+    carte.classList.toggle('has-warning', Boolean(message));
+
+    const complet = machine && debut && fin && cause && duree !== null && duree > 0;
+    if (etat) {
+        etat.textContent = complet ? 'Complet' : 'À compléter';
+        etat.classList.toggle('is-complete', complet);
+    }
+}
+
+function majCauseArret(index) {
+    const selectCause = document.querySelector(`.arret-cause-${index}`);
+    const champCategorie = document.querySelector(`.arret-categorie-${index}`);
+    const affichageCategorie = document.querySelector(`.arret-categorie-affichage-${index}`);
+    const champPrevu = document.querySelector(`#arret-${index} input[name="arret_duree_prevue[]"]`);
+    const aide = document.querySelector(`.cause-help-${index}`);
+    const detailWrap = document.querySelector(`.cause-detail-wrap-${index}`);
+    const detailInput = document.querySelector(`.arret-cause-detail-${index}`);
+    const detailLabel = document.querySelector(`.cause-detail-label-${index}`);
+    const cause = causesArret.find(c => c.cause === selectCause?.value);
+    const besoinDetail = selectCause?.value === 'Autre' || selectCause?.value === 'Changement de lame';
+    if (detailWrap && detailInput) {
+        detailWrap.style.display = besoinDetail ? 'block' : 'none';
+        detailInput.required = selectCause?.value === 'Autre';
+        if (!besoinDetail) detailInput.value = '';
+        if (detailLabel) {
+            detailLabel.textContent = selectCause?.value === 'Autre'
+                ? 'Écrire la cause manuellement'
+                : 'Préciser le changement de lame';
+        }
+        detailInput.placeholder = selectCause?.value === 'Autre'
+            ? 'Exemple : attente camion, essai machine, incident non prévu...'
+            : 'Exemple : lame cassée, lame émoussée, lame mal tendue...';
+    }
+    if (!cause) {
+        majArret(index);
+        return;
+    }
+    if (champCategorie) champCategorie.value = cause.categorie;
+    if (affichageCategorie) affichageCategorie.value = cause.categorie;
+    if (champPrevu && !champPrevu.value && cause.duree_prevue_min) {
+        champPrevu.value = cause.duree_prevue_min;
+    }
+    if (aide) {
+        const complement = besoinDetail ? ' Ajoutez une précision dans le champ manuel.' : '';
+        aide.textContent = `${cause.categorie} — ${cause.exemple}${complement}`;
+    }
+    majArret(index);
+}
+
+function confirmerAucunArret() {
+    const arretsExistants = document.querySelectorAll('[id^="arret-"]');
+    if (arretsExistants.length > 0) {
+        const message = `Vous avez déjà ${arretsExistants.length} arrêt${arretsExistants.length > 1 ? 's' : ''} saisi${arretsExistants.length > 1 ? 's' : ''}. Confirmer "Aucun arrêt" supprimera ${arretsExistants.length > 1 ? 'ces arrêts' : 'cet arrêt'}.`;
+        if (!window.confirm(message)) {
+            return;
+        }
+    }
+    arretsExistants.forEach(el => el.remove());
+    document.getElementById('aucun_arret_confirme').value = '1';
+    const msg = document.getElementById('msg-aucun-arret');
+    msg.style.display = 'block';
+    msg.innerHTML = '<i class="bi bi-check-circle" style="color:var(--wp-leaf);"></i> Aucun arrêt confirmé pour ce poste.';
 }
 
 function ajouterArret() {
+    document.getElementById('aucun_arret_confirme').value = '0';
     document.getElementById('msg-aucun-arret').style.display = 'none';
     document.getElementById('conteneur-arrets')
             .insertAdjacentHTML('beforeend', templateArret(compteurArret));
+    majCauseArret(compteurArret);
     compteurArret++;
+}
+
+function ajouterArretAvecCause(causeNom) {
+    ajouterArret();
+    const idx = compteurArret - 1;
+    const causeSelect = document.querySelector(`.arret-cause-${idx}`);
+    if (causeSelect) {
+        causeSelect.value = causeNom;
+        majCauseArret(idx);
+    }
 }
 
 function ajouterArretAvecDonnees(data) {
@@ -213,23 +1088,38 @@ function ajouterArretAvecDonnees(data) {
     const idx = compteurArret - 1;
     const row = document.getElementById('arret-' + idx);
     if (!row) return;
-    row.querySelector('select[name="arret_machine[]"]').value  = data.machine     || '';
-    row.querySelector('input[name="arret_debut[]"]').value     = data.heure_debut || '';
-    row.querySelector('input[name="arret_fin[]"]').value       = data.heure_fin   || '';
-    row.querySelector('input[name="arret_cause[]"]').value     = data.cause       || '';
-    row.querySelector('select[name="arret_categorie[]"]').value= data.categorie   || '';
+    row.querySelector('select[name="arret_machine[]"]').value   = data.machine     || '';
+    row.querySelector('input[name="arret_debut[]"]').value      = data.heure_debut || '';
+    row.querySelector('input[name="arret_fin[]"]').value        = data.heure_fin   || '';
+    row.querySelector('input[name="arret_duree_prevue[]"]').value = data.duree_prevue_min || '';
+    row.querySelector('input[name="arret_notes[]"]').value = data.notes || '';
+    const causeSelect = row.querySelector('select[name="arret_cause[]"]');
+    const causeBase = data.cause_base || data.cause || '';
+    if (causeBase && !Array.from(causeSelect.options).some(opt => opt.value === causeBase)) {
+        causeSelect.insertAdjacentHTML(
+            'beforeend',
+            `<option value="${escapeHtml(causeBase)}">${escapeHtml(causeBase)}</option>`
+        );
+    }
+    causeSelect.value = causeBase;
+    row.querySelector('input[name="arret_categorie[]"]').value = data.categorie   || '';
+    row.querySelector(`.arret-categorie-affichage-${idx}`).value = data.categorie || 'Autre';
+    majCauseArret(idx);
+    row.querySelector('input[name="arret_cause_detail[]"]').value = data.cause_detail || '';
+    row.querySelector('input[name="arret_categorie[]"]').value = data.categorie   || '';
+    row.querySelector(`.arret-categorie-affichage-${idx}`).value = data.categorie || 'Autre';
+    majArret(idx);
 }
 
 function supprimerArret(index) {
     const el = document.getElementById('arret-' + index);
     if (el) el.remove();
     if (document.querySelectorAll('[id^="arret-"]').length === 0) {
-        document.getElementById('msg-aucun-arret').style.display = 'block';
+        const msg = document.getElementById('msg-aucun-arret');
+        msg.style.display = 'block';
+        msg.innerHTML = `<i class="bi bi-check-circle" style="color:var(--wp-leaf);"></i> Aucun arrêt saisi — confirmez "Aucun arrêt" ou ajoutez un arrêt s'il y en a eu.`;
     }
 }
-
-// ── Initialisation ───────────────────────────────────────────────────────────
-// En mode modification, pré-remplir avec les données existantes
 
 const productionsDonnees = {{ productions_data | tojson }};
 const arretsDonnees      = {{ arrets_data | tojson }};
@@ -238,8 +1128,25 @@ if (productionsDonnees.length > 0) {
     productionsDonnees.forEach(p => ajouterProductionAvecDonnees(p));
 } else {
     ajouterProduction();
+    majHorairesCreneau();
 }
 
 arretsDonnees.forEach(a => ajouterArretAvecDonnees(a));
+if (aucunArretInitial && arretsDonnees.length === 0) {
+    confirmerAucunArret();
+}
+
+// Blocage soumission si chevauchement horaire (le serveur refuse aussi).
+const formEquipe = document.getElementById('formEquipe');
+if (formEquipe) {
+    formEquipe.addEventListener('submit', (e) => {
+        if (rafraichirEtatProductions()) {
+            e.preventDefault();
+            const banniere = document.getElementById('alerte-chevauchement');
+            if (banniere) banniere.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    });
+}
+rafraichirEtatProductions();
 </script>
 {% endblock %}

@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Feuille de relevé — Chaîne 4 CUF — {{ date_fmt }}</title>
+  <style>
+    /* ── Base ────────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 11pt;
+      color: #000;
+      background: #fff;
+      padding: 20px;
+      max-width: 210mm;
+      margin: 0 auto;
+    }
+
+    /* ── En-tête ─────────────────────────────────────────────────────── */
+    .entete {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2.5px solid #000;
+      padding-bottom: 10px;
+      margin-bottom: 14px;
+    }
+    .entete-titre h1 {
+      font-size: 14pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .entete-titre p {
+      font-size: 9pt;
+      color: #444;
+      margin-top: 2px;
+    }
+    .entete-logo {
+      font-size: 22pt;
+      font-weight: 900;
+      letter-spacing: -1px;
+      border: 2.5px solid #000;
+      padding: 4px 10px;
+      line-height: 1;
+    }
+
+    /* ── Bloc identité poste ─────────────────────────────────────────── */
+    .identite {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .champ {
+      border: 1px solid #000;
+      padding: 5px 8px;
+    }
+    .champ label {
+      font-size: 7.5pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      color: #555;
+      display: block;
+      margin-bottom: 3px;
+    }
+    .champ .valeur {
+      font-size: 11pt;
+      font-weight: bold;
+      min-height: 20px;
+    }
+    .champ .ligne {
+      border-bottom: 1px solid #aaa;
+      min-height: 22px;
+      margin-top: 2px;
+    }
+
+    /* ── Sections ────────────────────────────────────────────────────── */
+    .section {
+      margin-bottom: 16px;
+    }
+    .section-titre {
+      background: #000;
+      color: #fff;
+      font-size: 9pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      padding: 4px 8px;
+      margin-bottom: 0;
+    }
+
+    /* ── Tableaux ────────────────────────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9.5pt;
+    }
+    th {
+      background: #eee;
+      border: 1px solid #000;
+      padding: 4px 6px;
+      text-align: center;
+      font-size: 8.5pt;
+      font-weight: bold;
+    }
+    td {
+      border: 1px solid #999;
+      padding: 3px 6px;
+      height: 26px;
+    }
+    td.essence-nom {
+      background: #f5f5f5;
+      font-weight: bold;
+      font-size: 9pt;
+      width: 18%;
+    }
+    td.numero {
+      text-align: center;
+      color: #888;
+      font-size: 8pt;
+      width: 5%;
+    }
+    .total-row td {
+      background: #ddd;
+      font-weight: bold;
+    }
+
+    /* ── Section arrêts ──────────────────────────────────────────────── */
+    .arrets-table td {
+      height: 28px;
+    }
+
+    /* ── Observations ────────────────────────────────────────────────── */
+    .observations {
+      border: 1px solid #000;
+      padding: 8px;
+      min-height: 60px;
+    }
+    .observations label {
+      font-size: 8pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .obs-lignes {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .obs-ligne {
+      border-bottom: 1px solid #bbb;
+      height: 14px;
+    }
+
+    /* ── Signatures ──────────────────────────────────────────────────── */
+    .signatures {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-top: 14px;
+    }
+    .signature-bloc {
+      border: 1px solid #000;
+      padding: 8px;
+    }
+    .signature-bloc label {
+      font-size: 8pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      display: block;
+      margin-bottom: 28px;
+    }
+    .signature-ligne {
+      border-bottom: 1px solid #000;
+      margin-top: 4px;
+    }
+
+    /* ── Pied de page ────────────────────────────────────────────────── */
+    .pied {
+      margin-top: 10px;
+      font-size: 7.5pt;
+      color: #888;
+      text-align: center;
+      border-top: 1px solid #ccc;
+      padding-top: 6px;
+    }
+
+    /* ── Actions (cachées à l'impression) ─────────────────────────────── */
+    .actions {
+      display: flex;
+      justify-content: center;
+      margin: 0 auto 20px auto;
+    }
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 28px;
+      background: #1F5C3D;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 12pt;
+      font-weight: bold;
+      cursor: pointer;
+      letter-spacing: 0.5px;
+      text-decoration: none;
+    }
+    .btn-action:hover { background: #174d33; color: #fff; }
+
+    @media print {
+      .actions { display: none !important; }
+      body { padding: 0; }
+      .section { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="actions">
+    <button class="btn-action" onclick="window.print()">
+      Imprimer / enregistrer en PDF
+    </button>
+  </div>
+
+  <!-- ── En-tête ──────────────────────────────────────────────────── -->
+  <div class="entete">
+    <div class="entete-titre">
+      <h1>Feuille de relevé de production</h1>
+      <p>Scierie industrielle CUF — Chaîne 4 — Ebolowa, Cameroun</p>
+    </div>
+    <div class="entete-logo">wood_pilot</div>
+  </div>
+
+  <!-- ── Identité du poste ─────────────────────────────────────────── -->
+  <div class="identite">
+    <div class="champ">
+      <label>Date</label>
+      <div class="valeur">{{ date_fmt }}</div>
+    </div>
+    <div class="champ">
+      <label>Poste / Shift</label>
+      <div class="valeur">{{ shift }}</div>
+    </div>
+    <div class="champ">
+      <label>Opérateur (nom)</label>
+      <div class="ligne"></div>
+    </div>
+    <div class="champ">
+      <label>Équipe n°</label>
+      <div class="ligne"></div>
+    </div>
+  </div>
+
+  <!-- ── Section 1 : Grumes entrées ───────────────────────────────── -->
+  <div class="section">
+    <div class="section-titre">1. Grumes entrées (matière première)</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Essence</th>
+          <th>Nbre de grumes</th>
+          <th>Volume bille total (m³)</th>
+          <th>Diamètre moyen (cm)</th>
+          <th>Longueur moyenne (m)</th>
+          <th>Observations</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in essences %}
+        <tr>
+          <td class="essence-nom">{{ e }}</td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+        {% endfor %}
+        <tr class="total-row">
+          <td>TOTAL</td>
+          <td></td>
+          <td></td>
+          <td>—</td>
+          <td>—</td>
+          <td>—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Section 2 : Productions ──────────────────────────────────── -->
+  <div class="section">
+    <div class="section-titre">2. Production de bois scié</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Essence</th>
+          <th>Début traitement</th>
+          <th>Fin traitement</th>
+          <th>Vol. entré bicoupe (m³)</th>
+          <th>Vol. scié conforme (m³)</th>
+          <th>Vol. déclassé / chutes (m³)</th>
+          <th>Rendement matière (%)</th>
+          <th>Observations</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in essences %}
+        <tr>
+          <td class="essence-nom">{{ e }}</td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+        {% endfor %}
+        <tr class="total-row">
+          <td>TOTAL</td>
+          <td>—</td>
+          <td>—</td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td>—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Section 3 : Arrêts ────────────────────────────────────────── -->
+  <div class="section">
+    <div class="section-titre">3. Arrêts et incidents (1 ligne par arrêt)</div>
+    <table class="arrets-table">
+      <thead>
+        <tr>
+          <th style="width:5%">#</th>
+          <th style="width:20%">Machine concernée</th>
+          <th style="width:11%">Heure début</th>
+          <th style="width:11%">Heure fin</th>
+          <th style="width:9%">Durée réelle</th>
+          <th style="width:9%">Durée prévue</th>
+          <th style="width:17%">Catégorie</th>
+          <th>Cause / Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in range(8) %}
+        <tr>
+          <td class="numero">{{ i + 1 }}</td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div style="font-size:7.5pt;color:#555;margin-top:4px;padding:3px 6px;border:1px solid #ddd;">
+      ☐ Aucun arrêt pendant le poste
+      &nbsp;|&nbsp;
+      Catégories : {{ categories | join(' · ') }}
+      &nbsp;|&nbsp;
+      Machines : {{ machines | join(' · ') }}
+    </div>
+    <div style="font-size:7.5pt;color:#555;margin-top:4px;padding:3px 6px;border:1px solid #ddd;">
+      Causes simples :
+      {% for c in causes_arret %}
+      {{ c.cause }}{% if not loop.last %} · {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ── Section 4 : Chronométrages bicoupe ───────────────────────── -->
+  <div class="section">
+    <div class="section-titre">4. Chronométrages bicoupe (optionnel — si mesures terrain)</div>
+    <table>
+      <thead>
+        <tr>
+          <th style="width:5%">#</th>
+          <th>Essence</th>
+          <th>Heure début coupe</th>
+          <th>Heure fin coupe</th>
+          <th>Nb pièces coupées</th>
+          <th>Vitesse avance estimée (m/min)</th>
+          <th>Remarques</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for i in range(5) %}
+        <tr>
+          <td class="numero">{{ i + 1 }}</td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ── Observations générales ────────────────────────────────────── -->
+  <div class="observations">
+    <label>Observations générales / incidents hors tableau</label>
+    <div class="obs-lignes">
+      {% for _ in range(3) %}
+      <div class="obs-ligne"></div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- ── Signatures ────────────────────────────────────────────────── -->
+  <div class="signatures">
+    <div class="signature-bloc">
+      <label>Opérateur / Agent de saisie</label>
+      <div style="font-size:8pt;color:#777;margin-bottom:4px;">Nom, prénom :</div>
+      <div class="signature-ligne"></div>
+      <div style="font-size:8pt;color:#777;margin-top:10px;margin-bottom:4px;">Signature :</div>
+      <div class="signature-ligne" style="min-height:30px;"></div>
+    </div>
+    <div class="signature-bloc">
+      <label>Chef de production — Visa</label>
+      <div style="font-size:8pt;color:#777;margin-bottom:4px;">Nom, prénom :</div>
+      <div class="signature-ligne"></div>
+      <div style="font-size:8pt;color:#777;margin-top:10px;margin-bottom:4px;">Signature :</div>
+      <div class="signature-ligne" style="min-height:30px;"></div>
+    </div>
+  </div>
+
+  <!-- ── Pied de page ──────────────────────────────────────────────── -->
+  <div class="pied">
+    wood_pilot &nbsp;|&nbsp;
+    Feuille générée le {{ date_fmt }} &nbsp;|&nbsp;
+    Conserver après saisie dans le tableau de bord
+  </div>
+
+</body>
+</html>

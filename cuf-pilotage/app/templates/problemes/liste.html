@@ -1,0 +1,158 @@
+{% extends 'base.html' %}
+{% block title %}Résolution guidée · wood_pilot{% endblock %}
+{% block page_title %}Résolution guidée{% endblock %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-4">
+  <div>
+    <div class="wp-section-title mb-1">
+      <i class="bi bi-diagram-3"></i> Problèmes analysés
+    </div>
+    <div style="font-size:.84rem;color:var(--wp-muted);">
+      Ishikawa 6M + 5 Pourquoi : transformer une alerte en cause racine défendable.
+    </div>
+  </div>
+  <a href="{{ url_for('problemes.nouveau') }}" class="btn btn-primary">
+    <i class="bi bi-plus-circle"></i> Nouveau problème
+  </a>
+</div>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-lg-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Ouverts</div>
+      <div class="wp-kpi-value">{{ stats.par_statut.ouvert + stats.par_statut.en_analyse }}</div>
+      <div class="wp-kpi-sub">à analyser</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Causes racines</div>
+      <div class="wp-kpi-value">{{ stats.total_racines }}</div>
+      <div class="wp-kpi-sub">sélectionnées</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Organisationnel</div>
+      <div class="wp-kpi-value" style="color:var(--wp-ochre);">{{ stats.pct_organisationnel }}%</div>
+      <div class="wp-kpi-sub">lecture H2</div>
+    </div>
+  </div>
+  <div class="col-6 col-lg-3">
+    <div class="wp-kpi">
+      <div class="wp-kpi-label">Clos</div>
+      <div class="wp-kpi-value" style="color:var(--wp-leaf);">{{ stats.par_statut.clos }}</div>
+      <div class="wp-kpi-sub">rapports A3 terminés</div>
+    </div>
+  </div>
+</div>
+
+<div class="wp-card mb-4">
+  <div class="wp-card-header">
+    <i class="bi bi-pie-chart"></i> Résultats H2 par branche 6M
+  </div>
+  <div class="p-3">
+    <div class="row g-2">
+      {% for cat, n in stats.par_6m.items() %}
+      {% set h2 = interpretation_h2(cat) %}
+      <div class="col-6 col-md-4 col-xl-2">
+        <div class="wp-6m-stat">
+          <div class="wp-6m-stat-label">{{ cat }}</div>
+          <div class="wp-6m-stat-value">{{ n }}</div>
+          <div class="wp-6m-stat-sub">{{ h2.famille }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="wp-card mb-4">
+  <div class="p-3">
+    <div class="d-flex gap-2 flex-wrap">
+      <a class="btn btn-sm {% if statut == 'ouverts' %}btn-primary{% else %}btn-outline-primary{% endif %}"
+         href="{{ url_for('problemes.liste', statut='ouverts') }}">Ouverts</a>
+      {% for code, label in statuts.items() %}
+      <a class="btn btn-sm {% if statut == code %}btn-primary{% else %}btn-outline-primary{% endif %}"
+         href="{{ url_for('problemes.liste', statut=code) }}">{{ label }}</a>
+      {% endfor %}
+      <a class="btn btn-sm {% if statut == 'tous' %}btn-primary{% else %}btn-outline-primary{% endif %}"
+         href="{{ url_for('problemes.liste', statut='tous') }}">Tous</a>
+    </div>
+  </div>
+</div>
+
+<div class="wp-card">
+  <div class="wp-card-header">
+    <i class="bi bi-list-check"></i> Liste des problèmes
+  </div>
+  {% if problemes %}
+  <div class="table-responsive">
+    <table class="wp-table align-middle">
+      <thead>
+        <tr>
+          <th>Problème</th>
+          <th>Origine</th>
+          <th>Statut</th>
+          <th>Cause racine</th>
+          <th>Action</th>
+          <th class="text-end">Ouvrir</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in problemes %}
+        {% set racine = p.cause_racine %}
+        <tr>
+          <td>
+            <div style="font-weight:900;color:var(--wp-ink);">{{ p.titre }}</div>
+            <div style="font-size:.74rem;color:var(--wp-muted);">
+              #{{ p.id }} · {{ p.cree_le.strftime('%d/%m/%Y') if p.cree_le else '—' }}
+            </div>
+          </td>
+          <td>
+            <span class="wp-pill wp-pill-neutral">{{ origines.get(p.origine_type, p.origine_type) }}</span>
+            {% if p.origine_label %}
+            <div style="font-size:.75rem;color:var(--wp-muted);margin-top:.25rem;">{{ p.origine_label }}</div>
+            {% endif %}
+          </td>
+          <td>
+            {% if p.statut == 'clos' %}{% set couleur = 'secondary' %}
+            {% elif p.statut == 'cause_identifiee' %}{% set couleur = 'success' %}
+            {% elif p.statut == 'en_analyse' %}{% set couleur = 'warning' %}
+            {% else %}{% set couleur = 'info' %}{% endif %}
+            <span class="badge bg-{{ couleur }}">{{ statuts.get(p.statut, p.statut) }}</span>
+          </td>
+          <td>
+            {% if racine %}
+            <div style="font-weight:800;">{{ racine.categorie_6m }}</div>
+            <div style="font-size:.75rem;color:var(--wp-muted);">{{ racine.description }}</div>
+            {% else %}
+            <span style="color:var(--wp-muted);">Non sélectionnée</span>
+            {% endif %}
+          </td>
+          <td style="font-size:.8rem;">
+            {{ p.responsable_action or '—' }}
+            {% if p.delai_action %}
+            <div style="color:var(--wp-muted);">Délai : {{ p.delai_action.strftime('%d/%m/%Y') }}</div>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <a href="{{ url_for('problemes.detail', probleme_id=p.id) }}" class="btn btn-sm btn-outline-primary">
+              Ouvrir
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="p-5 text-center" style="color:var(--wp-muted);">
+    Aucun problème dans ce filtre.
+  </div>
+  {% endif %}
+</div>
+
+{% endblock %}

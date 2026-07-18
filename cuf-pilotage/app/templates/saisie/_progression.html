@@ -1,0 +1,91 @@
+{# Composant de progression opérateur — partagé entre l'accueil et l'historique (F1).
+   Attend une variable `stats_operateur` (dict) ou None. #}
+{% if stats_operateur is defined and stats_operateur is not none %}
+{% set s = stats_operateur %}
+{% set trs_class = 'is-good' if s.trs_moyen and s.trs_moyen >= 65 else ('is-mid' if s.trs_moyen and s.trs_moyen >= 50 else 'is-low') %}
+<div class="wp-progress">
+  <div class="wp-progress-head">
+    <span class="wp-progress-emoji" aria-hidden="true">
+      {%- if s.nb_equipes == 0 %}🌱
+      {%- elif s.trs_moyen and s.trs_moyen >= 65 %}🏆
+      {%- elif s.trs_moyen and s.trs_moyen >= 50 %}📈
+      {%- else %}💪{% endif -%}
+    </span>
+    <p class="wp-progress-message">
+      {% if s.nb_equipes == 0 %}
+        Bienvenue ! Votre première saisie construira le tableau de bord de la chaîne 4.
+      {% elif s.trs_moyen and s.trs_moyen >= 65 %}
+        Excellent travail — vous êtes au-dessus de la moyenne de la chaîne !
+      {% elif s.trs_moyen and s.trs_moyen >= 50 %}
+        Bonne dynamique — chaque poste bien documenté compte pour l'analyse.
+      {% else %}
+        Chaque saisie, même avec des arrêts, aide à identifier et réduire les pertes.
+      {% endif %}
+    </p>
+  </div>
+
+  {% if s.record_battu %}
+  <div class="wp-progress-record">
+    <i class="bi bi-trophy-fill" aria-hidden="true"></i>
+    <span>Nouveau record personnel : <strong>{{ s.record_trs | round | int }}%</strong> sur votre dernier poste !</span>
+  </div>
+  {% endif %}
+
+  {% if s.nb_equipes > 0 %}
+  <div class="wp-progress-metrics">
+    <div class="wp-progress-metric">
+      <span class="wp-progress-value">{{ s.nb_equipes }}</span>
+      <span class="wp-progress-label">Postes<br>saisis</span>
+    </div>
+    {% if s.trs_moyen %}
+    <div class="wp-progress-metric">
+      <span class="wp-progress-value {{ trs_class }}">{{ s.trs_moyen }}%</span>
+      <span class="wp-progress-label">TRS<br>moyen</span>
+    </div>
+    {% endif %}
+    {% if s.meilleur_trs %}
+    <div class="wp-progress-metric">
+      <span class="wp-progress-value is-good">{{ s.meilleur_trs }}%</span>
+      <span class="wp-progress-label">Meilleur<br>TRS</span>
+    </div>
+    {% endif %}
+    {% if s.trs_recent %}
+    <div class="wp-progress-metric">
+      <span class="wp-progress-value">{{ s.trs_recent }}%</span>
+      <span class="wp-progress-label">7 derniers<br>jours</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="wp-progress-week {{ 'is-done' if s.objectif_atteint else '' }}">
+    <div class="wp-progress-week-head">
+      <span><i class="bi bi-calendar-week" aria-hidden="true"></i> Cette semaine</span>
+      <strong>{{ s.postes_semaine }} / {{ s.objectif_hebdo }} postes</strong>
+    </div>
+    <div class="wp-progress-week-bar" role="progressbar"
+         aria-valuenow="{{ s.postes_semaine }}" aria-valuemin="0" aria-valuemax="{{ s.objectif_hebdo }}">
+      <span style="width: {{ s.objectif_pct }}%"></span>
+    </div>
+    <small>
+      {% if s.objectif_atteint %}
+        Objectif de régularité atteint — merci pour vos saisies !
+      {% elif s.postes_semaine == 0 %}
+        Aucun poste saisi cette semaine. Une fiche par jour suffit à nourrir l'analyse.
+      {% else %}
+        Encore {{ s.objectif_hebdo - s.postes_semaine }} poste{{ 's' if (s.objectif_hebdo - s.postes_semaine) > 1 }} pour atteindre votre objectif de la semaine.
+      {% endif %}
+    </small>
+  </div>
+
+  {% if s.tendance == 'up' %}
+  <span class="wp-progress-trend wp-progress-trend-up">
+    <i class="bi bi-arrow-up-right" aria-hidden="true"></i> En progression cette semaine
+  </span>
+  {% elif s.tendance == 'down' %}
+  <span class="wp-progress-trend wp-progress-trend-down">
+    <i class="bi bi-arrow-down-right" aria-hidden="true"></i> En baisse — la tendance peut s'inverser !
+  </span>
+  {% endif %}
+  {% endif %}
+</div>
+{% endif %}

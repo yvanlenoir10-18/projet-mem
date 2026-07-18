@@ -1,261 +1,245 @@
 """
-Données de test réalistes — Scierie CUF, Chaîne 4, Ebolowa.
+Génération de données fictives — 30 derniers jours glissants × 2 équipes/jour = 60 équipes.
+Permet d'accéder à toutes les fonctionnalités de l'app sans saisie manuelle.
 
-Les valeurs sont basées sur le contexte réel du mémoire :
-- Production réelle : 10 à 20 m³/poste
-- Objectif affiché : 25 m³/poste
-- TRS estimé < 60%
-- Essences : Ayous, Azobé, Iroko, Movingui
-- 2 postes par jour (Matin / Après-midi)
+Usage :
+  python seed_data.py
+
+Tout est aléatoire mais réaliste :
+- volume_entree : ~16-28 m³ de matière brute par poste (réparti sur 1-2 essences)
+- volume_conforme : ~10-20 m³/poste, cohérent avec les relevés terrain de la chaîne 4
+- 1 à 2 productions par équipe (mixage essences possible)
+- 0 à 4 arrêts par équipe (15-90 min chacun)
+- essences pondérées : Ayous 40%, Iroko 25%, Bilinga 20%, Movingui 15%
+- statut='verrouille' pour que les recommandations détectent les équipes
 """
-from datetime import date, timedelta
+import random
+from datetime import date, timedelta, datetime
 from app import create_app
-from app.models import db, Poste, Arret
+from app.models import db, User, Equipe, Production, Arret, Parametre
 from app.services.trs import calcule_trs
 
 app = create_app()
 
-# Données réalistes sur 3 semaines (21 jours = 42 postes, on en prend 16)
-POSTES_TEST = [
-    # --- Semaine 1 ---
-    {
-        'date': date.today() - timedelta(days=20),
-        'numero_poste': 'Matin', 'essence': 'Ayous',
-        'volume_entree': 32.0, 'volume_sorti': 14.5, 'volume_rebut': 1.2,
-        'nb_conformes': 210, 'nb_defectueux': 18, 'effectif': 10,
-        'notes': 'Démarrage difficile, lame émoussée',
-        'arrets': [
-            {'machine': 'Bicoupe', 'debut': '06:30', 'fin': '07:45',
-             'cause': 'Remplacement lame émoussée', 'categorie': 'Maintenance planifiée'},
-            {'machine': 'Bicoupe', 'debut': '11:20', 'fin': '11:50',
-             'cause': 'Bourrage bois dans la lame', 'categorie': 'Mécanique'},
-        ]
-    },
-    {
-        'date': date.today() - timedelta(days=20),
-        'numero_poste': 'Apres-midi', 'essence': 'Ayous',
-        'volume_entree': 35.0, 'volume_sorti': 17.2, 'volume_rebut': 0.8,
-        'nb_conformes': 250, 'nb_defectueux': 12, 'effectif': 9,
-        'notes': 'Poste correct après changement de lame',
-        'arrets': [
-            {'machine': 'Bicoupe', 'debut': '15:10', 'fin': '15:40',
-             'cause': 'Attente grumes — parc à grumes mal organisé', 'categorie': 'Approvisionnement'},
-        ]
-    },
-    {
-        'date': date.today() - timedelta(days=19),
-        'numero_poste': 'Matin', 'essence': 'Iroko',
-        'volume_entree': 28.0, 'volume_sorti': 11.0, 'volume_rebut': 2.5,
-        'nb_conformes': 130, 'nb_defectueux': 35, 'effectif': 10,
-        'notes': 'Iroko dur — beaucoup de rebuts, grumes noueuses',
-        'arrets': [
-            {'machine': 'Scie de tête', 'debut': '07:00', 'fin': '08:30',
-             'cause': 'Panne moteur scie de tête', 'categorie': 'Mécanique'},
-            {'machine': 'Bicoupe', 'debut': '10:15', 'fin': '10:45',
-             'cause': 'Réglage bicoupe pour Iroko (essence plus dure)', 'categorie': 'Organisationnelle'},
-            {'machine': 'Bicoupe', 'debut': '12:30', 'fin': '12:50',
-             'cause': 'Grume avec corps étranger (clou)', 'categorie': 'Qualité matière'},
-        ]
-    },
-    {
-        'date': date.today() - timedelta(days=19),
-        'numero_poste': 'Apres-midi', 'essence': 'Iroko',
-        'volume_entree': 30.0, 'volume_sorti': 13.5, 'volume_rebut': 1.8,
-        'nb_conformes': 185, 'nb_defectueux': 22, 'effectif': 10,
-        'notes': '',
-        'arrets': [
-            {'machine': 'Bicoupe', 'debut': '14:00', 'fin': '14:25',
-             'cause': 'Bourrage planches à la sortie bicoupe', 'categorie': 'Mécanique'},
-        ]
-    },
-    # --- Semaine 1 suite ---
-    {
-        'date': date.today() - timedelta(days=17),
-        'numero_poste': 'Matin', 'essence': 'Azobé',
-        'volume_entree': 25.0, 'volume_sorti': 10.0, 'volume_rebut': 1.0,
-        'nb_conformes': 110, 'nb_defectueux': 15, 'effectif': 8,
-        'notes': 'Effectif réduit — 2 absents',
-        'arrets': [
-            {'machine': 'Bicoupe', 'debut': '06:00', 'fin': '07:30',
-             'cause': 'Absence opérateur bicoupe — attente remplaçant', 'categorie': 'Organisationnelle'},
-            {'machine': 'Déligneuse', 'debut': '09:40', 'fin': '10:10',
-             'cause': 'Panne déligneuse — courroie cassée', 'categorie': 'Mécanique'},
-        ]
-    },
-    {
-        'date': date.today() - timedelta(days=17),
-        'numero_poste': 'Apres-midi', 'essence': 'Azobé',
-        'volume_entree': 27.0, 'volume_sorti': 15.8, 'volume_rebut': 0.6,
-        'nb_conformes': 220, 'nb_defectueux': 8, 'effectif': 10,
-        'notes': 'Bon poste — peu d\'arrêts',
-        'arrets': [
-            {'machine': 'Bicoupe', 'debut': '16:30', 'fin': '16:50',
-             'cause': 'Affûtage lame préventif', 'categorie': 'Maintenance planifiée'},
-        ]
-    },
-    # --- Semaine 2 ---
-    {
-        'date': date.today() - timedelta(days=14),
-        'numero_poste': 'Matin', 'essence': 'Movingui',
-        'volume_entree': 33.0, 'volume_sorti': 18.5, 'volume_rebut': 0.5,
-        'nb_conformes': 280, 'nb_defectueux': 8, 'effectif': 10,
-        'notes': 'Meilleur poste de la semaine — Movingui de bonne qualité',
-        'arrets': []  # Aucun arrêt !
-    },
-    {
-        'date': date.today() - timedelta(days=14),
-        'numero_poste': 'Apres-midi', 'essence': 'Movingui',
-        'volume_entree': 34.0, 'volume_sorti': 19.0, 'volume_rebut': 0.7,
-        'nb_conformes': 290, 'nb_defectueux': 10, 'effectif': 10,
-        'notes': '',
-        'arrets': [
-            {'machine': 'Bicoupe', 'debut': '18:10', 'fin': '18:30',
-             'cause': 'Pause technique — transition équipe', 'categorie': 'Organisationnelle'},
-        ]
-    },
-    {
-        'date': date.today() - timedelta(days=13),
-        'numero_poste': 'Matin', 'essence': 'Ayous',
-        'volume_entree': 30.0, 'volume_sorti': 12.0, 'volume_rebut': 1.5,
-        'nb_conformes': 165, 'nb_defectueux': 20, 'effectif': 9,
-        'notes': 'Grumes de mauvaise qualité — beaucoup de nœuds',
-        'arrets': [
-            {'machine': 'Bicoupe', 'debut': '07:30', 'fin': '09:00',
-             'cause': 'Panne hydraulique bicoupe', 'categorie': 'Mécanique'},
-            {'machine': 'Bicoupe', 'debut': '11:00', 'fin': '11:30',
-             'cause': 'Grumes trop petites — réglage nécessaire', 'categorie': 'Qualité matière'},
-        ]
-    },
-    {
-        'date': date.today() - timedelta(days=13),
-        'numero_poste': 'Apres-midi', 'essence': 'Ayous',
-        'volume_entree': 31.0, 'volume_sorti': 16.0, 'volume_rebut': 0.9,
-        'nb_conformes': 230, 'nb_defectueux': 14, 'effectif': 10,
-        'notes': '',
-        'arrets': [
-            {'machine': 'Scie de tête', 'debut': '14:30', 'fin': '15:00',
-             'cause': 'Réglage hauteur de coupe scie de tête', 'categorie': 'Organisationnelle'},
-        ]
-    },
-    # --- Semaine 3 (la plus récente) ---
-    {
-        'date': date.today() - timedelta(days=7),
-        'numero_poste': 'Matin', 'essence': 'Iroko',
-        'volume_entree': 29.0, 'volume_sorti': 13.0, 'volume_rebut': 2.0,
-        'nb_conformes': 160, 'nb_defectueux': 28, 'effectif': 10,
-        'notes': '',
-        'arrets': [
-            {'machine': 'Bicoupe', 'debut': '06:15', 'fin': '07:00',
-             'cause': 'Remplacement lame émoussée', 'categorie': 'Maintenance planifiée'},
-            {'machine': 'Bicoupe', 'debut': '10:45', 'fin': '11:15',
-             'cause': 'Bourrage bois dans la lame', 'categorie': 'Mécanique'},
-        ]
-    },
-    {
-        'date': date.today() - timedelta(days=7),
-        'numero_poste': 'Apres-midi', 'essence': 'Iroko',
-        'volume_entree': 28.0, 'volume_sorti': 14.5, 'volume_rebut': 1.5,
-        'nb_conformes': 195, 'nb_defectueux': 18, 'effectif': 10,
-        'notes': '',
-        'arrets': [
-            {'machine': 'Bicoupe', 'debut': '15:30', 'fin': '16:00',
-             'cause': 'Attente approvisionnement — grumes non prêtes', 'categorie': 'Approvisionnement'},
-        ]
-    },
-    {
-        'date': date.today() - timedelta(days=3),
-        'numero_poste': 'Matin', 'essence': 'Movingui',
-        'volume_entree': 36.0, 'volume_sorti': 20.0, 'volume_rebut': 0.4,
-        'nb_conformes': 310, 'nb_defectueux': 6, 'effectif': 10,
-        'notes': 'Meilleur poste du mois — bonne organisation, grumes bien triées',
-        'arrets': []
-    },
-    {
-        'date': date.today() - timedelta(days=3),
-        'numero_poste': 'Apres-midi', 'essence': 'Azobé',
-        'volume_entree': 26.0, 'volume_sorti': 11.5, 'volume_rebut': 1.1,
-        'nb_conformes': 150, 'nb_defectueux': 16, 'effectif': 9,
-        'notes': '',
-        'arrets': [
-            {'machine': 'Bicoupe', 'debut': '13:00', 'fin': '14:30',
-             'cause': 'Panne hydraulique bicoupe', 'categorie': 'Mécanique'},
-            {'machine': 'Bicoupe', 'debut': '17:20', 'fin': '17:50',
-             'cause': 'Absence opérateur bicoupe', 'categorie': 'Organisationnelle'},
-        ]
-    },
-    {
-        'date': date.today() - timedelta(days=1),
-        'numero_poste': 'Matin', 'essence': 'Ayous',
-        'volume_entree': 33.0, 'volume_sorti': 16.8, 'volume_rebut': 0.7,
-        'nb_conformes': 245, 'nb_defectueux': 11, 'effectif': 10,
-        'notes': 'Poste d\'hier matin',
-        'arrets': [
-            {'machine': 'Bicoupe', 'debut': '09:00', 'fin': '09:30',
-             'cause': 'Réglage bicoupe — changement diamètre grumes', 'categorie': 'Organisationnelle'},
-        ]
-    },
-    {
-        'date': date.today() - timedelta(days=1),
-        'numero_poste': 'Apres-midi', 'essence': 'Ayous',
-        'volume_entree': 34.0, 'volume_sorti': 17.5, 'volume_rebut': 0.6,
-        'nb_conformes': 255, 'nb_defectueux': 9, 'effectif': 10,
-        'notes': 'Poste d\'hier après-midi — correct',
-        'arrets': [
-            {'machine': 'Scie de tête', 'debut': '14:00', 'fin': '14:20',
-             'cause': 'Affûtage préventif scie de tête', 'categorie': 'Maintenance planifiée'},
-        ]
-    },
-]
+# Période des données fictives : 30 derniers jours glissants, finissant
+# aujourd'hui. Ainsi le cockpit « Aujourd'hui », la scorecard semaine et les
+# vues 7j / 30j du tableau de bord chef sont toujours peuplés.
+JOUR_FIN    = date.today()
+JOUR_DEBUT  = JOUR_FIN - timedelta(days=29)
+NB_JOURS    = (JOUR_FIN - JOUR_DEBUT).days + 1
+ESSENCES_PONDEREES = (
+    ['Ayous'] * 40 +
+    ['Iroko'] * 25 +
+    ['Bilinga'] * 20 +
+    ['Movingui'] * 15
+)
+
+MACHINES = ['Bicoupe', 'Scie de tête', 'Déligneuse', 'Ébouteuse']
+CAUSES_PAR_CATEGORIE = {
+    'Mécanique': [
+        'Bourrage bois dans la lame',
+        'Panne moteur',
+        'Panne hydraulique',
+        'Courroie cassée',
+        'Bourrage planches sortie bicoupe',
+    ],
+    'Maintenance planifiée': [
+        'Remplacement lame émoussée',
+        'Affûtage lame préventif',
+        'Lubrification roulements',
+        'Vérification systèmes',
+    ],
+    'Organisationnelle': [
+        'Réglage bicoupe pour nouvelle essence',
+        'Absence opérateur',
+        'Pause technique transition équipe',
+        'Réunion sécurité',
+    ],
+    'Approvisionnement': [
+        'Attente grumes — parc à grumes mal organisé',
+        'Grumes non prêtes',
+        'Retard livraison camions',
+    ],
+    'Qualité matière': [
+        'Grume avec corps étranger',
+        'Grumes trop petites — réglage',
+        'Grumes noueuses — rebuts élevés',
+    ],
+}
+
+
+def _genere_arrets():
+    """Retourne une liste de 0 à 4 arrêts aléatoires."""
+    nb = random.choices([0, 1, 2, 3, 4], weights=[10, 30, 35, 20, 5])[0]
+    arrets = []
+    heure_courante = 6 * 60 + random.randint(0, 30)  # début vers 06h00-06h30
+    for _ in range(nb):
+        duree = random.randint(15, 90)
+        heure_courante += random.randint(45, 180)
+        if heure_courante + duree > 22 * 60:
+            break
+        h_d, m_d = divmod(heure_courante, 60)
+        h_f, m_f = divmod(heure_courante + duree, 60)
+        categorie = random.choices(
+            list(CAUSES_PAR_CATEGORIE.keys()),
+            weights=[35, 15, 25, 15, 10]
+        )[0]
+        arrets.append({
+            'machine':   random.choices(MACHINES, weights=[60, 20, 15, 5])[0],
+            'debut':     f"{h_d:02d}:{m_d:02d}",
+            'fin':       f"{h_f:02d}:{m_f:02d}",
+            'cause':     random.choice(CAUSES_PAR_CATEGORIE[categorie]),
+            'categorie': categorie,
+            'duree_prevue_min': random.randint(20, 45) if categorie == 'Maintenance planifiée' else None,
+        })
+        heure_courante += duree
+    return arrets
+
+
+def _genere_productions():
+    """Retourne 1 ou 2 productions avec essences mixtes possibles.
+
+    Le volume est raisonné AU NIVEAU DU POSTE, pas par planche : on fixe un
+    budget de matière brute (16-28 m³) que la bicoupe peut traiter en un poste,
+    puis on le répartit entre les essences. Après rendement (55-78 % conforme),
+    la production conforme atteint ~10-20 m³/poste — cohérent avec les relevés
+    terrain de la chaîne 4. L'objectif technique de 12,5 m³/poste est donc
+    parfois dépassé (bon poste) et parfois manqué (poste dégradé).
+    """
+    nb = random.choices([1, 2], weights=[70, 30])[0]
+
+    # Budget matière brute du poste, avant la bicoupe (point de comptage fixe).
+    entree_poste = round(random.uniform(16.0, 28.0), 1)
+    if nb == 2:
+        part = random.uniform(0.4, 0.6)
+        volumes_entree = [round(entree_poste * part, 1),
+                          round(entree_poste * (1 - part), 1)]
+    else:
+        volumes_entree = [entree_poste]
+
+    essences_utilisees = []
+    productions = []
+    for volume_entree in volumes_entree:
+        # éviter doublons d'essence dans la même équipe
+        ess = random.choice(ESSENCES_PONDEREES)
+        while ess in essences_utilisees and len(essences_utilisees) < 4:
+            ess = random.choice(ESSENCES_PONDEREES)
+        essences_utilisees.append(ess)
+
+        # Rendement matière 55-78% conforme + 5-15% déclassé
+        taux_conforme = random.uniform(0.55, 0.78)
+        taux_declass  = random.uniform(0.05, 0.15)
+        if taux_conforme + taux_declass > 0.90:
+            taux_declass = 0.90 - taux_conforme
+
+        # Prix par essence (FCFA / m³) — ordres de grandeur réalistes
+        prix = {
+            'Ayous':    180_000,
+            'Iroko':    420_000,
+            'Bilinga':    280_000,
+            'Movingui': 320_000,
+        }[ess]
+        productions.append({
+            'essence':         ess,
+            'volume_entree':   volume_entree,
+            'volume_conforme': round(volume_entree * taux_conforme, 2),
+            'volume_declass':  round(volume_entree * taux_declass, 2),
+            'prix':            prix,
+        })
+    return productions
+
+
+def _fmt_heure(minutes):
+    h, m = divmod(minutes, 60)
+    return f"{h:02d}:{m:02d}"
+
+
+def _creneaux_production(numero_equipe, nb_productions):
+    debut = 6 * 60 if numero_equipe == 'Matin' else 14 * 60
+    duree = 480 // max(1, nb_productions)
+    return [
+        (_fmt_heure(debut + i * duree), _fmt_heure(debut + (i + 1) * duree))
+        for i in range(nb_productions)
+    ]
 
 def inserer_donnees():
     with app.app_context():
-        # Effacer les données existantes (pour repartir propre)
+        # Récupérer un utilisateur (saisie obligatoire)
+        user = User.query.filter_by(role='operateur').first() or User.query.first()
+        if not user:
+            print("ERREUR - Aucun utilisateur en base. Lancez l'app une fois pour seed les users.")
+            return
+
+        # Effacer les données existantes
         Arret.query.delete()
-        Poste.query.delete()
+        Production.query.delete()
+        Equipe.query.delete()
         db.session.commit()
-        print("Base nettoyée.")
+        print(f"Base nettoyée. Génération {JOUR_DEBUT} → {JOUR_FIN} : {NB_JOURS} jours × 2 équipes…\n")
 
-        for i, data in enumerate(POSTES_TEST):
-            poste = Poste(
-                date=data['date'],
-                numero_poste=data['numero_poste'],
-                essence=data['essence'],
-                volume_entree=data['volume_entree'],
-                volume_sorti=data['volume_sorti'],
-                volume_rebut=data['volume_rebut'],
-                nb_planches_conformes=data['nb_conformes'],
-                nb_planches_defectueuses=data['nb_defectueux'],
-                effectif=data['effectif'],
-                notes=data['notes'],
-                user_id=1  # Agent de saisie
-            )
-            db.session.add(poste)
-            db.session.flush()
+        random.seed(42)  # reproductibilité (changer pour des données différentes)
+        compteur = 0
 
-            for a in data['arrets']:
-                arret = Arret(
-                    poste_id=poste.id,
-                    machine=a['machine'],
-                    heure_debut=a['debut'],
-                    heure_fin=a['fin'],
-                    cause=a['cause'],
-                    categorie=a['categorie']
+        for jour_offset in range(NB_JOURS):
+            jour = JOUR_DEBUT + timedelta(days=jour_offset)
+
+            for numero in ['Matin', 'Apres-midi']:
+                equipe = Equipe(
+                    date=jour,
+                    numero_equipe=numero,
+                    effectif=random.choice([8, 9, 10, 10, 10]),
+                    operateur_nom=random.choice(['Ateba Martin', 'Mvondo Paul', 'Nsame Jules', 'Bikoro Alain']),
+                    statut='verrouille',
+                    notes='',
+                    cree_le=datetime.combine(jour, datetime.min.time()),
+                    soumis_le=datetime.combine(jour, datetime.min.time()),
+                    user_id=user.id,
                 )
-                arret.calcule_duree()
-                db.session.add(arret)
+                db.session.add(equipe)
+                db.session.flush()
 
-            db.session.flush()
-            calcule_trs(poste)
+                # Productions
+                productions = _genere_productions()
+                creneaux = _creneaux_production(numero, len(productions))
+                for idx, p in enumerate(productions):
+                    h_debut, h_fin = creneaux[idx]
+                    db.session.add(Production(
+                        equipe_id=equipe.id,
+                        essence=p['essence'],
+                        heure_debut=h_debut,
+                        heure_fin=h_fin,
+                        volume_entree=p['volume_entree'],
+                        volume_conforme=p['volume_conforme'],
+                        volume_declass=p['volume_declass'],
+                        prix_snapshot=p['prix'],
+                    ))
 
-            duree_arrets = poste.duree_totale_arrets
-            print(f"  Poste {i+1:02d} | {poste.date} {poste.numero_poste:12s} | "
-                  f"{poste.essence:9s} | {poste.volume_sorti:5.1f} m³ | "
-                  f"Arrêts: {duree_arrets:3d} min | "
-                  f"TRS: {poste.trs_global:5.1f}% "
-                  f"(D={poste.trs_disponibilite}% P={poste.trs_performance}% Q={poste.trs_qualite}%)")
+                # Arrêts
+                for a in _genere_arrets():
+                    arret = Arret(
+                        equipe_id=equipe.id,
+                        machine=a['machine'],
+                        heure_debut=a['debut'],
+                        heure_fin=a['fin'],
+                        cause=a['cause'],
+                        categorie=a['categorie'],
+                        duree_prevue_min=a['duree_prevue_min'],
+                    )
+                    arret.calcule_duree()
+                    db.session.add(arret)
+
+                db.session.flush()
+                calcule_trs(equipe)
+                compteur += 1
+
+                if compteur % 10 == 0 or compteur == NB_JOURS * 2:
+                    print(f"  {compteur:02d}/{NB_JOURS * 2} | {jour} {numero:11s} | "
+                          f"vol_sorti={equipe.volume_sorti:5.1f} m3 | "
+                          f"TRS={equipe.trs_global:5.1f}%")
 
         db.session.commit()
-        print(f"\n✓ {len(POSTES_TEST)} postes insérés avec succès.")
+        print(f"\nOK - {compteur} equipes inserees sur {NB_JOURS} jours.")
+        print("OK - Connecte-toi : chef/password ou pdg/password - toutes les fonctionnalites sont accessibles.")
 
 
 if __name__ == '__main__':

@@ -2,37 +2,80 @@
 {% block title %}Connexion{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center mt-5">
-    <div class="col-md-4">
-        <div class="card shadow">
-            <div class="card-body p-4">
-                <h4 class="card-title text-center mb-4">
-                    <i class="bi bi-tree-fill text-success"></i><br>
-                    CUF Pilotage<br>
-                    <small class="text-muted fs-6">Scierie Ebolowa — Chaîne 4</small>
-                </h4>
-                <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label">Email</label>
-                        <input type="email" name="email" class="form-control"
-                               placeholder="votre@email.cm" required autofocus>
-                    </div>
-                    <div class="mb-4">
-                        <label class="form-label">Mot de passe</label>
-                        <input type="password" name="password" class="form-control" required>
-                    </div>
-                    <button type="submit" class="btn btn-success w-100">
-                        <i class="bi bi-box-arrow-in-right"></i> Se connecter
-                    </button>
-                </form>
-                <hr>
-                <small class="text-muted d-block text-center">
-                    Comptes de démonstration :<br>
-                    saisie@cuf.cm / chef@cuf.cm / pdg@cuf.cm<br>
-                    Mot de passe : <strong>cuf2026</strong>
-                </small>
-            </div>
+<div class="wp-login-bg">
+  {# Blobs dégradés en arrière-plan #}
+  <div class="wp-login-blob" style="width:420px;height:420px;background:var(--wp-emerald);top:-120px;left:-100px;"></div>
+  <div class="wp-login-blob" style="width:320px;height:320px;background:var(--wp-leaf);bottom:-80px;right:-60px;"></div>
+  <div class="wp-login-blob" style="width:200px;height:200px;background:var(--wp-terracotta);top:40%;right:10%;"></div>
+
+  <div class="wp-login-card">
+    {# Brand mark #}
+    <div class="d-flex align-items-center gap-3 mb-4">
+      <div class="wp-brand-mark" style="width:44px;height:44px;border-radius:13px;font-size:1.3rem;">
+        <i class="bi bi-tree"></i>
+      </div>
+      <div>
+        <div style="font-size:1.1rem;font-weight:800;color:var(--wp-ink);">
+          wood_pilot
         </div>
+      </div>
     </div>
+
+    <div class="wp-login-title">Bonjour 👋<br>Connectez-vous.</div>
+
+    <form method="POST" autocomplete="off">
+      {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+      {# Email / Identifiant #}
+      <div class="mb-3">
+        <label class="form-label" for="email">Email</label>
+        <div class="wp-input-wrap">
+          <i class="bi bi-person-badge wp-input-icon"></i>
+          <input type="email" id="email" name="email" class="wp-input"
+                 placeholder="chef@cuf.cm" required autofocus>
+        </div>
+      </div>
+
+      {# Mot de passe #}
+      <div class="mb-4">
+        <label class="form-label" for="password">Mot de passe</label>
+        <div class="wp-input-wrap">
+          <i class="bi bi-key wp-input-icon"></i>
+          <input type="password" id="password" name="password" class="wp-input"
+                 placeholder="••••••••" required style="padding-right:44px;">
+          <button type="button" class="wp-eye-btn" onclick="togglePwd()" aria-label="Afficher le mot de passe">
+            <i class="bi bi-eye" id="eyeIcon"></i>
+          </button>
+        </div>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-100 btn-touch d-flex align-items-center justify-content-center gap-2">
+        Se connecter <i class="bi bi-arrow-right"></i>
+      </button>
+    </form>
+
+    <div class="mt-4 pt-3" style="border-top:1px solid var(--wp-line);">
+      <div style="font-size:.72rem;color:var(--wp-muted);text-align:center;line-height:1.8;">
+        Comptes de démonstration :<br>
+        <span class="wp-mono">saisie@cuf.cm · chef@cuf.cm · pdg@cuf.cm</span><br>
+        Mot de passe : <strong>cuf2026</strong>
+      </div>
+    </div>
+  </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function togglePwd() {
+  const inp = document.getElementById('password');
+  const ico = document.getElementById('eyeIcon');
+  if (inp.type === 'password') {
+    inp.type = 'text';
+    ico.className = 'bi bi-eye-slash';
+  } else {
+    inp.type = 'password';
+    ico.className = 'bi bi-eye';
+  }
+}
+</script>
 {% endblock %}

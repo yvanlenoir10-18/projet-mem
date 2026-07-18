@@ -1,0 +1,114 @@
+{# P7/P2.1 — Bannières d'alertes Chef (saisies manquantes + brouillons + fiches à vérifier) #}
+{% if alertes and (alertes.saisies_manquantes or alertes.brouillons_oublies or alertes.fiches_a_verifier) %}
+<div class="mb-4">
+
+  {% if alertes.fiches_a_verifier %}
+  <div style="background:rgba(63,138,92,0.10);border:1.5px solid rgba(63,138,92,0.3);
+              border-radius:14px;padding:16px 18px;margin-bottom:10px;
+              display:flex;align-items:flex-start;gap:14px;">
+    <i class="bi bi-shield-check"
+       style="font-size:1.25rem;color:var(--wp-leaf);flex-shrink:0;margin-top:2px;"></i>
+    <div style="flex:1;">
+      <div style="font-weight:700;color:var(--wp-ink);font-size:.875rem;">
+        {{ alertes.fiches_a_verifier | length }} fiche{% if alertes.fiches_a_verifier | length > 1 %}s{% endif %}
+        en attente de validation chef
+      </div>
+      <div style="margin-top:10px;display:grid;gap:8px;">
+        {% for f in alertes.fiches_a_verifier %}
+        <a href="{{ url_for('saisie.detail_poste', poste_id=f.id) }}"
+           style="text-decoration:none;border:1px solid rgba(63,138,92,0.25);background:rgba(255,255,255,.7);
+                  border-radius:10px;padding:9px 10px;color:var(--wp-ink);display:block;"
+           title="Ouvrir la fiche pour valider ou renvoyer à corriger">
+          <div class="d-flex align-items-center justify-content-between gap-2 flex-wrap">
+            <strong style="font-size:.84rem;">{{ f.date_fmt }} · {{ f.shift }} · {{ f.operateur }}</strong>
+            <span style="display:inline-flex;gap:5px;flex-wrap:wrap;">
+              {% if f.nb_commentaires > 0 %}
+              <span class="wp-pill wp-pill-info" style="font-size:.68rem;">
+                <i class="bi bi-chat-left-text"></i> {{ f.nb_commentaires }} commentaire{{ 's' if f.nb_commentaires > 1 }}
+              </span>
+              {% endif %}
+              {% if f.nb_anomalies > 0 %}
+              <span class="wp-pill wp-pill-warning" style="font-size:.68rem;"
+                    title="Alertes : {{ f.codes_anomalies }}">
+                <i class="bi bi-shield-exclamation"></i> {{ f.nb_anomalies }} alerte{{ 's' if f.nb_anomalies > 1 }}
+              </span>
+              {% endif %}
+            </span>
+          </div>
+          {% if f.commentaire_extrait %}
+          <div style="font-size:.75rem;color:var(--wp-muted);margin-top:5px;line-height:1.35;">
+            {{ f.commentaire_extrait }}
+          </div>
+          {% endif %}
+        </a>
+        {% endfor %}
+      </div>
+      <div style="font-size:.75rem;color:var(--wp-muted);margin-top:8px;">
+        <i class="bi bi-info-circle"></i>
+        Ces fiches ne sont pas encore comptées dans les KPI tant que le chef ne les valide pas.
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if alertes.saisies_manquantes %}
+  <div style="background:rgba(197,151,58,0.10);border:1.5px solid rgba(197,151,58,0.3);
+              border-radius:14px;padding:16px 18px;margin-bottom:10px;
+              display:flex;align-items:flex-start;gap:14px;">
+    <i class="bi bi-calendar-x"
+       style="font-size:1.25rem;color:var(--wp-ochre);flex-shrink:0;margin-top:2px;"></i>
+    <div style="flex:1;">
+      <div style="font-weight:700;color:var(--wp-ink);font-size:.875rem;">
+        {{ alertes.saisies_manquantes | length }} poste{% if alertes.saisies_manquantes | length > 1 %}s{% endif %}
+        non saisi{% if alertes.saisies_manquantes | length > 1 %}s{% endif %}
+        sur les 7 derniers jours ouvrés
+      </div>
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">
+        {% for s in alertes.saisies_manquantes %}
+        <a href="{{ url_for('saisie.nouveau_poste') }}?date={{ s.date_iso }}&shift={{ s.shift }}"
+           class="wp-pill wp-pill-warning"
+           style="text-decoration:none;"
+           title="Saisir ce poste rétroactivement">
+          {{ s.date_fmt }} · {{ s.shift }}
+        </a>
+        {% endfor %}
+      </div>
+      <div style="font-size:.75rem;color:var(--wp-muted);margin-top:8px;">
+        <i class="bi bi-info-circle"></i>
+        Un poste oublié = des m³ produits non comptabilisés. Le TRS est faussé tant que les saisies ne sont pas complètes.
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if alertes.brouillons_oublies %}
+  <div style="background:rgba(111,168,181,0.10);border:1.5px solid rgba(111,168,181,0.3);
+              border-radius:14px;padding:16px 18px;
+              display:flex;align-items:flex-start;gap:14px;">
+    <i class="bi bi-hourglass-split"
+       style="font-size:1.25rem;color:var(--wp-sky);flex-shrink:0;margin-top:2px;"></i>
+    <div style="flex:1;">
+      <div style="font-weight:700;color:var(--wp-ink);font-size:.875rem;">
+        {{ alertes.brouillons_oublies | length }} brouillon{% if alertes.brouillons_oublies | length > 1 %}s{% endif %}
+        en attente depuis plus de 2 jours
+      </div>
+      <div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;">
+        {% for b in alertes.brouillons_oublies %}
+        <a href="{{ url_for('saisie.detail_poste', poste_id=b.id) }}"
+           class="wp-pill wp-pill-info"
+           style="text-decoration:none;"
+           title="Ouvrir le brouillon pour le compléter ou le supprimer">
+          {{ b.date_fmt }} · {{ b.shift }} · il y a {{ b.jours }} j
+        </a>
+        {% endfor %}
+      </div>
+      <div style="font-size:.75rem;color:var(--wp-muted);margin-top:8px;">
+        <i class="bi bi-info-circle"></i>
+        Les brouillons ne sont pas comptés dans les KPI. Soumettez-les ou supprimez-les.
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endif %}

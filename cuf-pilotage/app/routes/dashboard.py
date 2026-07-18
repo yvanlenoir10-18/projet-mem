@@ -2681,7 +2681,7 @@ def fiches_chef():
 @roles_required('chef', 'prod', 'admin')
 def machines_chef():
     """Diagnostic Machines & Arrêts pour le chef scierie."""
-    jours = request.args.get('jours', 30)
+    jours = request.args.get('jours', 0)
     mode = request.args.get('mode', 'officiel').strip()
     if mode not in ('officiel', 'temps_reel'):
         mode = 'officiel'
@@ -2714,7 +2714,7 @@ def machines_chef():
 @roles_required('chef', 'prod', 'admin')
 def production_chef():
     """Production & Objectifs pour le chef scierie."""
-    jours = request.args.get('jours', 30)
+    jours = request.args.get('jours', 0)
     mode = request.args.get('mode', 'officiel').strip()
     if mode not in ('officiel', 'temps_reel'):
         mode = 'officiel'
@@ -2744,7 +2744,7 @@ def production_chef():
 @roles_required('chef', 'prod', 'admin')
 def qualite_chef():
     """Qualité / Matière pour le chef scierie."""
-    jours = request.args.get('jours', 30)
+    jours = request.args.get('jours', 0)
     mode = request.args.get('mode', 'officiel').strip()
     if mode not in ('officiel', 'temps_reel'):
         mode = 'officiel'
@@ -3274,6 +3274,21 @@ def pertes():
     debut = date(annee, mois, 1)
     fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)
 
+    # Repli : mois courant vide et aucun mois choisi -> dernier mois avec données
+    if not request.args.get('mois'):
+        _q = Equipe.query.filter(
+            Equipe.date >= debut, Equipe.date < fin,
+            Equipe.statut.in_(_STATUTS_ANALYSES)
+        ).first()
+        if not _q:
+            _derniere = Equipe.query.filter(
+                Equipe.statut.in_(_STATUTS_ANALYSES)
+            ).order_by(Equipe.date.desc()).first()
+            if _derniere:
+                mois, annee = _derniere.date.month, _derniere.date.year
+                debut = date(annee, mois, 1)
+                fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)
+
     equipes = Equipe.query.filter(
         Equipe.date >= debut, Equipe.date < fin,
         Equipe.statut.in_(_STATUTS_ANALYSES)
@@ -3411,6 +3426,21 @@ def export_excel():
 
     debut = date(annee, mois, 1)
     fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)
+
+    # Repli : mois courant vide et aucun mois choisi -> dernier mois avec données
+    if not request.args.get('mois'):
+        _q = Equipe.query.filter(
+            Equipe.date >= debut, Equipe.date < fin,
+            Equipe.statut.in_(_STATUTS_ANALYSES)
+        ).first()
+        if not _q:
+            _derniere = Equipe.query.filter(
+                Equipe.statut.in_(_STATUTS_ANALYSES)
+            ).order_by(Equipe.date.desc()).first()
+            if _derniere:
+                mois, annee = _derniere.date.month, _derniere.date.year
+                debut = date(annee, mois, 1)
+                fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)
 
     equipes = Equipe.query.filter(
         Equipe.date >= debut, Equipe.date < fin,

@@ -16,7 +16,7 @@ analyse_bp = Blueprint('analyse', __name__, url_prefix='/analyse')
 @login_required
 @roles_required('chef', 'prod', 'admin')
 def arrets():
-    jours     = int(request.args.get('jours', 30))
+    jours     = int(request.args.get('jours', 0))
     machine   = request.args.get('machine', '').strip()
     categorie = request.args.get('categorie', '').strip()
 

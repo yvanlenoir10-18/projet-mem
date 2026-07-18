@@ -214,7 +214,7 @@ def generer_donnees():
         if AuditCorrection: AuditCorrection.query.delete()
         Equipe.query.delete(); db.session.commit()
 
-        debut = date(2026, 5, 20); fin = date(2026, 6, 23)
+        debut = date(2026, 5, 20); fin = date.today()  # rempli jusqu'a aujourd'hui
         n_eq = n_prod = n_arr = 0
         fiches_par_op = {op.id: [] for op in ops}
         idx = 0; jour = debut
@@ -244,10 +244,14 @@ def generer_donnees():
                             duree_min=d, cause=cause, categorie=cat)); curseur += d; n_arr += 1
                 mix = random.choice([{'Ayous':1.0},{'Ayous':0.6,'Bilinga':0.4},{'Iroko':0.5,'Movingui':0.5},
                                      {'Bilinga':0.7,'Ayous':0.3},{'Movingui':1.0}])
-                tot = sum(mix.values()); hd, hf = H_PROD[poste]
-                for ess, w in mix.items():
+                tot = sum(mix.values()); items = list(mix.items()); n_ess = len(items)
+                base_min = BASE_H[poste] * 60; slot = 480 // n_ess
+                for i, (ess, w) in enumerate(items):
                     fr = w / tot; v_s = round(vs*fr,3); v_c = round(vc*fr,3); v_d = round(vd*fr,3)
                     v_e = round(v_s / RENDEMENT[ess], 3) if v_s > 0 else 0.0
+                    d0 = base_min + i * slot
+                    d1 = base_min + 480 if i == n_ess - 1 else base_min + (i + 1) * slot
+                    hd = f'{d0//60:02d}:{d0%60:02d}'; hf = f'{d1//60:02d}:{d1%60:02d}'
                     db.session.add(Production(equipe_id=eq.id, essence=ess, volume_entree=v_e,
                         volume_conforme=v_c, volume_declass=v_d, heure_debut=hd, heure_fin=hf,
                         prix_snapshot=PRIX[ess])); n_prod += 1

@@ -76,53 +76,33 @@ def appliquer_correctifs():
     patch(DASH, "jours = request.args.get('jours', 30)",
                 "jours = request.args.get('jours', 0)")
 
-    # 5) PDG : repli sur le dernier mois avec donnees
+    # 5) + 7) Replis mensuels (PDG / pertes / export) : NE PLUS INJECTER.
+    #     dashboard.py (HEAD) embarque deja des replis surs (_q / _derniere) et
+    #     les donnees vont jusqu'a aujourd'hui : le mois courant a toujours des
+    #     lignes, donc ces replis sont du code mort. Les injecter en plus des
+    #     replis existants creait des blocs empiles et une UnboundLocalError '_d'
+    #     sur /dashboard/pertes selon l'ordre d'application. On les retire ici et
+    #     on nettoie tout bloc '_d' deja injecte par une ancienne execution.
     contenu = _read(DASH)
-    if "Repli PDG : mois courant vide" not in contenu:
-        bloc = nl.join([
-            "    # Repli PDG : mois courant vide et aucun mois choisi -> dernier mois avec donnees",
-            "    if not equipes_mois and not mode_libre and not request.args.get('mois'):",
-            "        _d = Equipe.query.filter(Equipe.statut.in_(_STATUTS_ANALYSES)).order_by(Equipe.date.desc()).first()",
-            "        if _d:",
-            "            mois, annee = _d.date.month, _d.date.year",
-            "            debut = date(annee, mois, 1)",
-            "            fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)",
-            "            equipes_mois = Equipe.query.filter(",
-            "                Equipe.date >= debut, Equipe.date < fin,",
-            "                Equipe.statut.in_(_STATUTS_ANALYSES)).all()",
-            "",
-            "    nb_brouillons = Equipe.query.filter(",
-        ])
-        anc = "    nb_brouillons = Equipe.query.filter("
-        if anc in contenu:
-            _write(DASH, contenu.replace(anc, bloc, 1)); print("  OK (1) : dashboard.py (repli PDG)")
-        else:
-            print("  ancre PDG absente")
-
-    # 7) pages mensuelles (pertes + export) : repli dernier mois avec donnees
-    contenu = _read(DASH)
-    if "Repli mensuel : mois courant vide" not in contenu:
-        pat = re.compile(
-            r"(    equipes = Equipe\.query\.filter\(\r?\n"
-            r"        Equipe\.date >= debut, Equipe\.date < fin,\r?\n"
-            r"        Equipe\.statut\.in_\(_STATUTS_ANALYSES\)\r?\n"
-            r"    \)\.order_by\(Equipe\.date\.asc\(\)\)\.all\(\))")
-        repli = nl.join([
-            "    # Repli mensuel : mois courant vide et aucun mois choisi -> dernier mois avec donnees",
-            "    if not request.args.get('mois'):",
-            "        _e = Equipe.query.filter(Equipe.date >= debut, Equipe.date < fin, Equipe.statut.in_(_STATUTS_ANALYSES)).first()",
-            "        if not _e:",
-            "            _d = Equipe.query.filter(Equipe.statut.in_(_STATUTS_ANALYSES)).order_by(Equipe.date.desc()).first()",
-            "            if _d:",
-            "                mois, annee = _d.date.month, _d.date.year",
-            "                debut = date(annee, mois, 1)",
-            "                fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)",
-            "", ""])
-        contenu2, n = pat.subn(lambda m: repli + m.group(1), contenu)
-        if n:
-            _write(DASH, contenu2); print("  OK (%d) : dashboard.py (repli mensuel)" % n)
-        else:
-            print("  motif mensuel absent")
+    lignes = contenu.split(nl)
+    sortie = []
+    i = 0
+    retires = 0
+    while i < len(lignes):
+        s = lignes[i].strip()
+        if s.startswith("# Repli") and ("Repli PDG" in s or "Repli mensuel" in s):
+            i += 1
+            while i < len(lignes) and lignes[i].strip() != "":
+                i += 1
+            if i < len(lignes) and lignes[i].strip() == "":
+                i += 1
+            retires += 1
+            continue
+        sortie.append(lignes[i]); i += 1
+    if retires:
+        _write(DASH, nl.join(sortie)); print("  OK : %d bloc(s) '_d' retire(s) de dashboard.py" % retires)
+    else:
+        print("  deja ok : dashboard.py (aucun repli '_d' a retirer)")
 
     # 3) cockpit chef : repli periode si fenetre recente vide
     contenu = _read(DASH)

@@ -240,13 +240,48 @@ def generer_donnees():
             jour += timedelta(days=1)
         db.session.commit()
 
+        def _forcer_chevauchement(e):
+            """Rend deux essences chevauchantes -> anomalie bloquante R8.
+            Sert à démontrer une fiche 'bloquée' que le chef ne peut pas valider."""
+            prods = list(e.productions)
+            if len(prods) >= 2:
+                prods[0].heure_debut, prods[0].heure_fin = '06:00', '12:00'
+                prods[1].heure_debut, prods[1].heure_fin = '10:00', '14:00'  # recouvre 10:00-12:00
+            elif len(prods) == 1:
+                p = prods[0]
+                p.heure_debut, p.heure_fin = '06:00', '12:00'
+                autre = 'Bilinga' if p.essence != 'Bilinga' else 'Ayous'
+                db.session.add(Production(
+                    equipe_id=e.id, essence=autre,
+                    volume_entree=round((p.volume_entree or 0) * 0.4, 3),
+                    volume_conforme=round((p.volume_conforme or 0) * 0.4, 3),
+                    volume_declass=round((p.volume_declass or 0) * 0.4, 3),
+                    heure_debut='10:00', heure_fin='14:00', prix_snapshot=None))
+
+        # Éventail complet par opérateur (fiches les plus récentes) pour la démo :
+        # à corriger · à vérifier (propres) · bloquées (chevauchement) · brouillons · validées.
+        # Le reste demeure 'verrouille'. 'bloque' = a_verifier + anomalie bloquante R8.
+        PLAN_STATUTS = [
+            ('a_corriger',  3),
+            ('a_verifier',  3),
+            ('bloque',      1),
+            ('brouillon',   2),
+            ('valide_chef', 2),
+        ]
+        n_bloquees = 0
         for op in ops:
             fs = sorted(fiches_par_op[op.id], key=lambda e: e.date, reverse=True)
             k = 0
-            for statut, nb in [('a_corriger',2),('a_verifier',2),('brouillon',1),('valide_chef',1)]:
+            for statut, nb in PLAN_STATUTS:
                 for _ in range(nb):
                     if k >= len(fs): break
-                    e = fs[k]; k += 1; e.statut = statut
+                    e = fs[k]; k += 1
+                    if statut == 'bloque':
+                        e.statut = 'a_verifier'
+                        _forcer_chevauchement(e)
+                        n_bloquees += 1
+                    else:
+                        e.statut = statut
                     if statut == 'a_corriger':
                         e.correction_motif = "Volume conforme a reverifier : ecart avec le releve papier."
             db.session.commit()
@@ -258,7 +293,7 @@ def generer_donnees():
         c = Counter(e.statut for e in Equipe.query.all())
         print(f"  {n_eq} fiches, {n_prod} productions, {n_arr} arrets · {debut} -> {fin}")
         print(f"  operateurs (mdp cuf2026) : edgar@cuf.cm, messi@cuf.cm, gerve@cuf.cm")
-        print(f"  statuts : {dict(c)}")
+        print(f"  statuts : {dict(c)} · dont {n_bloquees} fiche(s) 'a_verifier' bloquee(s) (chevauchement)")
 
 
 if __name__ == '__main__':

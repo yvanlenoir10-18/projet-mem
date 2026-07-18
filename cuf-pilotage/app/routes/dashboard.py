@@ -3142,6 +3142,17 @@ def vue_pdg():
                 Equipe.statut.in_(_STATUTS_ANALYSES)
             ).all()
 
+    # Repli PDG : mois courant vide et aucun mois choisi -> dernier mois avec donnees
+    if not equipes_mois and not mode_libre and not request.args.get('mois'):
+        _d = Equipe.query.filter(Equipe.statut.in_(_STATUTS_ANALYSES)).order_by(Equipe.date.desc()).first()
+        if _d:
+            mois, annee = _d.date.month, _d.date.year
+            debut = date(annee, mois, 1)
+            fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)
+            equipes_mois = Equipe.query.filter(
+                Equipe.date >= debut, Equipe.date < fin,
+                Equipe.statut.in_(_STATUTS_ANALYSES)).all()
+
     nb_brouillons = Equipe.query.filter(
         Equipe.date >= debut, Equipe.date < fin,
         Equipe.statut.in_(STATUTS_NON_ANALYSES)
@@ -3286,6 +3297,16 @@ def pertes():
             ).order_by(Equipe.date.desc()).first()
             if _derniere:
                 mois, annee = _derniere.date.month, _derniere.date.year
+                debut = date(annee, mois, 1)
+                fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)
+
+    # Repli mensuel : mois courant vide et aucun mois choisi -> dernier mois avec donnees
+    if not request.args.get('mois'):
+        _e = Equipe.query.filter(Equipe.date >= debut, Equipe.date < fin, Equipe.statut.in_(_STATUTS_ANALYSES)).first()
+        if not _e:
+            _d = Equipe.query.filter(Equipe.statut.in_(_STATUTS_ANALYSES)).order_by(Equipe.date.desc()).first()
+            if _d:
+                mois, annee = _d.date.month, _d.date.year
                 debut = date(annee, mois, 1)
                 fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)
 
@@ -3439,6 +3460,16 @@ def export_excel():
             ).order_by(Equipe.date.desc()).first()
             if _derniere:
                 mois, annee = _derniere.date.month, _derniere.date.year
+                debut = date(annee, mois, 1)
+                fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)
+
+    # Repli mensuel : mois courant vide et aucun mois choisi -> dernier mois avec donnees
+    if not request.args.get('mois'):
+        _e = Equipe.query.filter(Equipe.date >= debut, Equipe.date < fin, Equipe.statut.in_(_STATUTS_ANALYSES)).first()
+        if not _e:
+            _d = Equipe.query.filter(Equipe.statut.in_(_STATUTS_ANALYSES)).order_by(Equipe.date.desc()).first()
+            if _d:
+                mois, annee = _d.date.month, _d.date.year
                 debut = date(annee, mois, 1)
                 fin   = date(annee, mois + 1, 1) if mois < 12 else date(annee + 1, 1, 1)
 
